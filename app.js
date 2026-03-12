@@ -1,3 +1,80 @@
+// ── Canvas Theme Palette ─────────────────────────────────────
+// All canvas rendering colors that change between dark/light themes.
+// Functional overlay colors (camera blue, mic green) at low alpha
+// remain the same in both themes — only structural colors swap.
+const CANVAS_THEME = {
+    dark: {
+        bg: '#111215',               // canvas + room background
+        surface: '#1C1D22',           // devices, table, badges
+        displayFill: '#121820',       // display body
+        displayInner: 'rgba(26,32,44,0.8)',
+        displayStroke: 'rgba(138,146,164,0.25)',
+        displayStrokePOV: 'rgba(138,146,164,0.4)',
+        displayShadow: 'rgba(91,156,245,0.15)',
+        displayGradEnd: 'rgba(28,29,34,0.70)',
+        povGradTop: '#1C1D22',
+        povGradMid: '#141518',
+        povGradBot: '#0C0D10',
+        exportBg: '#0C0D10',
+        label: '#8B8D95',             // dimension labels, device labels
+        labelBright: '#EAEBED',       // prominent values (lens height)
+        gridDot: 'rgba(255,255,255,0.03)',
+        gridAxis: 'rgba(92,94,102,0.5)',
+        roomStroke: 'rgba(255,255,255,0.06)',
+        wallAccent: 'rgba(238,50,36,0.05)',
+        tableStroke: 'rgba(255,255,255,0.08)',
+        viewGradStart: 'rgba(255,255,255,0.06)',
+        viewGradEnd: 'rgba(255,255,255,0)',
+        viewDash: 'rgba(255,255,255,0.12)',
+        viewPill: 'rgba(0,0,0,0.75)',
+        viewText: 'rgba(255,255,255,0.9)',
+        scaleBarPill: 'rgba(17,18,21,0.80)',
+        scaleBarTick: 'rgba(139,141,149,0.60)',
+        scaleBarHalf: 'rgba(139,141,149,0.30)',
+        povDimDash: 'rgba(139,141,149,0.40)',
+        povDimTick: 'rgba(139,141,149,0.70)',
+        povBadgeStroke: 'rgba(139,141,149,0.35)',
+    },
+    light: {
+        bg: '#F2F3F5',
+        surface: '#FFFFFF',
+        displayFill: '#DFE2EA',
+        displayInner: 'rgba(200,210,228,0.5)',
+        displayStroke: 'rgba(100,108,130,0.30)',
+        displayStrokePOV: 'rgba(100,108,130,0.40)',
+        displayShadow: 'rgba(91,156,245,0.10)',
+        displayGradEnd: 'rgba(200,210,228,0.50)',
+        povGradTop: '#E8E9ED',
+        povGradMid: '#EAEBEF',
+        povGradBot: '#F2F3F5',
+        exportBg: '#F2F3F5',
+        label: '#6B6E78',
+        labelBright: '#1A1C22',
+        gridDot: 'rgba(0,0,0,0.05)',
+        gridAxis: 'rgba(80,82,90,0.50)',
+        roomStroke: 'rgba(0,0,0,0.08)',
+        wallAccent: 'rgba(217,42,29,0.06)',
+        tableStroke: 'rgba(0,0,0,0.10)',
+        viewGradStart: 'rgba(0,0,0,0.04)',
+        viewGradEnd: 'rgba(0,0,0,0)',
+        viewDash: 'rgba(0,0,0,0.15)',
+        viewPill: 'rgba(255,255,255,0.88)',
+        viewText: 'rgba(0,0,0,0.80)',
+        scaleBarPill: 'rgba(255,255,255,0.85)',
+        scaleBarTick: 'rgba(80,82,90,0.60)',
+        scaleBarHalf: 'rgba(80,82,90,0.30)',
+        povDimDash: 'rgba(80,82,90,0.40)',
+        povDimTick: 'rgba(80,82,90,0.70)',
+        povBadgeStroke: 'rgba(80,82,90,0.35)',
+    }
+};
+
+/** Return current canvas color palette based on active theme */
+function cc() {
+    const theme = document.documentElement.getAttribute('data-theme') || 'dark';
+    return CANVAS_THEME[theme] || CANVAS_THEME.dark;
+}
+
 // ── Application State ────────────────────────────────────────
 const state = {
     roomLength: 20, roomWidth: 15,
@@ -557,7 +634,7 @@ function downloadLayout() {
 
     // 1. Flood-fill with --bg-base so the PNG has a solid dark
     //    background even if pasted onto a white document or slide.
-    exportCtx.fillStyle = '#0C0D10';
+    exportCtx.fillStyle = cc().exportBg;
     exportCtx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
 
     // 2. Composite the live canvas (already fully rendered at DPR
@@ -651,27 +728,27 @@ function importConfig(event) {
 /** Draw a display rectangle (top-down view) */
 function drawDisplay(x, y, w, h) {
     ctx.save();
-    ctx.shadowColor = 'rgba(91, 156, 245, 0.15)';
+    ctx.shadowColor = cc().displayShadow;
     ctx.shadowBlur = 8;
-    ctx.fillStyle = '#121820';
-    ctx.strokeStyle = 'rgba(138,146,164,0.25)';
+    ctx.fillStyle = cc().displayFill;
+    ctx.strokeStyle = cc().displayStroke;
     ctx.lineWidth = 1;
     roundRect(ctx, x, y, w, h, 2);
     ctx.fill();
     ctx.restore();
-    ctx.strokeStyle = 'rgba(138,146,164,0.25)';
+    ctx.strokeStyle = cc().displayStroke;
     ctx.lineWidth = 1;
     roundRect(ctx, x, y, w, h, 2);
     ctx.stroke();
-    ctx.fillStyle = 'rgba(26,32,44,0.8)';
+    ctx.fillStyle = cc().displayInner;
     ctx.fillRect(x + 1.5, y + 1.5, w - 3, h - 3);
 }
 
 /** Draw a display rectangle (POV perspective view) */
 function drawDisplayPOV(x, y, w, h) {
     if (w <= 0 || h <= 0) return;
-    ctx.fillStyle = '#121820';
-    ctx.strokeStyle = 'rgba(138,146,164,0.4)';
+    ctx.fillStyle = cc().displayFill;
+    ctx.strokeStyle = cc().displayStrokePOV;
     ctx.lineWidth = 2;
     roundRect(ctx, x, y, w, h, 4);
     ctx.fill();
@@ -680,7 +757,7 @@ function drawDisplayPOV(x, y, w, h) {
     // Screen gradient fill
     const g = ctx.createLinearGradient(x, y, x + w, y + h);
     g.addColorStop(0, 'rgba(91, 156, 245, 0.08)');
-    g.addColorStop(1, 'rgba(28, 29, 34, 0.70)');
+    g.addColorStop(1, cc().displayGradEnd);
     ctx.fillStyle = g;
     ctx.fillRect(x + 2, y + 2, w - 4, h - 4);
 }
@@ -817,7 +894,7 @@ function drawCoverage(devX, devY, device, facingAngle) {
  */
 function drawGrid(rx, ry, rw, rl, ppf) {
     // Draw 1px dots at every grid intersection (2-ft spacing)
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.03)';
+    ctx.fillStyle = cc().gridDot;
 
     for (let fy = 0; fy <= state.roomLength; fy += 2) {
         for (let fx = 0; fx <= state.roomWidth; fx += 2) {
@@ -829,7 +906,7 @@ function drawGrid(rx, ry, rw, rl, ppf) {
 
     // Axis labels
     ctx.font = `500 ${Math.max(9, ppf * 0.4)}px 'JetBrains Mono', monospace`;
-    ctx.fillStyle = 'rgba(92, 94, 102, 0.5)';
+    ctx.fillStyle = cc().gridAxis;
 
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
@@ -850,8 +927,8 @@ function drawGrid(rx, ry, rw, rl, ppf) {
  */
 function drawRoom(rx, ry, rw, rl, ppf) {
     // Room background
-    ctx.fillStyle = '#111215';
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.06)';
+    ctx.fillStyle = cc().bg;
+    ctx.strokeStyle = cc().roomStroke;
     ctx.lineWidth = 1.5;
     roundRect(ctx, rx, ry, rw, rl, 4);
     ctx.fill();
@@ -859,7 +936,7 @@ function drawRoom(rx, ry, rw, rl, ppf) {
 
     // Front wall accent strip (display wall)
     const wallThick = Math.max(3, ppf * 0.2);
-    ctx.fillStyle = 'rgba(238, 50, 36, 0.05)';
+    ctx.fillStyle = cc().wallAccent;
     ctx.fillRect(rx, ry, rw, wallThick);
 
     return wallThick;
@@ -874,8 +951,8 @@ function drawViewAngle(ox, dispY, rl, ppf, isHovered) {
     const hv = deg2rad(30); // half of 60°
 
     const g = ctx.createRadialGradient(ox, dispY, 0, ox, dispY, vr);
-    g.addColorStop(0, 'rgba(255,255,255,0.06)');
-    g.addColorStop(1, 'rgba(255,255,255,0)');
+    g.addColorStop(0, cc().viewGradStart);
+    g.addColorStop(1, cc().viewGradEnd);
     ctx.fillStyle = g;
     ctx.beginPath();
     ctx.moveTo(ox, dispY);
@@ -884,7 +961,7 @@ function drawViewAngle(ox, dispY, rl, ppf, isHovered) {
     ctx.fill();
 
     // Dashed cone edge lines
-    ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+    ctx.strokeStyle = cc().viewDash;
     ctx.lineWidth = 1;
     ctx.setLineDash([10, 10]);
 
@@ -911,7 +988,7 @@ function drawViewAngle(ox, dispY, rl, ppf, isHovered) {
         const px = 8, py = 5;
 
         // Background pill
-        ctx.fillStyle = 'rgba(0,0,0,0.75)';
+        ctx.fillStyle = cc().viewPill;
         ctx.beginPath();
         ctx.roundRect(
             labelX - textWidth / 2 - px,
@@ -923,7 +1000,7 @@ function drawViewAngle(ox, dispY, rl, ppf, isHovered) {
         ctx.fill();
 
         // Label text
-        ctx.fillStyle = 'rgba(255,255,255,0.9)';
+        ctx.fillStyle = cc().viewText;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText(text, labelX, labelY);
@@ -957,7 +1034,7 @@ function drawEquipmentTopDown(ox, ry, wallThick, dispY, dispDepthPx, dispWidthPx
         ctx.save();
         ctx.shadowColor = 'rgba(91, 156, 245, 0.20)';
         ctx.shadowBlur = 12;
-        ctx.fillStyle = '#1C1D22';
+        ctx.fillStyle = cc().surface;
         ctx.strokeStyle = 'rgba(91, 156, 245, 0.25)';
         ctx.lineWidth = 1.5;
         roundRect(ctx, bx, by, eqWidthPx, eqDepthPx, 3);
@@ -988,7 +1065,7 @@ function drawEquipmentTopDown(ox, ry, wallThick, dispY, dispDepthPx, dispWidthPx
         ctx.save();
         ctx.shadowColor = 'rgba(91, 156, 245, 0.20)';
         ctx.shadowBlur = 8;
-        ctx.fillStyle = '#1C1D22';
+        ctx.fillStyle = cc().surface;
         ctx.strokeStyle = 'rgba(91, 156, 245, 0.30)';
         ctx.lineWidth = 1.5;
         roundRect(ctx, bx, by, eqWidthPx, eqDepthPx, 2);
@@ -1016,8 +1093,8 @@ function drawTable(ox, ry, wallThick, ppf) {
     const tx = ox - tw / 2;
     const ty = ry + wallThick + state.tableDist * ppf;
 
-    ctx.fillStyle = '#1C1D22';
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+    ctx.fillStyle = cc().surface;
+    ctx.strokeStyle = cc().tableStroke;
     ctx.lineWidth = 1.5;
 
     if (state.tableShape === 'rectangular') {
@@ -1047,7 +1124,7 @@ function drawTable(ox, ry, wallThick, ppf) {
 
     // Table dimension label
     ctx.font = `400 ${Math.max(8, ppf * 0.3)}px 'JetBrains Mono', monospace`;
-    ctx.fillStyle = '#8B8D95';
+    ctx.fillStyle = cc().label;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(
@@ -1063,7 +1140,7 @@ function drawCenterDevice(centerX, centerY, centerEq, ppf) {
     const cSize = Math.max(12, centerEq.width * ppf * 3);
 
     // Device body (circle)
-    ctx.fillStyle = '#1C1D22';
+    ctx.fillStyle = cc().surface;
     ctx.strokeStyle = 'rgba(91, 156, 245, 0.30)';
     ctx.lineWidth = 1.5;
     ctx.beginPath();
@@ -1080,7 +1157,7 @@ function drawCenterDevice(centerX, centerY, centerEq, ppf) {
 
     // Label beneath — secondary spec style
     ctx.font = `400 ${Math.max(7, ppf * 0.22)}px 'JetBrains Mono', monospace`;
-    ctx.fillStyle = '#8B8D95';
+    ctx.fillStyle = cc().label;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
     ctx.fillText(centerEq.name.split(' ').pop(), centerX, centerY + cSize / 2 + 3);
@@ -1093,7 +1170,7 @@ function drawMicPod(micPodX, micPodY, micPodEq, ppf) {
     const ms = Math.max(10, micPodEq.width * ppf * 4);
 
     // Outer ring
-    ctx.fillStyle = '#1C1D22';
+    ctx.fillStyle = cc().surface;
     ctx.strokeStyle = 'rgba(74, 222, 128, 0.30)';
     ctx.lineWidth = 1.5;
     ctx.beginPath();
@@ -1109,7 +1186,7 @@ function drawMicPod(micPodX, micPodY, micPodEq, ppf) {
 
     // Label beneath — secondary spec style
     ctx.font = `400 ${Math.max(7, ppf * 0.22)}px 'JetBrains Mono', monospace`;
-    ctx.fillStyle = '#8B8D95';
+    ctx.fillStyle = cc().label;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
     ctx.fillText('Mic Pod', micPodX, micPodY + ms / 2 + 3);
@@ -1120,7 +1197,7 @@ function drawMicPod(micPodX, micPodY, micPodEq, ppf) {
  */
 function drawDimensionLabels(ox, oy, rx, ry, rl, ppf) {
     ctx.font = `500 ${Math.max(10, ppf * 0.4)}px 'JetBrains Mono', monospace`;
-    ctx.fillStyle = '#8B8D95';
+    ctx.fillStyle = cc().label;
 
     // Width label (below room)
     ctx.textAlign = 'center';
@@ -1155,12 +1232,12 @@ function drawScaleBar(rx, ry, rl, ppf) {
     // Background pill for legibility
     const pillW = barPx + 2;
     const pillH = tickH * 2 + 14;
-    ctx.fillStyle = 'rgba(17, 18, 21, 0.80)';
+    ctx.fillStyle = cc().scaleBarPill;
     roundRect(ctx, bx - 4, by - tickH - 7, pillW + 8, pillH, 4);
     ctx.fill();
 
     // End ticks and horizontal bar
-    ctx.strokeStyle = 'rgba(139, 141, 149, 0.60)';
+    ctx.strokeStyle = cc().scaleBarTick;
     ctx.lineWidth = 1.5;
     ctx.setLineDash([]);
 
@@ -1171,7 +1248,7 @@ function drawScaleBar(rx, ry, rl, ppf) {
     // Half-way tick for bars >= 4 ft
     if (barFt >= 4) {
         const halfPx = barPx / 2;
-        ctx.strokeStyle = 'rgba(139, 141, 149, 0.30)';
+        ctx.strokeStyle = cc().scaleBarHalf;
         ctx.lineWidth = 1;
         ctx.beginPath();
         ctx.moveTo(bx + halfPx, by - tickH * 0.55);
@@ -1181,7 +1258,7 @@ function drawScaleBar(rx, ry, rl, ppf) {
 
     // Label centred above bar
     ctx.font = `600 10px 'JetBrains Mono', monospace`;
-    ctx.fillStyle = '#8B8D95';
+    ctx.fillStyle = cc().label;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'bottom';
     ctx.fillText(barLabel, bx + barPx / 2, by - tickH - 2);
@@ -1267,7 +1344,7 @@ function render() {
     const micPodEq = getMicPodEq();
 
     // ── Background ───────────────────────────────────────
-    ctx.fillStyle = '#111215';
+    ctx.fillStyle = cc().bg;
     ctx.fillRect(0, 0, canvas.width / dpr, canvas.height / dpr);
 
     // ── Grid ─────────────────────────────────────────────
@@ -1360,9 +1437,9 @@ function renderPOV(cw, ch, dpr) {
 
     // ── Sky / floor gradient background ──────────────────
     const g = ctx.createLinearGradient(0, 0, 0, ch);
-    g.addColorStop(0, '#1C1D22');
-    g.addColorStop(0.5, '#141518');
-    g.addColorStop(1, '#0C0D10');
+    g.addColorStop(0, cc().povGradTop);
+    g.addColorStop(0.5, cc().povGradMid);
+    g.addColorStop(1, cc().povGradBot);
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, cw, ch);
 
@@ -1423,7 +1500,7 @@ function renderPOV(cw, ch, dpr) {
     if (eq.type !== 'board') {
         const a = proj(-ewf / 2, dvc + ehi / 2, dz);
         const b = proj(ewf / 2, dvc - ehi / 2, dz);
-        ctx.fillStyle = '#1C1D22';
+        ctx.fillStyle = cc().surface;
         ctx.strokeStyle = 'rgba(91, 156, 245, 0.30)';
         ctx.lineWidth = 2;
         roundRect(ctx, a.x, a.y, b.x - a.x, b.y - a.y, 4);
@@ -1458,8 +1535,8 @@ function renderPOV(cw, ch, dpr) {
         const pNL = proj(-state.tableWidth / 2, thi, tnz);
         const pNR = proj(state.tableWidth / 2, thi, tnz);
 
-        ctx.fillStyle = '#1C1D22';
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+        ctx.fillStyle = cc().surface;
+        ctx.strokeStyle = cc().tableStroke;
         ctx.lineWidth = 2;
         ctx.beginPath();
 
@@ -1500,7 +1577,7 @@ function renderPOV(cw, ch, dpr) {
         if (centerZ < vd - 0.5) {
             const pCTL = proj(centerXOff - centerEqWF / 2, thi + centerEqHI, centerZ);
             const pCBR = proj(centerXOff + centerEqWF / 2, thi, centerZ);
-            ctx.fillStyle = '#1C1D22';
+            ctx.fillStyle = cc().surface;
             ctx.strokeStyle = 'rgba(91, 156, 245, 0.30)';
             ctx.lineWidth = 2;
             roundRect(ctx, pCTL.x, pCTL.y, pCBR.x - pCTL.x, pCBR.y - pCTL.y, 8);
@@ -1582,7 +1659,7 @@ function renderPOV(cw, ch, dpr) {
         const tw2 = 6;
 
         // Dashed vertical line
-        ctx.strokeStyle = 'rgba(139, 141, 149, 0.40)';
+        ctx.strokeStyle = cc().povDimDash;
         ctx.lineWidth = 1.5;
         ctx.setLineDash([4, 4]);
         ctx.beginPath();
@@ -1592,7 +1669,7 @@ function renderPOV(cw, ch, dpr) {
         ctx.setLineDash([]);
 
         // End ticks
-        ctx.strokeStyle = 'rgba(139, 141, 149, 0.70)';
+        ctx.strokeStyle = cc().povDimTick;
         ctx.lineWidth = 2;
         ctx.beginPath(); ctx.moveTo(lx - tw2, pL.y); ctx.lineTo(lx + tw2, pL.y); ctx.stroke();
         ctx.beginPath(); ctx.moveTo(lx - tw2, pF.y); ctx.lineTo(lx + tw2, pF.y); ctx.stroke();
@@ -1604,20 +1681,20 @@ function renderPOV(cw, ch, dpr) {
         const lh = 22;
         const ly = (pF.y + pL.y) / 2;
 
-        ctx.fillStyle = '#1C1D22';
-        ctx.strokeStyle = 'rgba(139, 141, 149, 0.35)';
+        ctx.fillStyle = cc().surface;
+        ctx.strokeStyle = cc().povBadgeStroke;
         ctx.lineWidth = 1.5;
         roundRect(ctx, lx - lw2 / 2, ly - lh / 2 - 7, lw2, lh + 14, 4);
         ctx.fill();
         ctx.stroke();
 
-        ctx.fillStyle = '#EAEBED';
+        ctx.fillStyle = cc().labelBright;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText(lb, lx, ly - 4);
 
         ctx.font = "500 9px 'JetBrains Mono', monospace";
-        ctx.fillStyle = '#8B8D95';
+        ctx.fillStyle = cc().label;
         ctx.fillText('LENS HT', lx, ly + 8);
     }
 
@@ -2194,8 +2271,41 @@ window.addEventListener('resize', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════
+//  THEME TOGGLE (Light / Dark)
+// ═══════════════════════════════════════════════════════════════
+
+function initTheme() {
+    const saved = localStorage.getItem('av-planner-theme');
+    const theme = saved || 'dark';
+    applyTheme(theme);
+}
+
+function applyTheme(theme) {
+    document.documentElement.setAttribute('data-theme', theme);
+    document.querySelector('meta[name="color-scheme"]')
+        ?.setAttribute('content', theme);
+    const btn = document.getElementById('theme-toggle');
+    if (btn) {
+        btn.textContent = theme === 'dark' ? '☽' : '☀';
+        btn.title = theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode';
+    }
+}
+
+function toggleTheme() {
+    const current = document.documentElement.getAttribute('data-theme') || 'dark';
+    const next = current === 'dark' ? 'light' : 'dark';
+    localStorage.setItem('av-planner-theme', next);
+    applyTheme(next);
+    render();
+}
+
+document.getElementById('theme-toggle')?.addEventListener('click', toggleTheme);
+
+// ═══════════════════════════════════════════════════════════════
 //  INITIALIZATION
 // ═══════════════════════════════════════════════════════════════
+
+initTheme();
 
 setBrand('neat');
 initGroups();

@@ -148,6 +148,60 @@ body.theme-logi {
 }
 
 
+/* ── Light Theme ── */
+[data-theme="light"] {
+    /* Surfaces */
+    --bg-base: #F5F5F7;
+    --bg-panel: #FFFFFF;
+    --bg-elevated: #EEEEF0;
+    --bg-input: #F0F0F2;
+    --bg-hover: rgba(0, 0, 0, 0.03);
+    --bg-active: rgba(0, 0, 0, 0.05);
+
+    /* Borders */
+    --border-subtle: rgba(0, 0, 0, 0.06);
+    --border-default: rgba(0, 0, 0, 0.10);
+    --border-focus: rgba(0, 0, 0, 0.22);
+
+    /* Text */
+    --text-primary: rgba(0, 0, 0, 0.88);
+    --text-secondary: rgba(0, 0, 0, 0.55);
+    --text-tertiary: rgba(0, 0, 0, 0.30);
+
+    /* Brand Red — Gensler (slightly darkened for light bg) */
+    --red: #D92A1D;
+    --red-hover: #EE3224;
+    --red-dim: rgba(217, 42, 29, 0.08);
+    --red-glow: rgba(217, 42, 29, 0.04);
+
+    /* Brand dims for light */
+    --neat-purple-dim: rgba(124, 58, 237, 0.08);
+    --logi-teal-dim: rgba(20, 184, 166, 0.08);
+}
+
+[data-theme="light"] .theme-neat {
+    --red: #6D28D9;
+    --red-hover: #7C3AED;
+    --red-dim: rgba(109, 40, 217, 0.08);
+    --red-glow: rgba(109, 40, 217, 0.04);
+    --accent: #6D28D9;
+    --accent-bright: #7C3AED;
+    --accent-dim: rgba(109, 40, 217, 0.08);
+    --accent-glow: rgba(109, 40, 217, 0.04);
+}
+
+[data-theme="light"] .theme-logi {
+    --red: #0D9488;
+    --red-hover: #14B8A6;
+    --red-dim: rgba(13, 148, 136, 0.08);
+    --red-glow: rgba(13, 148, 136, 0.04);
+    --accent: #0D9488;
+    --accent-bright: #14B8A6;
+    --accent-dim: rgba(13, 148, 136, 0.08);
+    --accent-glow: rgba(13, 148, 136, 0.04);
+}
+
+
 /* ── Reset ── */
 *,
 *::before,
@@ -1611,6 +1665,179 @@ canvas:focus-visible {
 
 .control-label .value.value-updated {
     animation: valuePulse 0.25s var(--ease-out);
+}
+
+
+/* ══════════════════════════════════════════════════════════════
+   LIGHT THEME OVERRIDES — Component-level tweaks
+   ══════════════════════════════════════════════════════════════ */
+[data-theme="light"] .sidebar-scroll {
+    scrollbar-color: rgba(0, 0, 0, 0.12) transparent;
+}
+
+[data-theme="light"] ::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.12);
+}
+
+[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.20);
+}
+
+[data-theme="light"] .control-group[aria-expanded="true"] {
+    background: rgba(0, 0, 0, 0.015);
+}
+
+[data-theme="light"] input[type="range"] {
+    background: linear-gradient(to right,
+            var(--red) 0%, var(--red) var(--slider-pct, 0%),
+            rgba(0, 0, 0, 0.08) var(--slider-pct, 0%),
+            rgba(0, 0, 0, 0.08) 100%);
+}
+
+[data-theme="light"] input[type="range"]::-webkit-slider-thumb {
+    background: #fff;
+    box-shadow:
+        0 1px 3px rgba(0, 0, 0, 0.15),
+        0 0 0 1px rgba(0, 0, 0, 0.06);
+}
+
+[data-theme="light"] input[type="range"]::-webkit-slider-thumb:hover {
+    box-shadow:
+        0 2px 8px rgba(0, 0, 0, 0.18),
+        0 0 0 1px rgba(0, 0, 0, 0.08),
+        0 0 0 4px var(--red-dim),
+        0 0 12px var(--red-glow);
+}
+
+[data-theme="light"] input[type="range"]::-moz-range-thumb {
+    background: #fff;
+    box-shadow:
+        0 1px 3px rgba(0, 0, 0, 0.15),
+        0 0 0 1px rgba(0, 0, 0, 0.06);
+}
+
+[data-theme="light"] .toggle-group {
+    background: rgba(0, 0, 0, 0.04);
+}
+
+[data-theme="light"] .toggle-btn:hover:not(.active) {
+    color: var(--text-secondary);
+    background: rgba(0, 0, 0, 0.03);
+}
+
+[data-theme="light"] .toggle-btn.active {
+    box-shadow:
+        0 1px 2px rgba(0, 0, 0, 0.06),
+        inset 0 1px 0 rgba(255, 255, 255, 0.6);
+}
+
+[data-theme="light"] .brand-toggle {
+    background: rgba(0, 0, 0, 0.04);
+}
+
+[data-theme="light"] .brand-btn:hover:not(.active) {
+    background: rgba(0, 0, 0, 0.03);
+}
+
+[data-theme="light"] .switch .slider {
+    background: rgba(0, 0, 0, 0.10);
+}
+
+[data-theme="light"] .switch .slider::before {
+    background: #fff;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+}
+
+[data-theme="light"] .download-btn {
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+}
+
+[data-theme="light"] canvas {
+    box-shadow:
+        0 0 0 1px rgba(0, 0, 0, 0.08),
+        0 4px 32px rgba(0, 0, 0, 0.08);
+}
+
+[data-theme="light"] .canvas-container {
+    background:
+        radial-gradient(circle, rgba(0, 0, 0, 0.04) 1px, transparent 1px),
+        var(--bg-base);
+    background-size: 28px 28px;
+}
+
+[data-theme="light"] .canvas-header .legend-item:hover {
+    background: rgba(0, 0, 0, 0.04);
+}
+
+[data-theme="light"] .info-overlay {
+    background: rgba(255, 255, 255, 0.80);
+    border-color: rgba(0, 0, 0, 0.08);
+    box-shadow:
+        0 12px 48px rgba(0, 0, 0, 0.10),
+        0 2px 8px rgba(0, 0, 0, 0.06),
+        inset 0 1px 0 rgba(255, 255, 255, 0.5);
+}
+
+[data-theme="light"] .info-specs-tab {
+    background: rgba(255, 255, 255, 0.80);
+    border-color: rgba(0, 0, 0, 0.08);
+}
+
+[data-theme="light"] .info-specs-tab:hover {
+    background: rgba(255, 255, 255, 0.92);
+}
+
+[data-theme="light"] .info-minimize-btn:hover {
+    background: rgba(0, 0, 0, 0.05);
+}
+
+[data-theme="light"] .toast {
+    background: rgba(255, 255, 255, 0.90);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.10);
+}
+
+[data-theme="light"] .drag-hint {
+    background: rgba(255, 255, 255, 0.85);
+    border-color: rgba(0, 0, 0, 0.08);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.10);
+}
+
+[data-theme="light"] .sidebar-header h1 .icon {
+    box-shadow: 0 2px 8px rgba(217, 42, 29, 0.20);
+}
+
+[data-theme="light"] .sidebar-header h1:hover .icon {
+    box-shadow: 0 4px 16px rgba(217, 42, 29, 0.28);
+}
+
+/* Theme toggle button */
+.theme-toggle {
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    border: 1px solid var(--border-default);
+    background: transparent;
+    color: var(--text-tertiary);
+    font-size: 14px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s var(--ease-out);
+    flex-shrink: 0;
+    padding: 0;
+    line-height: 1;
+}
+
+.theme-toggle:hover {
+    background: var(--bg-hover);
+    border-color: var(--border-focus);
+    color: var(--text-primary);
+}
+
+.theme-toggle:focus-visible {
+    outline: 2px solid var(--border-focus);
+    outline-offset: 2px;
 }
 
 
