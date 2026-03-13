@@ -61,7 +61,8 @@ function scheduleRender() {
     _renderPending = true;
     requestAnimationFrame(() => {
         _renderPending = false;
-        renderForeground();
+        if (state.viewMode === 'pov') render();
+        else renderForeground();
     });
 }
 
