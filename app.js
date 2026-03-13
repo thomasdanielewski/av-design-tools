@@ -79,7 +79,9 @@ function cc() {
 const state = {
     roomLength: 20, roomWidth: 15, ceilingHeight: 9,
     tableLength: 8, tableWidth: 4, tableDist: 4,
-    tableShape: 'rectangular', tableHeight: 30,
+    tableShape: 'rectangular', tableHeight: 30, tableX: 0, tableRotation: 0,
+    tables: [{ id: 1, shape: 'rectangular', length: 8, width: 4, x: 0, dist: 4, height: 30, rotation: 0 }],
+    selectedTableId: 1,
     displayCount: 1, displaySize: 65, displayElev: 54,
     brand: 'neat', videoBar: 'neat-bar-gen2',
     mountPos: 'below',
@@ -108,7 +110,9 @@ const DOM = {};
 function cacheDOMRefs() {
     const ids = [
         'room-length', 'room-width', 'room-ceiling-height', 'table-length', 'table-width',
-        'table-height', 'table-dist', 'display-size', 'display-elev',
+        'table-height', 'table-dist', 'table-rotation', 'table-x',
+        'table-list', 'add-table-btn', 'remove-table-btn',
+        'display-size', 'display-elev',
         'viewer-dist', 'viewer-offset', 'table-shape', 'video-bar',
         'include-center', 'include-micpod', 'show-camera', 'show-mic',
         'show-grid', 'show-view-angle', 'brand-toggle', 'display-count-toggle',
@@ -121,7 +125,8 @@ function cacheDOMRefs() {
         'legend-camera', 'legend-mic', 'download-btn', 'export-btn',
         'import-btn', 'import-file-input', 'expand-all-btn', 'collapse-all-btn',
         'val-room-length', 'val-room-width', 'val-room-ceiling-height', 'val-table-length', 'val-table-width',
-        'val-table-height', 'val-table-dist', 'val-display-size', 'val-display-elev',
+        'val-table-height', 'val-table-dist', 'val-table-rotation', 'val-table-x',
+        'val-display-size', 'val-display-elev',
         'val-viewer-dist', 'val-viewer-offset'
     ];
     ids.forEach(id => { DOM[id] = document.getElementById(id); });
@@ -147,7 +152,9 @@ function formatFtIn(v) {
 
 /** Centralized value formatter — returns the correct string for any unit */
 function formatValue(v, unit) {
-    return unit === 'in' ? `${v}"` : formatFtIn(v);
+    if (unit === 'in') return `${v}"`;
+    if (unit === 'deg') return `${v}°`;
+    return formatFtIn(v);
 }
 
 /** Return the equipment key for the current brand's center device */
@@ -481,8 +488,9 @@ function makeEditable(badge) {
         v = Math.round(v / step) * step;
 
         state[stateKey] = v;
+        if (TABLE_SLIDER_PROPS.has(stateKey)) syncTableFromFlatState();
         slider.value = v;
-        badge.textContent = unit === 'in' ? `${v}"` : formatFtIn(v);
+        badge.textContent = formatValue(v, unit);
 
         // Mirror circle table sync: keep length === width
         if (state.tableShape === 'circle') {
@@ -524,8 +532,12 @@ document.querySelectorAll('.control-label .value[data-slider]').forEach(badge =>
 // All slider inputs use scheduleRender() (rAF-debounced) instead
 // of calling render() directly.
 
+const TABLE_SLIDER_PROPS = new Set(['tableLength', 'tableWidth', 'tableDist', 'tableHeight', 'tableRotation', 'tableX']);
+
 function bindSlider(id, sk, vl) {
-    const unit = (sk === 'displaySize' || sk === 'displayElev' || sk === 'tableHeight') ? 'in' : 'ft';
+    const unit = (sk === 'displaySize' || sk === 'displayElev' || sk === 'tableHeight') ? 'in'
+        : sk === 'tableRotation' ? 'deg'
+        : 'ft';
     (DOM[id] || document.getElementById(id)).addEventListener('input', function () {
         let v = parseFloat(this.value);
 
@@ -540,6 +552,7 @@ function bindSlider(id, sk, vl) {
         }
 
         state[sk] = v;
+        if (TABLE_SLIDER_PROPS.has(sk)) syncTableFromFlatState();
         const badge = DOM[vl];
         badge.textContent = formatValue(v, unit);
 
@@ -572,6 +585,7 @@ function bindSelect(id, sk) {
                 updateSliderTrack(DOM['table-length']);
                 updateSliderTrack(DOM['table-width']);
             }
+            syncTableFromFlatState();
         }
 
         // Auto-scale display size for specific board models
@@ -616,10 +630,189 @@ function syncCircleSliderRanges() {
     updateSliderTrack(widSlider);
 }
 
+// ── Multi-table helpers ───────────────────────────────────────
+
+function getSelectedTable() {
+    return state.tables.find(t => t.id === state.selectedTableId) || state.tables[0];
+}
+
+/** Copy flat state table props → selected table object */
+function syncTableFromFlatState() {
+    const t = getSelectedTable();
+    if (!t) return;
+    t.shape = state.tableShape;
+    t.length = state.tableLength;
+    t.width = state.tableWidth;
+    t.x = state.tableX;
+    t.dist = state.tableDist;
+    t.height = state.tableHeight;
+    t.rotation = state.tableRotation;
+}
+
+/** Copy selected table object → flat state (does NOT update DOM) */
+function syncFlatStateFromTable(t) {
+    if (!t) return;
+    state.tableShape = t.shape;
+    state.tableLength = t.length;
+    state.tableWidth = t.width;
+    state.tableX = t.x;
+    state.tableDist = t.dist;
+    state.tableHeight = t.height;
+    state.tableRotation = t.rotation;
+}
+
+/** Update all table-related DOM sliders and badges from flat state */
+function updateTableSliders() {
+    DOM['table-shape'].value = state.tableShape;
+    DOM['table-length'].value = state.tableLength;
+    DOM['table-width'].value = state.tableWidth;
+    DOM['table-height'].value = state.tableHeight;
+    DOM['table-dist'].value = state.tableDist;
+    DOM['table-rotation'].value = state.tableRotation;
+    DOM['table-x'].value = state.tableX;
+    DOM['val-table-length'].textContent = formatFtIn(state.tableLength);
+    DOM['val-table-width'].textContent = formatFtIn(state.tableWidth);
+    DOM['val-table-height'].textContent = `${state.tableHeight}"`;
+    DOM['val-table-dist'].textContent = formatFtIn(state.tableDist);
+    DOM['val-table-rotation'].textContent = `${state.tableRotation}°`;
+    DOM['val-table-x'].textContent = formatFtIn(state.tableX);
+    syncCircleSliderRanges();
+    updateSliderTrack(DOM['table-length']);
+    updateSliderTrack(DOM['table-width']);
+    updateSliderTrack(DOM['table-height']);
+    updateSliderTrack(DOM['table-dist']);
+    updateSliderTrack(DOM['table-rotation']);
+    updateSliderTrack(DOM['table-x']);
+}
+
+/** Re-render the table selector pills */
+function renderTableList() {
+    const container = DOM['table-list'];
+    if (!container) return;
+    container.innerHTML = '';
+    state.tables.forEach(t => {
+        const btn = document.createElement('button');
+        btn.className = 'table-pill' + (t.id === state.selectedTableId ? ' active' : '');
+        const shapeLabel = { rectangular: 'Rect', oval: 'Oval', circle: 'Circle', 'd-shape': 'D' }[t.shape] || t.shape;
+        btn.textContent = `T${t.id} · ${shapeLabel}`;
+        btn.title = `${t.shape} ${formatFtIn(t.length)} × ${formatFtIn(t.width)}`;
+        btn.addEventListener('click', () => { selectTable(t.id); pushHistory(); });
+        container.appendChild(btn);
+    });
+    if (DOM['remove-table-btn']) DOM['remove-table-btn'].disabled = state.tables.length <= 1;
+}
+
+/** Select a table by id, syncing flat state and DOM */
+function selectTable(id) {
+    if (id === state.selectedTableId) return;
+    syncTableFromFlatState();
+    state.selectedTableId = id;
+    const t = getSelectedTable();
+    syncFlatStateFromTable(t);
+    state.centerPos = { x: 0, y: 0 };
+    updateTableSliders();
+    renderTableList();
+    scheduleRender();
+}
+
+/** Add a new table (copy of current settings, offset slightly) */
+function addTable() {
+    syncTableFromFlatState();
+    const newId = Math.max(...state.tables.map(t => t.id)) + 1;
+    const sel = getSelectedTable();
+    const newDist = Math.min(sel.dist + sel.length + 1, state.roomLength - sel.length - 0.5);
+    const newTable = {
+        id: newId, shape: 'rectangular',
+        length: Math.min(6, state.tableLength), width: Math.min(3, state.tableWidth),
+        x: 0, dist: Math.max(0, newDist), height: state.tableHeight, rotation: 0
+    };
+    state.tables.push(newTable);
+    state.selectedTableId = newId;
+    syncFlatStateFromTable(newTable);
+    state.centerPos = { x: 0, y: 0 };
+    updateTableSliders();
+    renderTableList();
+    pushHistory();
+    scheduleRender();
+}
+
+/** Remove the currently selected table */
+function removeTable() {
+    if (state.tables.length <= 1) return;
+    const idx = state.tables.findIndex(t => t.id === state.selectedTableId);
+    state.tables.splice(idx, 1);
+    const next = state.tables[Math.max(0, idx - 1)];
+    state.selectedTableId = next.id;
+    syncFlatStateFromTable(next);
+    state.centerPos = { x: 0, y: 0 };
+    updateTableSliders();
+    renderTableList();
+    pushHistory();
+    scheduleRender();
+}
+
+/** Apply a named table arrangement preset */
+function applyArrangement(name) {
+    syncTableFromFlatState();
+    const rl = state.roomLength, rw = state.roomWidth;
+    let tables = [];
+
+    if (name === 'u-shape') {
+        const sideLen = Math.min(rl * 0.48, 10);
+        const sideWid = 2.5;
+        const sideX = rw / 2 - sideWid / 2 - 0.5;
+        const backLen = Math.min(rw * 0.72, 12);
+        const backWid = 2.5;
+        // back table uses rotation=90 so "length" spans laterally
+        const backCenterZ = rl * 0.76;
+        const backDist = backCenterZ - backLen / 2;
+        tables = [
+            { id: 1, shape: 'rectangular', length: sideLen, width: sideWid, x: -sideX, dist: rl * 0.12, height: 30, rotation: 0 },
+            { id: 2, shape: 'rectangular', length: sideLen, width: sideWid, x: +sideX, dist: rl * 0.12, height: 30, rotation: 0 },
+            { id: 3, shape: 'rectangular', length: backWid, width: Math.min(backLen, 8), x: 0, dist: rl * 0.7, height: 30, rotation: 90 },
+        ];
+    } else if (name === 'classroom') {
+        const tl = Math.min(5, rl * 0.22), tw = Math.min(2.5, rw * 0.3);
+        const colX = rw * 0.26;
+        tables = [
+            { id: 1, shape: 'rectangular', length: tl, width: tw, x: -colX, dist: rl * 0.1, height: 30, rotation: 0 },
+            { id: 2, shape: 'rectangular', length: tl, width: tw, x: +colX, dist: rl * 0.1, height: 30, rotation: 0 },
+            { id: 3, shape: 'rectangular', length: tl, width: tw, x: -colX, dist: rl * 0.38, height: 30, rotation: 0 },
+            { id: 4, shape: 'rectangular', length: tl, width: tw, x: +colX, dist: rl * 0.38, height: 30, rotation: 0 },
+        ];
+    } else if (name === 'pods') {
+        const pd = Math.min(4, Math.min(rw * 0.35, rl * 0.25));
+        const colX = rw * 0.27;
+        tables = [
+            { id: 1, shape: 'circle', length: pd, width: pd, x: -colX, dist: rl * 0.1, height: 30, rotation: 0 },
+            { id: 2, shape: 'circle', length: pd, width: pd, x: +colX, dist: rl * 0.1, height: 30, rotation: 0 },
+            { id: 3, shape: 'circle', length: pd, width: pd, x: -colX, dist: rl * 0.38, height: 30, rotation: 0 },
+            { id: 4, shape: 'circle', length: pd, width: pd, x: +colX, dist: rl * 0.38, height: 30, rotation: 0 },
+        ];
+    }
+
+    // Clamp all tables to room bounds
+    tables.forEach(t => {
+        t.dist = Math.max(0, Math.min(t.dist, rl - t.length));
+        t.x = Math.max(-(rw / 2 - t.width / 2), Math.min(rw / 2 - t.width / 2, t.x));
+    });
+
+    state.tables = tables;
+    state.selectedTableId = 1;
+    syncFlatStateFromTable(tables[0]);
+    state.centerPos = { x: 0, y: 0 };
+    updateTableSliders();
+    renderTableList();
+    pushHistory();
+    scheduleRender();
+}
+
 // Wire up all sliders
 bindSlider('room-length', 'roomLength', 'val-room-length');
 bindSlider('room-width', 'roomWidth', 'val-room-width');
 bindSlider('room-ceiling-height', 'ceilingHeight', 'val-room-ceiling-height');
+bindSlider('table-rotation', 'tableRotation', 'val-table-rotation');
+bindSlider('table-x', 'tableX', 'val-table-x');
 bindSlider('table-length', 'tableLength', 'val-table-length');
 bindSlider('table-width', 'tableWidth', 'val-table-width');
 bindSlider('table-height', 'tableHeight', 'val-table-height');
@@ -1108,49 +1301,72 @@ function drawEquipmentTopDown(ox, ry, wallThick, dispY, dispDepthPx, dispWidthPx
  * Draw the conference table in top-down view.
  */
 function drawTable(ox, ry, wallThick, ppf) {
-    const tl = state.tableLength * ppf;
-    const tw = state.tableWidth * ppf;
-    const tx = ox - tw / 2;
-    const ty = ry + wallThick + state.tableDist * ppf;
+    state.tables.forEach(t => {
+        const isSelected = t.id === state.selectedTableId;
+        const tl = t.length * ppf;
+        const tw = t.width * ppf;
+        const tcx = ox + t.x * ppf;
+        const tcy = ry + wallThick + t.dist * ppf + tl / 2;
+        const angle = t.rotation * Math.PI / 180;
+        const x0 = -tw / 2, y0 = -tl / 2;
 
-    ctx.fillStyle = cc().surface;
-    ctx.strokeStyle = cc().tableStroke;
-    ctx.lineWidth = 1.5;
+        ctx.save();
+        ctx.translate(tcx, tcy);
+        ctx.rotate(angle);
+        ctx.globalAlpha = isSelected ? 1.0 : 0.55;
+        ctx.fillStyle = cc().surface;
+        ctx.strokeStyle = cc().tableStroke;
+        ctx.lineWidth = isSelected ? 1.5 : 1;
 
-    if (state.tableShape === 'rectangular') {
-        roundRect(ctx, tx, ty, tw, tl, 6);
-        ctx.fill();
-        ctx.stroke();
-    } else if (state.tableShape === 'oval') {
-        ctx.beginPath();
-        ctx.ellipse(ox, ty + tl / 2, tw / 2, tl / 2, 0, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.stroke();
-    } else if (state.tableShape === 'circle') {
-        ctx.beginPath();
-        ctx.arc(ox, ty + tl / 2, Math.min(tw, tl) / 2, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.stroke();
-    } else if (state.tableShape === 'd-shape') {
-        ctx.beginPath();
-        ctx.moveTo(tx, ty);
-        ctx.lineTo(tx + tw, ty);
-        ctx.lineTo(tx + tw, ty + tl - tw / 2);
-        ctx.arc(ox, ty + tl - tw / 2, tw / 2, 0, Math.PI);
-        ctx.lineTo(tx, ty);
-        ctx.fill();
-        ctx.stroke();
-    }
+        if (t.shape === 'rectangular') {
+            roundRect(ctx, x0, y0, tw, tl, 6);
+            ctx.fill(); ctx.stroke();
+        } else if (t.shape === 'oval') {
+            ctx.beginPath();
+            ctx.ellipse(0, 0, tw / 2, tl / 2, 0, 0, Math.PI * 2);
+            ctx.fill(); ctx.stroke();
+        } else if (t.shape === 'circle') {
+            ctx.beginPath();
+            ctx.arc(0, 0, Math.min(tw, tl) / 2, 0, Math.PI * 2);
+            ctx.fill(); ctx.stroke();
+        } else if (t.shape === 'd-shape') {
+            ctx.beginPath();
+            ctx.moveTo(x0, y0);
+            ctx.lineTo(x0 + tw, y0);
+            ctx.lineTo(x0 + tw, y0 + tl - tw / 2);
+            ctx.arc(0, y0 + tl - tw / 2, tw / 2, 0, Math.PI);
+            ctx.lineTo(x0, y0);
+            ctx.fill(); ctx.stroke();
+        }
 
-    // Table dimension label
-    ctx.font = `400 ${Math.max(8, ppf * 0.3)}px 'JetBrains Mono', monospace`;
-    ctx.fillStyle = cc().label;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(
-        `${formatFtIn(state.tableLength)} × ${formatFtIn(state.tableWidth)}`,
-        ox, ty + tl / 2
-    );
+        // Label
+        ctx.font = `400 ${Math.max(7, ppf * 0.28)}px 'JetBrains Mono', monospace`;
+        ctx.fillStyle = cc().label;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        if (state.tables.length === 1 || isSelected) {
+            ctx.fillText(`${formatFtIn(t.length)} × ${formatFtIn(t.width)}`, 0, 0);
+        } else {
+            ctx.fillText(`T${t.id}`, 0, 0);
+        }
+
+        ctx.globalAlpha = 1.0;
+        ctx.restore();
+
+        // Selection ring for multi-table mode
+        if (isSelected && state.tables.length > 1) {
+            ctx.save();
+            ctx.translate(tcx, tcy);
+            ctx.rotate(angle);
+            ctx.strokeStyle = 'rgba(238,50,36,0.45)';
+            ctx.lineWidth = 1.5;
+            ctx.setLineDash([3, 3]);
+            roundRect(ctx, x0 - 4, y0 - 4, tw + 8, tl + 8, 8);
+            ctx.stroke();
+            ctx.setLineDash([]);
+            ctx.restore();
+        }
+    });
 }
 
 /**
@@ -1389,11 +1605,13 @@ function render() {
         mainDeviceY = dispY - dispDepthPx / 2 - eqDepthPx / 2 - 2;
     }
 
-    const tableY = ry + wallThick + state.tableDist * ppf + (state.tableLength * ppf) / 2;
-    const centerX = ox + state.centerPos.x * ppf;
+    const selT = getSelectedTable();
+    const tableX_px = ox + selT.x * ppf;
+    const tableY = ry + wallThick + selT.dist * ppf + (selT.length * ppf) / 2;
+    const centerX = tableX_px + state.centerPos.x * ppf;
     const centerY = tableY + state.centerPos.y * ppf;
-    const micPodX = ox;
-    const micPodY = ry + wallThick + state.tableDist * ppf + state.tableLength * ppf - 0.5 * ppf;
+    const micPodX = tableX_px;
+    const micPodY = ry + wallThick + selT.dist * ppf + selT.length * ppf - 0.5 * ppf;
 
     // ── Viewing angle overlay ────────────────────────────
     if (state.showViewAngle) {
@@ -1663,54 +1881,57 @@ function renderPOV(cw, ch, dpr) {
         ctx.fill();
     }
 
-    // ── Draw table in perspective ────────────────────────
-    const thi = state.tableHeight;
-    const tfz = state.tableDist;
-    let tnz = state.tableDist + state.tableLength;
-    if (tfz < vd) {
-        if (tnz >= vd) tnz = vd - 0.5;
+    // ── Draw all tables in perspective ───────────────────
+    state.tables.forEach(t => {
+        const thi_t = t.height;
+        const angle_t = t.rotation * Math.PI / 180;
+        const cos_t = Math.cos(angle_t), sin_t = Math.sin(angle_t);
+        const hw = t.width / 2, hl = t.length / 2;
+        const cx_t = t.x, cz_t = t.dist + hl;
 
-        const pFL = proj(-state.tableWidth / 2, thi, tfz);
-        const pFR = proj(state.tableWidth / 2, thi, tfz);
-        const pNL = proj(-state.tableWidth / 2, thi, tnz);
-        const pNR = proj(state.tableWidth / 2, thi, tnz);
+        function rcPOV(lx, lz) {
+            return { wx: cx_t + lx * cos_t - lz * sin_t, wz: cz_t + lx * sin_t + lz * cos_t };
+        }
+        const wc = [rcPOV(-hw, -hl), rcPOV(+hw, -hl), rcPOV(+hw, +hl), rcPOV(-hw, +hl)];
+        if (wc.every(c => c.wz >= vd - 0.01)) return; // entirely behind viewer
+
+        const pc = wc.map(c => proj(c.wx, thi_t, Math.min(c.wz, vd - 0.1)));
 
         ctx.fillStyle = cc().surface;
         ctx.strokeStyle = cc().tableStroke;
         ctx.lineWidth = 2;
         ctx.beginPath();
 
-        if (state.tableShape === 'rectangular' || state.tableShape === 'd-shape') {
-            ctx.moveTo(pFL.x, pFL.y);
-            ctx.lineTo(pFR.x, pFR.y);
-            ctx.lineTo(pNR.x, pNR.y);
-            ctx.lineTo(pNL.x, pNL.y);
+        if (t.rotation === 0 && (t.shape === 'oval' || t.shape === 'circle')) {
+            // Preserve curved edges for unrotated oval/circle
+            const fw = Math.abs(pc[1].x - pc[0].x), nw = Math.abs(pc[2].x - pc[3].x);
+            const vs = Math.abs(pc[3].y - pc[0].y);
+            const bb = Math.min(vs * 0.1, fw * 0.15), fb = Math.min(vs * 0.1, nw * 0.15);
+            ctx.moveTo(pc[0].x, pc[0].y);
+            ctx.quadraticCurveTo((pc[0].x + pc[1].x) / 2, pc[0].y - bb, pc[1].x, pc[1].y);
+            ctx.lineTo(pc[2].x, pc[2].y);
+            ctx.quadraticCurveTo((pc[2].x + pc[3].x) / 2, pc[3].y + fb, pc[3].x, pc[3].y);
         } else {
-            // Oval / circle: curved front and back edges
-            const fw = Math.abs(pFR.x - pFL.x);
-            const nw = Math.abs(pNR.x - pNL.x);
-            const vs = Math.abs(pNL.y - pFL.y);
-            const bb = Math.min(vs * 0.1, fw * 0.15);
-            const fb = Math.min(vs * 0.1, nw * 0.15);
-            const fmx = (pFL.x + pFR.x) / 2;
-            const nmx = (pNL.x + pNR.x) / 2;
-            ctx.moveTo(pFL.x, pFL.y);
-            ctx.quadraticCurveTo(fmx, pFL.y - bb, pFR.x, pFR.y);
-            ctx.lineTo(pNR.x, pNR.y);
-            ctx.quadraticCurveTo(nmx, pNL.y + fb, pNL.x, pNL.y);
+            ctx.moveTo(pc[0].x, pc[0].y);
+            ctx.lineTo(pc[1].x, pc[1].y);
+            ctx.lineTo(pc[2].x, pc[2].y);
+            ctx.lineTo(pc[3].x, pc[3].y);
         }
 
         ctx.closePath();
         ctx.fill();
         ctx.stroke();
-    }
+    });
+
+    // Height used by center companion device = selected table's height
+    const thi = state.tableHeight;
 
     // ── Draw center companion in POV ─────────────────────
     if (state.includeCenter) {
         const centerEq = EQUIPMENT[getCenterEqKey()];
         const tableCenterZ = state.tableDist + state.tableLength / 2;
         const centerZ = tableCenterZ + state.centerPos.y;
-        const centerXOff = state.centerPos.x;
+        const centerXOff = state.tableX + state.centerPos.x;
         const centerEqHI = centerEq.height * 12;
         const centerEqWF = centerEq.width;
 
@@ -1987,7 +2208,7 @@ function redo() {
 const HASH_KEYS = {
     rl: 'roomLength', rw: 'roomWidth', rch: 'ceilingHeight',
     tl: 'tableLength', tw: 'tableWidth', td: 'tableDist',
-    th: 'tableHeight', ts: 'tableShape',
+    th: 'tableHeight', ts: 'tableShape', tx: 'tableX', tr: 'tableRotation',
     dc: 'displayCount', ds: 'displaySize', de: 'displayElev',
     br: 'brand', vb: 'videoBar', mp: 'mountPos',
     ic: 'includeCenter', im: 'includeMicPod',
@@ -2005,6 +2226,9 @@ function serializeToHash() {
         if (typeof v === 'boolean') params.set(k, v ? '1' : '0');
         else params.set(k, v);
     }
+    // Serialize full tables array + selected id
+    params.set('tb', JSON.stringify(state.tables));
+    params.set('stid', state.selectedTableId);
     history.replaceState
         ? window.history.replaceState(null, '', '#' + params.toString())
         : (window.location.hash = params.toString());
@@ -2024,6 +2248,19 @@ function loadFromHash() {
             if (typeof state[sk] === 'number') { state[sk] = parseFloat(raw); continue; }
             state[sk] = raw;
         }
+        // Load tables array (or build from legacy flat state)
+        if (params.has('tb')) {
+            try { state.tables = JSON.parse(params.get('tb')); } catch (_) {}
+        } else {
+            state.tables = [{ id: 1, shape: state.tableShape, length: state.tableLength,
+                width: state.tableWidth, x: state.tableX, dist: state.tableDist,
+                height: state.tableHeight, rotation: state.tableRotation }];
+        }
+        if (params.has('stid')) state.selectedTableId = parseInt(params.get('stid')) || 1;
+        // Ensure selectedTableId points to an existing table
+        if (!state.tables.find(t => t.id === state.selectedTableId)) state.selectedTableId = state.tables[0].id;
+        // Sync flat state from selected table
+        syncFlatStateFromTable(state.tables.find(t => t.id === state.selectedTableId));
         return true;
     } catch (e) { return false; }
 }
@@ -2044,6 +2281,10 @@ function copyShareLink() {
 // Used after undo/redo or config import to push state → DOM.
 
 function syncUIFromState() {
+    // Sync flat state from the selected table first
+    const selT = getSelectedTable();
+    if (selT) syncFlatStateFromTable(selT);
+
     // Align circle slider ranges before setting values
     syncCircleSliderRanges();
 
@@ -2056,6 +2297,8 @@ function syncUIFromState() {
         'table-width': ['tableWidth', 'val-table-width', 'ft'],
         'table-height': ['tableHeight', 'val-table-height', 'in'],
         'table-dist': ['tableDist', 'val-table-dist', 'ft'],
+        'table-rotation': ['tableRotation', 'val-table-rotation', 'deg'],
+        'table-x': ['tableX', 'val-table-x', 'ft'],
         'display-size': ['displaySize', 'val-display-size', 'in'],
         'display-elev': ['displayElev', 'val-display-elev', 'in'],
         'viewer-dist': ['viewerDist', 'val-viewer-dist', 'ft'],
@@ -2071,6 +2314,9 @@ function syncUIFromState() {
     // Table shape
     const ts = DOM['table-shape'];
     if (ts) ts.value = state.tableShape;
+
+    // Re-render table list
+    renderTableList();
 
     // Brand + video bar
     setBrand(state.brand);
@@ -2138,52 +2384,60 @@ function getDragMetrics(e) {
     const ry = oy - (state.roomLength * scale) / 2;
     const wt = Math.max(3, ppf * 0.2);
 
-    // Table center Y in canvas px
-    const ty2 = ry + wt + state.tableDist * ppf + (state.tableLength * ppf) / 2;
+    // Selected table center position in canvas px
+    const selT = getSelectedTable();
+    const tableX_px = ox + selT.x * ppf;
+    const ty2 = ry + wt + selT.dist * ppf + (selT.length * ppf) / 2;
 
     // Center device position
-    const cX = ox + state.centerPos.x * ppf;
+    const cX = tableX_px + state.centerPos.x * ppf;
     const cY = ty2 + state.centerPos.y * ppf;
 
-    return { mx, my, ppf, ox, ry, wt, ty2, cX, cY };
+    return { mx, my, ppf, ox, ry, wt, ty2, tableX_px, cX, cY };
+}
+
+/** Hit-test a rotated table rectangle (with 4px tolerance) */
+function isPointInTableHitbox(mx, my, t, ox, ry, wt, ppf) {
+    const tcx = ox + t.x * ppf;
+    const tcy = ry + wt + t.dist * ppf + (t.length * ppf) / 2;
+    const tw = t.width * ppf, tl = t.length * ppf;
+    const angle = -(t.rotation * Math.PI / 180);
+    const dx = mx - tcx, dy = my - tcy;
+    const lx = dx * Math.cos(angle) - dy * Math.sin(angle);
+    const ly = dx * Math.sin(angle) + dy * Math.cos(angle);
+    return Math.abs(lx) <= tw / 2 + 4 && Math.abs(ly) <= tl / 2 + 4;
 }
 
 // ── Cursor feedback on hover ─────────────────────────────────
 canvas.addEventListener('mousemove', e => {
-    // Always track mouse position in CSS pixels for cone hover detection
     const _rect = canvas.getBoundingClientRect();
     mousePos.x = e.clientX - _rect.left;
     mousePos.y = e.clientY - _rect.top;
 
-    if (state.viewMode !== 'top' || isDraggingTable || isDraggingCenter) return;
+    if (state.viewMode !== 'top' || isDraggingTableId !== null || isDraggingCenter) return;
     const { mx, my, ppf, ox, ry, wt, cX, cY } = getDragMetrics(e);
 
     let onTarget = false;
 
-    // Check center device hit area
     if (state.includeCenter) {
         const ceq = EQUIPMENT[getCenterEqKey()];
         const cs = Math.max(12, ceq.width * ppf * 3);
         if (Math.sqrt((mx - cX) ** 2 + (my - cY) ** 2) <= cs) onTarget = true;
     }
 
-    // Check table hit area
     if (!onTarget) {
-        const tl = state.tableLength * ppf;
-        const tw = state.tableWidth * ppf;
-        const tx = ox - tw / 2;
-        const ty = ry + wt + state.tableDist * ppf;
-        if (mx >= tx && mx <= tx + tw && my >= ty && my <= ty + tl) onTarget = true;
+        for (const t of state.tables) {
+            if (isPointInTableHitbox(mx, my, t, ox, ry, wt, ppf)) { onTarget = true; break; }
+        }
     }
 
     canvas.style.cursor = onTarget ? 'grab' : '';
-
-    // Redraw so the cone hover label appears/disappears in real time
     if (state.showViewAngle) scheduleRender();
 });
 
 // ── Drag state ───────────────────────────────────────────────
-let isDraggingTable = false;
+let isDraggingTableId = null;  // null or table id being dragged
+let dragTableOffset = null;    // { x, y } pixel offset from table center to mouse at drag start
 let isDraggingCenter = false;
 
 // ── Mouse down: start drag ───────────────────────────────────
@@ -2191,7 +2445,7 @@ canvas.addEventListener('mousedown', e => {
     if (state.viewMode !== 'top') return;
     const { mx, my, ppf, ox, ry, wt, cX, cY } = getDragMetrics(e);
 
-    // Try center device first
+    // Center device takes priority
     if (state.includeCenter) {
         const ceq = EQUIPMENT[getCenterEqKey()];
         const cs = Math.max(12, ceq.width * ppf * 3);
@@ -2203,57 +2457,71 @@ canvas.addEventListener('mousedown', e => {
         }
     }
 
-    // Try table
-    const tl = state.tableLength * ppf;
-    const tw = state.tableWidth * ppf;
-    const tx = ox - tw / 2;
-    const ty = ry + wt + state.tableDist * ppf;
-    if (mx >= tx && mx <= tx + tw && my >= ty && my <= ty + tl) {
-        isDraggingTable = true;
-        canvas.style.cursor = 'grabbing';
-        pushHistory();
+    // Check tables in reverse order (topmost rendered last = visually on top)
+    for (let i = state.tables.length - 1; i >= 0; i--) {
+        const t = state.tables[i];
+        if (isPointInTableHitbox(mx, my, t, ox, ry, wt, ppf)) {
+            if (t.id !== state.selectedTableId) selectTable(t.id);
+            isDraggingTableId = t.id;
+            const tcx = ox + t.x * ppf;
+            const tcy = ry + wt + t.dist * ppf + (t.length * ppf) / 2;
+            dragTableOffset = { x: mx - tcx, y: my - tcy };
+            canvas.style.cursor = 'grabbing';
+            pushHistory();
+            return;
+        }
     }
 });
 
 // ── Mouse move: update position while dragging ───────────────
 canvas.addEventListener('mousemove', e => {
-    if (!isDraggingTable && !isDraggingCenter) return;
-    const { mx, my, ppf, ox, ry, wt, ty2 } = getDragMetrics(e);
+    if (isDraggingTableId === null && !isDraggingCenter) return;
+    const { mx, my, ppf, ox, ry, wt, tableX_px, ty2 } = getDragMetrics(e);
 
-    if (isDraggingTable) {
-        let nd = (my - ry - wt) / ppf;
-        nd = Math.max(0, Math.min(nd, state.roomLength - state.tableLength));
-        nd = Math.round(nd * 2) / 2; // snap to 0.5 ft
+    if (isDraggingTableId !== null) {
+        const t = state.tables.find(tbl => tbl.id === isDraggingTableId);
+        if (t) {
+            const newCX = mx - dragTableOffset.x;
+            const newCY = my - dragTableOffset.y;
 
-        if (nd !== state.tableDist) {
-            state.tableDist = nd;
-            DOM['table-dist'].value = nd;
-            DOM['val-table-dist'].textContent = formatFtIn(nd);
-            scheduleRender(); // rAF-guarded instead of direct render()
+            let nd = (newCY - ry - wt) / ppf - t.length / 2;
+            nd = Math.round(Math.max(0, Math.min(state.roomLength - t.length, nd)) * 2) / 2;
+
+            let nx = (newCX - ox) / ppf;
+            nx = Math.round(Math.max(-(state.roomWidth / 2 - t.width / 2), Math.min(state.roomWidth / 2 - t.width / 2, nx)) * 2) / 2;
+
+            t.dist = nd; t.x = nx;
+
+            // Keep flat state in sync for the selected table
+            if (t.id === state.selectedTableId) {
+                state.tableDist = nd; state.tableX = nx;
+                DOM['table-dist'].value = nd; DOM['val-table-dist'].textContent = formatFtIn(nd);
+                DOM['table-x'].value = nx; DOM['val-table-x'].textContent = formatFtIn(nx);
+                updateSliderTrack(DOM['table-dist']); updateSliderTrack(DOM['table-x']);
+            }
+            scheduleRender();
         }
     } else if (isDraggingCenter) {
-        let nx = (mx - ox) / ppf;
+        const selT = getSelectedTable();
+        let nx = (mx - tableX_px) / ppf;
         let ny = (my - ty2) / ppf;
-
-        // Constrain to table bounds
-        nx = Math.max(-state.tableWidth / 2, Math.min(nx, state.tableWidth / 2));
-        ny = Math.max(-state.tableLength / 2, Math.min(ny, state.tableLength / 2));
-
+        nx = Math.max(-selT.width / 2, Math.min(nx, selT.width / 2));
+        ny = Math.max(-selT.length / 2, Math.min(ny, selT.length / 2));
         state.centerPos = { x: nx, y: ny };
-        scheduleRender(); // rAF-guarded instead of direct render()
+        scheduleRender();
     }
 });
 
 // ── Mouse up / leave: end drag ───────────────────────────────
 canvas.addEventListener('mouseup', () => {
-    isDraggingTable = false;
+    isDraggingTableId = null; dragTableOffset = null;
     isDraggingCenter = false;
     canvas.style.cursor = '';
     serializeToHash();
 });
 
 canvas.addEventListener('mouseleave', () => {
-    isDraggingTable = false;
+    isDraggingTableId = null; dragTableOffset = null;
     isDraggingCenter = false;
     canvas.style.cursor = '';
     mousePos = { x: -9999, y: -9999 };
@@ -2266,18 +2534,18 @@ function checkRoomWarnings() {
     const w = DOM['room-warning'];
     const t = DOM['room-warning-text'];
     const issues = [];
+    const multi = state.tables.length > 1;
 
-    if (state.tableWidth > state.roomWidth) {
-        issues.push(
-            `Table width (${formatFtIn(state.tableWidth)}) exceeds room width (${formatFtIn(state.roomWidth)}).`
-        );
-    }
-    const tableEnd = state.tableDist + state.tableLength;
-    if (tableEnd > state.roomLength) {
-        issues.push(
-            `Table reaches ${formatFtIn(tableEnd)} but room is only ${formatFtIn(state.roomLength)} deep.`
-        );
-    }
+    state.tables.forEach(tbl => {
+        const prefix = multi ? `T${tbl.id}: ` : '';
+        if (tbl.width > state.roomWidth) {
+            issues.push(`${prefix}width (${formatFtIn(tbl.width)}) exceeds room width.`);
+        }
+        const tableEnd = tbl.dist + tbl.length;
+        if (tableEnd > state.roomLength) {
+            issues.push(`${prefix}extends ${formatFtIn(tableEnd)} but room is only ${formatFtIn(state.roomLength)} deep.`);
+        }
+    });
 
     if (issues.length) {
         t.innerHTML = issues.join('<br>');
@@ -2332,6 +2600,13 @@ document.querySelectorAll('[data-toggle-group]').forEach(el => {
     el.addEventListener('click', () => {
         toggleGroup(el.dataset.toggleGroup);
     });
+});
+
+// ── Table manager buttons ─────────────────────────────────────
+document.getElementById('add-table-btn').addEventListener('click', addTable);
+document.getElementById('remove-table-btn').addEventListener('click', removeTable);
+document.querySelectorAll('.arr-pill[data-arrangement]').forEach(btn => {
+    btn.addEventListener('click', () => applyArrangement(btn.dataset.arrangement));
 });
 
 // ── Room preset pills ────────────────────────────────────────
@@ -2454,6 +2729,7 @@ initTheme();
 setBrand('neat');
 initGroups();
 initSliderTracks();
+renderTableList();
 
 // Auto-minimize info overlay on small screens
 if (window.innerWidth <= 900) {
