@@ -104,6 +104,35 @@ function addTable() {
     scheduleRender();
 }
 
+/** Duplicate a specific table (spawns the copy offset slightly from the original) */
+function duplicateTable(sourceId) {
+    syncTableFromFlatState();
+    const src = state.tables.find(t => t.id === sourceId);
+    if (!src) return;
+    const newId = Math.max(...state.tables.map(t => t.id)) + 1;
+    // Offset the duplicate slightly so it doesn't sit directly on top
+    const newDist = Math.min(src.dist + 1.5, state.roomLength - src.length);
+    const newX = Math.min(src.x + 1, state.roomWidth / 2 - src.width / 2);
+    const newTable = {
+        id: newId,
+        shape: src.shape,
+        length: src.length,
+        width: src.width,
+        x: Math.max(-(state.roomWidth / 2 - src.width / 2), newX),
+        dist: Math.max(0, newDist),
+        height: src.height,
+        rotation: src.rotation
+    };
+    state.tables.push(newTable);
+    state.selectedTableId = newId;
+    syncFlatStateFromTable(newTable);
+    state.centerPos = { x: 0, y: 0 };
+    updateTableSliders();
+    renderTableList();
+    pushHistory();
+    scheduleRender();
+}
+
 /** Remove the currently selected table */
 function removeTable() {
     if (state.tables.length <= 1) return;

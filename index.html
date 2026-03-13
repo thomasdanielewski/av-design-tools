@@ -470,6 +470,33 @@
         </div>
     </main>
 
+    <!-- Context Menu (right-click on canvas table) -->
+    <div id="context-menu" class="context-menu">
+        <button class="context-menu-btn" data-action="ctx-duplicate">
+            <span class="context-menu-icon">⊕</span> Duplicate Table
+        </button>
+        <button class="context-menu-btn" data-action="ctx-rotate">
+            <span class="context-menu-icon">↻</span> Rotate 90°
+        </button>
+        <button class="context-menu-btn" data-action="ctx-reset-rotation">
+            <span class="context-menu-icon">⟲</span> Reset Rotation
+        </button>
+        <div class="context-menu-sep"></div>
+        <button class="context-menu-btn" data-action="ctx-center">
+            <span class="context-menu-icon">⊞</span> Center in Room
+        </button>
+        <button class="context-menu-btn" data-action="ctx-bring-front">
+            <span class="context-menu-icon">▲</span> Bring to Front
+        </button>
+        <button class="context-menu-btn" data-action="ctx-send-back">
+            <span class="context-menu-icon">▼</span> Send to Back
+        </button>
+        <div class="context-menu-sep"></div>
+        <button class="context-menu-btn context-menu-btn--danger" data-action="ctx-delete">
+            <span class="context-menu-icon">✕</span> Delete Table
+        </button>
+    </div>
+
     <script src="data.js?v=3"></script>
     <script src="constants.js?v=3"></script>
     <script src="theme.js?v=3"></script>

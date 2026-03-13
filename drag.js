@@ -675,3 +675,145 @@ canvas.addEventListener('dblclick', e => {
     markViewportDirty();
     applyViewportTransform();
 });
+
+// ── Context menu (right-click) ───────────────────────────────
+const _ctxMenu = document.getElementById('context-menu');
+let _ctxTargetTableId = null;
+
+function hideContextMenu() {
+    if (_ctxMenu) {
+        _ctxMenu.classList.remove('visible');
+    }
+}
+
+canvas.addEventListener('contextmenu', e => {
+    e.preventDefault();
+    hideContextMenu();
+
+    if (state.viewMode !== 'top') return;
+
+    const { mx, my, ppf, ox, ry, wt } = getDragMetrics(e);
+
+    // Hit-test tables in reverse order (topmost first)
+    let hitTable = null;
+    for (let i = state.tables.length - 1; i >= 0; i--) {
+        if (isPointInTableHitbox(mx, my, state.tables[i], ox, ry, wt, ppf)) {
+            hitTable = state.tables[i];
+            break;
+        }
+    }
+
+    if (!hitTable) return;
+
+    // Select the right-clicked table
+    if (hitTable.id !== state.selectedTableId) {
+        selectTable(hitTable.id);
+    }
+    _ctxTargetTableId = hitTable.id;
+
+    // Disable delete if only one table
+    const deleteBtn = _ctxMenu.querySelector('[data-action="ctx-delete"]');
+    if (deleteBtn) deleteBtn.disabled = state.tables.length <= 1;
+
+    // Position the menu at the mouse location
+    const containerRect = document.querySelector('.canvas-container').getBoundingClientRect();
+    let left = e.clientX - containerRect.left;
+    let top = e.clientY - containerRect.top;
+
+    // Ensure the menu stays within the container bounds
+    _ctxMenu.style.left = left + 'px';
+    _ctxMenu.style.top = top + 'px';
+    _ctxMenu.classList.add('visible');
+
+    // Adjust if the menu overflows the container
+    requestAnimationFrame(() => {
+        const menuRect = _ctxMenu.getBoundingClientRect();
+        if (menuRect.right > containerRect.right) {
+            left -= (menuRect.right - containerRect.right + 8);
+            _ctxMenu.style.left = left + 'px';
+        }
+        if (menuRect.bottom > containerRect.bottom) {
+            top -= (menuRect.bottom - containerRect.bottom + 8);
+            _ctxMenu.style.top = top + 'px';
+        }
+    });
+});
+
+// Global click hides the context menu
+document.addEventListener('mousedown', e => {
+    if (_ctxMenu && !_ctxMenu.contains(e.target)) {
+        hideContextMenu();
+    }
+});
+
+// Escape key hides the context menu
+document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') hideContextMenu();
+});
+
+// Context menu button handlers
+_ctxMenu.addEventListener('click', e => {
+    const btn = e.target.closest('[data-action]');
+    if (!btn || btn.disabled) return;
+    const action = btn.dataset.action;
+    const t = state.tables.find(tbl => tbl.id === _ctxTargetTableId);
+
+    if (action === 'ctx-duplicate' && t) {
+        duplicateTable(t.id);
+    } else if (action === 'ctx-rotate' && t) {
+        t.rotation = (t.rotation + 90) % 360;
+        if (t.id === state.selectedTableId) {
+            state.tableRotation = t.rotation;
+            DOM['table-rotation'].value = t.rotation;
+            DOM['val-table-rotation'].textContent = `${t.rotation}°`;
+            updateSliderTrack(DOM['table-rotation']);
+        }
+        pushHistory();
+        scheduleRender();
+    } else if (action === 'ctx-reset-rotation' && t) {
+        t.rotation = 0;
+        if (t.id === state.selectedTableId) {
+            state.tableRotation = 0;
+            DOM['table-rotation'].value = 0;
+            DOM['val-table-rotation'].textContent = '0°';
+            updateSliderTrack(DOM['table-rotation']);
+        }
+        pushHistory();
+        scheduleRender();
+    } else if (action === 'ctx-center' && t) {
+        t.x = 0;
+        if (t.id === state.selectedTableId) {
+            state.tableX = 0;
+            DOM['table-x'].value = 0;
+            DOM['val-table-x'].textContent = formatFtIn(0);
+            updateSliderTrack(DOM['table-x']);
+        }
+        pushHistory();
+        scheduleRender();
+    } else if (action === 'ctx-bring-front' && t) {
+        const idx = state.tables.indexOf(t);
+        if (idx < state.tables.length - 1) {
+            state.tables.splice(idx, 1);
+            state.tables.push(t);
+            pushHistory();
+            scheduleRender();
+        }
+    } else if (action === 'ctx-send-back' && t) {
+        const idx = state.tables.indexOf(t);
+        if (idx > 0) {
+            state.tables.splice(idx, 1);
+            state.tables.unshift(t);
+            pushHistory();
+            scheduleRender();
+        }
+    } else if (action === 'ctx-delete') {
+        if (state.tables.length > 1) {
+            if (_ctxTargetTableId !== state.selectedTableId) {
+                selectTable(_ctxTargetTableId);
+            }
+            removeTable();
+        }
+    }
+
+    hideContextMenu();
+});

@@ -2229,6 +2229,101 @@ select:focus-visible {
 
 
 /* ══════════════════════════════════════════════════════════════
+   CONTEXT MENU — Right-click on canvas tables
+   ══════════════════════════════════════════════════════════════ */
+.context-menu {
+    position: absolute;
+    display: none;
+    z-index: 1000;
+    min-width: 180px;
+    padding: 6px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-sm);
+    box-shadow:
+        0 8px 32px rgba(0, 0, 0, 0.45),
+        0 2px 8px rgba(0, 0, 0, 0.25),
+        0 0 1px rgba(0, 0, 0, 0.4);
+    opacity: 0;
+    transform: scale(0.96) translateY(-4px);
+    transform-origin: top left;
+    transition:
+        opacity 0.18s var(--ease-out),
+        transform 0.18s var(--ease-out);
+    pointer-events: none;
+    font-family: var(--font-body);
+}
+
+.context-menu.visible {
+    display: block;
+    opacity: 1;
+    transform: scale(1) translateY(0);
+    pointer-events: auto;
+}
+
+.context-menu-btn {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 7px 12px;
+    border: none;
+    border-radius: calc(var(--radius-sm) - 2px);
+    background: transparent;
+    color: var(--text-primary);
+    font-family: var(--font-body);
+    font-size: var(--text-base);
+    cursor: pointer;
+    transition: background 0.12s var(--ease-out);
+    text-align: left;
+    white-space: nowrap;
+}
+
+.context-menu-btn:hover {
+    background: var(--bg-hover);
+}
+
+.context-menu-btn:active {
+    background: var(--bg-active);
+}
+
+.context-menu-btn--danger {
+    color: var(--error-red);
+}
+
+.context-menu-btn--danger:hover {
+    background: rgba(239, 68, 68, 0.1);
+}
+
+.context-menu-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    font-size: 13px;
+    color: var(--text-secondary);
+    flex-shrink: 0;
+}
+
+.context-menu-btn--danger .context-menu-icon {
+    color: var(--error-red);
+}
+
+.context-menu-sep {
+    height: 1px;
+    margin: 4px 8px;
+    background: var(--border-subtle);
+}
+
+[data-theme="light"] .context-menu {
+    box-shadow:
+        0 8px 32px rgba(0, 0, 0, 0.16),
+        0 2px 8px rgba(0, 0, 0, 0.10),
+        0 0 1px rgba(0, 0, 0, 0.12);
+}
+
+
+/* ══════════════════════════════════════════════════════════════
    ACCESSIBILITY — Reduced Motion & High Contrast
    ══════════════════════════════════════════════════════════════ */
 @media (prefers-reduced-motion: reduce) {
