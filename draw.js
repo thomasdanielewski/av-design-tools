@@ -350,6 +350,7 @@ function drawEquipmentTopDown(dispX, dispY, dispDepthPx, dispWidthPx,
  * Returns array of { x, y, angle } where angle is the outward-facing normal.
  */
 function getChairPositions(table) {
+    if (state.seatingDensity === 'none') return [];
     const spacing = CHAIR_SPACING[state.seatingDensity] || CHAIR_SPACING.normal;
     const gap = CHAIR_GAP;
     const hw = table.width / 2;
