@@ -34,7 +34,7 @@ const HASH_KEYS = {
     rl: 'roomLength', rw: 'roomWidth', rch: 'ceilingHeight',
     tl: 'tableLength', tw: 'tableWidth', td: 'tableDist',
     th: 'tableHeight', ts: 'tableShape', tx: 'tableX', tr: 'tableRotation',
-    dc: 'displayCount', ds: 'displaySize', de: 'displayElev', dox: 'displayOffsetX',
+    dc: 'displayCount', ds: 'displaySize', de: 'displayElev', dox: 'displayOffsetX', dw: 'displayWall',
     br: 'brand', vb: 'videoBar', mp: 'mountPos',
     ic: 'includeCenter', im: 'includeMicPod',
     sc: 'showCamera', sm: 'showMic', sg: 'showGrid', sv: 'showViewAngle',

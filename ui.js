@@ -67,6 +67,30 @@ function setDisplayCount(n) {
     render();
 }
 
+/** Set the display wall (north / south / east / west) */
+function setDisplayWall(w) {
+    state.displayWall = w;
+    DOM['display-wall-toggle']
+        .querySelectorAll('.toggle-btn')
+        .forEach(b => {
+            const isActive = b.dataset.val === w;
+            b.classList.toggle('active', isActive);
+            b.setAttribute('aria-pressed', isActive);
+        });
+    // Update structural element wall dropdown labels
+    const wallSelect = DOM['element-wall'];
+    if (wallSelect) {
+        const labels = { north: 'North', south: 'South', east: 'East', west: 'West' };
+        Array.from(wallSelect.options).forEach(opt => {
+            const base = labels[opt.value];
+            const suffix = opt.value === w ? ' (Display)' : '';
+            opt.textContent = base + suffix;
+        });
+    }
+    if (!_suppressHistory) pushHistory();
+    render();
+}
+
 /** Set the bar mount position (above / below display) */
 function setMountPos(p) {
     state.mountPos = p;
@@ -96,17 +120,22 @@ function setViewMode(m) {
         DOM['pov-controls'].style.display = 'block';
         DOM['cg-overlays'].style.display = 'none';
 
+        // Display wall determines which dimension is depth vs width for POV
+        const isNS = (state.displayWall === 'north' || state.displayWall === 'south');
+        const povDepth = isNS ? state.roomLength : state.roomWidth;
+        const povWidth = isNS ? state.roomWidth : state.roomLength;
+
         // Auto-set viewer distance to table far edge if it was still at default
         if (state.viewerDist === 12 && state.tableDist + state.tableLength !== 12) {
-            state.viewerDist = Math.max(1, state.tableDist + state.tableLength);
+            state.viewerDist = Math.max(1, Math.min(povDepth, state.tableDist + state.tableLength));
             DOM['viewer-dist'].value = state.viewerDist;
             DOM['val-viewer-dist'].textContent = formatFtIn(state.viewerDist);
         }
 
-        // Clamp slider ranges to room dims
-        DOM['viewer-dist'].max = state.roomLength;
-        DOM['viewer-offset'].min = -state.roomWidth / 2;
-        DOM['viewer-offset'].max = state.roomWidth / 2;
+        // Clamp slider ranges to room dims based on display wall
+        DOM['viewer-dist'].max = povDepth;
+        DOM['viewer-offset'].min = -povWidth / 2;
+        DOM['viewer-offset'].max = povWidth / 2;
     } else {
         DOM['pov-controls'].style.display = 'none';
         DOM['cg-overlays'].style.display = 'block';
@@ -216,11 +245,12 @@ function applyPreset(len, wid, targetBtn) {
     document.querySelectorAll('.preset-pill').forEach(p => p.classList.remove('active'));
     if (targetBtn) targetBtn.classList.add('active');
 
-    // Sync POV slider ranges to new room size
+    // Sync POV slider ranges to new room size (account for display wall)
     if (state.viewMode === 'pov') {
-        DOM['viewer-dist'].max = len;
-        DOM['viewer-offset'].min = -wid / 2;
-        DOM['viewer-offset'].max = wid / 2;
+        const isNS = (state.displayWall === 'north' || state.displayWall === 'south');
+        DOM['viewer-dist'].max = isNS ? len : wid;
+        DOM['viewer-offset'].min = -(isNS ? wid : len) / 2;
+        DOM['viewer-offset'].max = (isNS ? wid : len) / 2;
     }
 
     pushHistory();

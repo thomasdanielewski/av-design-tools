@@ -34,6 +34,36 @@ function renderPOV(cw, ch, dpr) {
     const eye = state.posture === 'seated' ? 48 : 65; // eye height in inches
     const hY = cy;
 
+    // Display wall affects which room dimension is "width" (cross-wall) vs "depth"
+    const dw = state.displayWall;
+    const isNS = (dw === 'north' || dw === 'south');
+    const frontWallWidth = isNS ? state.roomWidth : state.roomLength;
+    const roomDepth = isNS ? state.roomLength : state.roomWidth;
+
+    /**
+     * Transform room-space table coords into POV-space.
+     * Returns { px: lateral ft, pz: depth from display wall ft, rotOffset: degrees }
+     */
+    function tableToPOV(t) {
+        const roomCX = t.x;
+        const roomCZ = t.dist + t.length / 2;
+        let px, pz, rotOffset;
+        if (dw === 'north') {
+            px = roomCX; pz = roomCZ; rotOffset = 0;
+        } else if (dw === 'south') {
+            px = -roomCX; pz = state.roomLength - roomCZ; rotOffset = 180;
+        } else if (dw === 'east') {
+            px = -(roomCZ - state.roomLength / 2);
+            pz = state.roomWidth / 2 - roomCX;
+            rotOffset = -90;
+        } else {
+            px = roomCZ - state.roomLength / 2;
+            pz = state.roomWidth / 2 + roomCX;
+            rotOffset = 90;
+        }
+        return { px, pz, rotOffset };
+    }
+
     /** Project a 3D point (x ft, y inches, z ft) to 2D screen coords */
     function proj(x, y, z) {
         const d = Math.max(0.5, vd - z);
@@ -47,7 +77,7 @@ function renderPOV(cw, ch, dpr) {
     // ── Room sketch: walls, ceiling, floor lines ─────────
     {
         const ceilHI = state.ceilingHeight * 12;
-        const rHW = state.roomWidth / 2;
+        const rHW = frontWallWidth / 2;
         const nearZ = Math.max(0.1, vd - 0.3);
 
         // Front wall corners (z=0, the display wall)
@@ -141,7 +171,7 @@ function renderPOV(cw, ch, dpr) {
             ctx.beginPath(); ctx.moveTo(fTL.x, dimY - tw); ctx.lineTo(fTL.x, dimY + tw); ctx.stroke();
             ctx.beginPath(); ctx.moveTo(fTR.x, dimY - tw); ctx.lineTo(fTR.x, dimY + tw); ctx.stroke();
 
-            const lbl = formatFtIn(state.roomWidth);
+            const lbl = formatFtIn(frontWallWidth);
             ctx.font = "600 11px 'JetBrains Mono', monospace";
             const lw = ctx.measureText(lbl).width + 14;
             const lhb = 20;
@@ -229,10 +259,11 @@ function renderPOV(cw, ch, dpr) {
     // ── Draw all tables in perspective ───────────────────
     state.tables.forEach(t => {
         const thi_t = t.height;
-        const angle_t = t.rotation * Math.PI / 180;
+        const { px: tPovX, pz: tPovZ, rotOffset } = tableToPOV(t);
+        const angle_t = (t.rotation + rotOffset) * Math.PI / 180;
         const cos_t = Math.cos(angle_t), sin_t = Math.sin(angle_t);
         const hw = t.width / 2, hl = t.length / 2;
-        const cx_t = t.x, cz_t = t.dist + hl;
+        const cx_t = tPovX, cz_t = tPovZ;
 
         function rcPOV(lx, lz) {
             return { wx: cx_t + lx * cos_t - lz * sin_t, wz: cz_t + lx * sin_t + lz * cos_t };
@@ -274,9 +305,10 @@ function renderPOV(cw, ch, dpr) {
     // ── Draw center companion in POV ─────────────────────
     if (state.includeCenter) {
         const centerEq = EQUIPMENT[getCenterEqKey()];
-        const tableCenterZ = state.tableDist + state.tableLength / 2;
-        const centerZ = tableCenterZ + state.centerPos.y;
-        const centerXOff = state.tableX + state.centerPos.x;
+        // Transform center device position to POV space
+        const selTPov = tableToPOV(getSelectedTable());
+        const centerZ = selTPov.pz + state.centerPos.y;
+        const centerXOff = selTPov.px + state.centerPos.x;
         const centerEqHI = centerEq.height * 12;
         const centerEqWF = centerEq.width;
 
@@ -432,8 +464,9 @@ function renderPOV(cw, ch, dpr) {
     }
 
     // ── Update DOM ───────────────────────────────────────
+    const wallLabel = { north: 'N', south: 'S', east: 'E', west: 'W' }[dw];
     DOM['header-room'].textContent =
-        `POV: ${formatFtIn(vd)} from display`;
+        `POV: ${formatFtIn(vd)} from display (${wallLabel})`;
     DOM['header-device'].textContent =
         eq.name + (state.includeCenter ? ' + ' + EQUIPMENT[getCenterEqKey()].name : '');
     updateInfoOverlay(eq, state.includeCenter ? EQUIPMENT[getCenterEqKey()] : null);
