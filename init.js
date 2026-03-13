@@ -25,6 +25,7 @@ bindSlider('viewer-offset', 'viewerOffset', 'val-viewer-offset');
 
 // ── Wire up selects ──────────────────────────────────────────
 bindSelect('table-shape', 'tableShape');
+bindSelect('seating-density', 'seatingDensity');
 bindSelect('video-bar', 'videoBar');
 
 // ── Wire up checkboxes ───────────────────────────────────────

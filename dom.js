@@ -42,6 +42,7 @@ function cacheDOMRefs() {
         'pov-controls', 'cg-overlays', 'center-label', 'micpod-row',
         'mic-warning', 'mic-warning-btn', 'mic-warning-text',
         'room-warning', 'room-warning-text',
+        'seating-density', 'header-capacity',
         'header-room', 'header-device', 'mount-row', 'info-overlay',
         'info-content', 'info-title', 'undo-btn', 'redo-btn', 'share-btn',
         'legend-camera', 'legend-mic', 'download-btn', 'export-btn',

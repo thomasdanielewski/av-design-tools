@@ -3,6 +3,7 @@ const state = {
     roomLength: 20, roomWidth: 15, ceilingHeight: 9,
     tableLength: 8, tableWidth: 4, tableDist: 4,
     tableShape: 'rectangular', tableHeight: 30, tableX: 0, tableRotation: 0,
+    seatingDensity: 'normal',
     tables: [{ id: 1, shape: 'rectangular', length: 8, width: 4, x: 0, dist: 4, height: 30, rotation: 0 }],
     selectedTableId: 1,
     displayCount: 1, displaySize: 65, displayElev: 54, displayOffsetX: 0,
@@ -181,6 +182,10 @@ function syncUIFromState() {
     // Table shape
     const ts = DOM['table-shape'];
     if (ts) ts.value = state.tableShape;
+
+    // Seating density
+    const sd = DOM['seating-density'];
+    if (sd) sd.value = state.seatingDensity;
 
     // Re-render table list
     renderTableList();
