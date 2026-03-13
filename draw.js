@@ -313,7 +313,7 @@ function drawEquipmentTopDown(ox, ry, wallThick, dispY, dispDepthPx, dispWidthPx
 
 /**
  * Calculate chair positions around a table in local (unrotated) coordinates.
- * Returns array of { x, y, angle } where angle is the outward-facing direction.
+ * Returns array of { x, y, angle } where angle is the outward-facing normal.
  */
 function getChairPositions(table) {
     const spacing = CHAIR_SPACING[state.seatingDensity] || CHAIR_SPACING.normal;
@@ -379,12 +379,12 @@ function getChairPositions(table) {
         // Right edge down to semicircle start (chairs face right)
         const semiY = hl - hw;
         distributeAlongEdge(hw + gap, -hl, hw + gap, semiY, 0);
-        // Bottom semicircle
+        // Bottom semicircle (arc from 0 to π: right → bottom → left)
         const semiR = hw + gap;
         const semiPerim = Math.PI * semiR;
         const semiCount = Math.max(2, Math.floor(semiPerim / spacing));
         for (let i = 0; i < semiCount; i++) {
-            const t = -Math.PI / 2 + (Math.PI * (i + 0.5)) / semiCount;
+            const t = (Math.PI * (i + 0.5)) / semiCount;
             chairs.push({
                 x: semiR * Math.cos(t),
                 y: semiY + semiR * Math.sin(t),
@@ -430,14 +430,16 @@ function drawChairsForTable(chairs, ppf, alpha) {
         const cy = chair.y * ppf;
         ctx.save();
         ctx.translate(cx, cy);
-        ctx.rotate(chair.angle);
+        // Rotate so local Y- points outward (away from table).
+        // angle is the outward normal; adding π/2 maps local Y- to that direction.
+        ctx.rotate(chair.angle + Math.PI / 2);
 
         // Seat: rounded rectangle
         roundRect(ctx, -cw / 2, -cd / 2, cw, cd, 3);
         ctx.fill();
         ctx.stroke();
 
-        // Backrest indicator: small arc on the far edge (away from table)
+        // Backrest indicator: small arc on the outer edge (Y- side, away from table)
         ctx.beginPath();
         ctx.arc(0, -cd / 2, cw * 0.32, Math.PI * 0.15, Math.PI * 0.85);
         ctx.stroke();
