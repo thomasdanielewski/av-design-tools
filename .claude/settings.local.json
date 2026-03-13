@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(wc -l /c/Users/Thomas/Documents/GitHub/av-design-tools/*.js)",
+      "Bash(grep -n \"^//\" /c/Users/Thomas/Documents/GitHub/av-design-tools/app.js)",
+      "mcp__Claude_Preview__preview_start"
+    ]
+  }
+}

@@ -1,0 +1,241 @@
+// ── Multi-table Helpers ──────────────────────────────────────
+
+function getSelectedTable() {
+    return state.tables.find(t => t.id === state.selectedTableId) || state.tables[0];
+}
+
+/** Copy flat state table props → selected table object */
+function syncTableFromFlatState() {
+    const t = getSelectedTable();
+    if (!t) return;
+    t.shape = state.tableShape;
+    t.length = state.tableLength;
+    t.width = state.tableWidth;
+    t.x = state.tableX;
+    t.dist = state.tableDist;
+    t.height = state.tableHeight;
+    t.rotation = state.tableRotation;
+}
+
+/** Copy selected table object → flat state (does NOT update DOM) */
+function syncFlatStateFromTable(t) {
+    if (!t) return;
+    state.tableShape = t.shape;
+    state.tableLength = t.length;
+    state.tableWidth = t.width;
+    state.tableX = t.x;
+    state.tableDist = t.dist;
+    state.tableHeight = t.height;
+    state.tableRotation = t.rotation;
+}
+
+/** Update all table-related DOM sliders and badges from flat state */
+function updateTableSliders() {
+    DOM['table-shape'].value = state.tableShape;
+    DOM['table-length'].value = state.tableLength;
+    DOM['table-width'].value = state.tableWidth;
+    DOM['table-height'].value = state.tableHeight;
+    DOM['table-dist'].value = state.tableDist;
+    DOM['table-rotation'].value = state.tableRotation;
+    DOM['table-x'].value = state.tableX;
+    DOM['val-table-length'].textContent = formatFtIn(state.tableLength);
+    DOM['val-table-width'].textContent = formatFtIn(state.tableWidth);
+    DOM['val-table-height'].textContent = `${state.tableHeight}"`;
+    DOM['val-table-dist'].textContent = formatFtIn(state.tableDist);
+    DOM['val-table-rotation'].textContent = `${state.tableRotation}°`;
+    DOM['val-table-x'].textContent = formatFtIn(state.tableX);
+    syncCircleSliderRanges();
+    updateSliderTrack(DOM['table-length']);
+    updateSliderTrack(DOM['table-width']);
+    updateSliderTrack(DOM['table-height']);
+    updateSliderTrack(DOM['table-dist']);
+    updateSliderTrack(DOM['table-rotation']);
+    updateSliderTrack(DOM['table-x']);
+}
+
+/** Re-render the table selector pills */
+function renderTableList() {
+    const container = DOM['table-list'];
+    if (!container) return;
+    container.innerHTML = '';
+    state.tables.forEach(t => {
+        const btn = document.createElement('button');
+        btn.className = 'table-pill' + (t.id === state.selectedTableId ? ' active' : '');
+        const shapeLabel = { rectangular: 'Rect', oval: 'Oval', circle: 'Circle', 'd-shape': 'D' }[t.shape] || t.shape;
+        btn.textContent = `T${t.id} · ${shapeLabel}`;
+        btn.title = `${t.shape} ${formatFtIn(t.length)} × ${formatFtIn(t.width)}`;
+        btn.addEventListener('click', () => { selectTable(t.id); pushHistory(); });
+        container.appendChild(btn);
+    });
+    if (DOM['remove-table-btn']) DOM['remove-table-btn'].disabled = state.tables.length <= 1;
+}
+
+/** Select a table by id, syncing flat state and DOM */
+function selectTable(id) {
+    if (id === state.selectedTableId) return;
+    syncTableFromFlatState();
+    state.selectedTableId = id;
+    const t = getSelectedTable();
+    syncFlatStateFromTable(t);
+    state.centerPos = { x: 0, y: 0 };
+    updateTableSliders();
+    renderTableList();
+    scheduleRender();
+}
+
+/** Add a new table (copy of current settings, offset slightly) */
+function addTable() {
+    syncTableFromFlatState();
+    const newId = Math.max(...state.tables.map(t => t.id)) + 1;
+    const sel = getSelectedTable();
+    const newDist = Math.min(sel.dist + sel.length + 1, state.roomLength - sel.length - 0.5);
+    const newTable = {
+        id: newId, shape: 'rectangular',
+        length: Math.min(6, state.tableLength), width: Math.min(3, state.tableWidth),
+        x: 0, dist: Math.max(0, newDist), height: state.tableHeight, rotation: 0
+    };
+    state.tables.push(newTable);
+    state.selectedTableId = newId;
+    syncFlatStateFromTable(newTable);
+    state.centerPos = { x: 0, y: 0 };
+    updateTableSliders();
+    renderTableList();
+    pushHistory();
+    scheduleRender();
+}
+
+/** Remove the currently selected table */
+function removeTable() {
+    if (state.tables.length <= 1) return;
+    const idx = state.tables.findIndex(t => t.id === state.selectedTableId);
+    state.tables.splice(idx, 1);
+    const next = state.tables[Math.max(0, idx - 1)];
+    state.selectedTableId = next.id;
+    syncFlatStateFromTable(next);
+    state.centerPos = { x: 0, y: 0 };
+    updateTableSliders();
+    renderTableList();
+    pushHistory();
+    scheduleRender();
+}
+
+/** Apply a named table arrangement preset */
+function applyArrangement(name) {
+    syncTableFromFlatState();
+    const rl = state.roomLength, rw = state.roomWidth;
+    let tables = [];
+
+    if (name === 'u-shape') {
+        const sideLen = Math.min(rl * 0.48, 10);
+        const sideWid = 2.5;
+        const sideX = rw / 2 - sideWid / 2 - 0.5;
+        const backLen = Math.min(rw * 0.72, 12);
+        const backWid = 2.5;
+        // back table uses rotation=90 so "length" spans laterally
+        const backCenterZ = rl * 0.76;
+        const backDist = backCenterZ - backLen / 2;
+        tables = [
+            { id: 1, shape: 'rectangular', length: sideLen, width: sideWid, x: -sideX, dist: rl * 0.12, height: 30, rotation: 0 },
+            { id: 2, shape: 'rectangular', length: sideLen, width: sideWid, x: +sideX, dist: rl * 0.12, height: 30, rotation: 0 },
+            { id: 3, shape: 'rectangular', length: backWid, width: Math.min(backLen, 8), x: 0, dist: rl * 0.7, height: 30, rotation: 90 },
+        ];
+    } else if (name === 'classroom') {
+        const tl = Math.min(5, rl * 0.22), tw = Math.min(2.5, rw * 0.3);
+        const colX = rw * 0.26;
+        tables = [
+            { id: 1, shape: 'rectangular', length: tl, width: tw, x: -colX, dist: rl * 0.1, height: 30, rotation: 0 },
+            { id: 2, shape: 'rectangular', length: tl, width: tw, x: +colX, dist: rl * 0.1, height: 30, rotation: 0 },
+            { id: 3, shape: 'rectangular', length: tl, width: tw, x: -colX, dist: rl * 0.38, height: 30, rotation: 0 },
+            { id: 4, shape: 'rectangular', length: tl, width: tw, x: +colX, dist: rl * 0.38, height: 30, rotation: 0 },
+        ];
+    } else if (name === 'pods') {
+        const pd = Math.min(4, Math.min(rw * 0.35, rl * 0.25));
+        const colX = rw * 0.27;
+        tables = [
+            { id: 1, shape: 'circle', length: pd, width: pd, x: -colX, dist: rl * 0.1, height: 30, rotation: 0 },
+            { id: 2, shape: 'circle', length: pd, width: pd, x: +colX, dist: rl * 0.1, height: 30, rotation: 0 },
+            { id: 3, shape: 'circle', length: pd, width: pd, x: -colX, dist: rl * 0.38, height: 30, rotation: 0 },
+            { id: 4, shape: 'circle', length: pd, width: pd, x: +colX, dist: rl * 0.38, height: 30, rotation: 0 },
+        ];
+    }
+
+    // Clamp all tables to room bounds
+    tables.forEach(t => {
+        t.dist = Math.max(0, Math.min(t.dist, rl - t.length));
+        t.x = Math.max(-(rw / 2 - t.width / 2), Math.min(rw / 2 - t.width / 2, t.x));
+    });
+
+    state.tables = tables;
+    state.selectedTableId = 1;
+    syncFlatStateFromTable(tables[0]);
+    state.centerPos = { x: 0, y: 0 };
+    updateTableSliders();
+    renderTableList();
+    pushHistory();
+    scheduleRender();
+}
+
+// ── Validation ───────────────────────────────────────────────
+
+function enableCompanion() {
+    state.includeCenter = true;
+    DOM['include-center'].checked = true;
+    pushHistory();
+    render();
+}
+
+function checkMicRange() {
+    const eq = EQUIPMENT[state.videoBar];
+    const fe = state.tableDist + state.tableLength;
+    const ex = fe > eq.micRange;
+
+    const w = DOM['mic-warning'];
+    const b = DOM['mic-warning-btn'];
+    const t = DOM['mic-warning-text'];
+    const cn = state.brand === 'logitech' ? 'Logitech Sight' : 'Neat Center';
+
+    // Always remove old listener to prevent leak — re-added below only when needed
+    b.removeEventListener('click', enableCompanion);
+
+    if (ex && !state.includeCenter) {
+        // Warn user: mic can't reach the table's far edge
+        w.classList.add('visible');
+        b.classList.remove('resolved');
+        t.textContent = `Table far edge is ${(fe - eq.micRange).toFixed(1)} ft beyond the ${eq.name}'s ${eq.micRange} ft mic range.`;
+        b.innerHTML = `<span>+</span> Add ${cn} for extended coverage`;
+        b.addEventListener('click', enableCompanion, { once: true });
+    } else if (ex && state.includeCenter) {
+        // Companion is active — show resolved state
+        w.classList.add('visible');
+        b.classList.add('resolved');
+        t.textContent = `Table exceeds primary mic range — ${cn} provides supplemental coverage.`;
+        b.innerHTML = `✓ ${cn} active`;
+    } else {
+        w.classList.remove('visible');
+    }
+}
+
+function checkRoomWarnings() {
+    const w = DOM['room-warning'];
+    const t = DOM['room-warning-text'];
+    const issues = [];
+    const multi = state.tables.length > 1;
+
+    state.tables.forEach(tbl => {
+        const prefix = multi ? `T${tbl.id}: ` : '';
+        if (tbl.width > state.roomWidth) {
+            issues.push(`${prefix}width (${formatFtIn(tbl.width)}) exceeds room width.`);
+        }
+        const tableEnd = tbl.dist + tbl.length;
+        if (tableEnd > state.roomLength) {
+            issues.push(`${prefix}extends ${formatFtIn(tableEnd)} but room is only ${formatFtIn(state.roomLength)} deep.`);
+        }
+    });
+
+    if (issues.length) {
+        t.innerHTML = issues.join('<br>');
+        w.classList.add('visible');
+    } else {
+        w.classList.remove('visible');
+    }
+}
