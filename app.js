@@ -529,17 +529,25 @@ function bindSlider(id, sk, vl) {
     (DOM[id] || document.getElementById(id)).addEventListener('input', function () {
         let v = parseFloat(this.value);
 
-        // Mirror circle table sync
-        if (state.tableShape === 'circle') {
-            if (sk === 'tableLength') {
-                state.tableWidth = v;
-                DOM['table-width'].value = v;
-                DOM['val-table-width'].textContent = formatFtIn(v);
-            } else if (sk === 'tableWidth') {
-                state.tableLength = v;
-                DOM['table-length'].value = v;
-                DOM['val-table-length'].textContent = formatFtIn(v);
-            }
+        // Mirror circle table sync — clamp to the overlapping range of both sliders
+        if (state.tableShape === 'circle' && (sk === 'tableLength' || sk === 'tableWidth')) {
+            const circleMin = Math.max(
+                parseFloat(DOM['table-length'].min),
+                parseFloat(DOM['table-width'].min)
+            );
+            const circleMax = Math.min(
+                parseFloat(DOM['table-length'].max),
+                parseFloat(DOM['table-width'].max)
+            );
+            v = Math.min(circleMax, Math.max(circleMin, v));
+            this.value = v; // snap dragged slider thumb to clamped value
+
+            const other = sk === 'tableLength' ? 'tableWidth' : 'tableLength';
+            const otherSlider = sk === 'tableLength' ? 'table-width' : 'table-length';
+            const otherVal = sk === 'tableLength' ? 'val-table-width' : 'val-table-length';
+            state[other] = v;
+            DOM[otherSlider].value = v;
+            DOM[otherVal].textContent = formatFtIn(v);
         }
 
         state[sk] = v;
