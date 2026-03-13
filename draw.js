@@ -312,6 +312,143 @@ function drawEquipmentTopDown(ox, ry, wallThick, dispY, dispDepthPx, dispWidthPx
 }
 
 /**
+ * Calculate chair positions around a table in local (unrotated) coordinates.
+ * Returns array of { x, y, angle } where angle is the outward-facing direction.
+ */
+function getChairPositions(table) {
+    const spacing = CHAIR_SPACING[state.seatingDensity] || CHAIR_SPACING.normal;
+    const gap = CHAIR_GAP;
+    const hw = table.width / 2;
+    const hl = table.length / 2;
+    const chairs = [];
+
+    function distributeAlongEdge(startX, startY, endX, endY, outAngle) {
+        const dx = endX - startX, dy = endY - startY;
+        const edgeLen = Math.sqrt(dx * dx + dy * dy);
+        const count = Math.max(1, Math.floor(edgeLen / spacing));
+        const step = edgeLen / (count + 1);
+        const ux = dx / edgeLen, uy = dy / edgeLen;
+        for (let i = 1; i <= count; i++) {
+            chairs.push({
+                x: startX + ux * step * i,
+                y: startY + uy * step * i,
+                angle: outAngle
+            });
+        }
+    }
+
+    if (table.shape === 'rectangular') {
+        // Left edge (chairs face left)
+        distributeAlongEdge(-hw - gap, -hl, -hw - gap, hl, Math.PI);
+        // Right edge (chairs face right)
+        distributeAlongEdge(hw + gap, -hl, hw + gap, hl, 0);
+        // Bottom edge (chairs face down)
+        distributeAlongEdge(-hw, hl + gap, hw, hl + gap, Math.PI / 2);
+        // Top edge (chairs face up)
+        distributeAlongEdge(-hw, -hl - gap, hw, -hl - gap, -Math.PI / 2);
+    } else if (table.shape === 'oval') {
+        const a = hw + gap; // semi-axis X
+        const b = hl + gap; // semi-axis Y
+        const perim = Math.PI * (3 * (a + b) - Math.sqrt((3 * a + b) * (a + 3 * b)));
+        const count = Math.max(2, Math.floor(perim / spacing));
+        for (let i = 0; i < count; i++) {
+            const t = (2 * Math.PI * i) / count;
+            const nx = Math.cos(t) / a, ny = Math.sin(t) / b;
+            const nLen = Math.sqrt(nx * nx + ny * ny);
+            chairs.push({
+                x: a * Math.cos(t),
+                y: b * Math.sin(t),
+                angle: Math.atan2(ny / nLen, nx / nLen)
+            });
+        }
+    } else if (table.shape === 'circle') {
+        const r = Math.min(hw, hl) + gap;
+        const perim = 2 * Math.PI * r;
+        const count = Math.max(2, Math.floor(perim / spacing));
+        for (let i = 0; i < count; i++) {
+            const t = (2 * Math.PI * i) / count;
+            chairs.push({
+                x: r * Math.cos(t),
+                y: r * Math.sin(t),
+                angle: t
+            });
+        }
+    } else if (table.shape === 'd-shape') {
+        // Top straight edge (chairs face up)
+        distributeAlongEdge(-hw, -hl - gap, hw, -hl - gap, -Math.PI / 2);
+        // Right edge down to semicircle start (chairs face right)
+        const semiY = hl - hw;
+        distributeAlongEdge(hw + gap, -hl, hw + gap, semiY, 0);
+        // Bottom semicircle
+        const semiR = hw + gap;
+        const semiPerim = Math.PI * semiR;
+        const semiCount = Math.max(2, Math.floor(semiPerim / spacing));
+        for (let i = 0; i < semiCount; i++) {
+            const t = -Math.PI / 2 + (Math.PI * (i + 0.5)) / semiCount;
+            chairs.push({
+                x: semiR * Math.cos(t),
+                y: semiY + semiR * Math.sin(t),
+                angle: t
+            });
+        }
+        // Left edge from semicircle end back up (chairs face left)
+        distributeAlongEdge(-hw - gap, semiY, -hw - gap, -hl, Math.PI);
+    }
+
+    return chairs;
+}
+
+/**
+ * Calculate total seating capacity across all tables.
+ */
+function calcTotalCapacity() {
+    let total = 0;
+    for (const t of state.tables) {
+        total += getChairPositions(t).length;
+    }
+    return total;
+}
+
+/**
+ * Draw chairs around a single table. Called within the table's rotated/translated context.
+ * @param {Array} chairs - Array of {x, y, angle} in local table coords (feet)
+ * @param {number} ppf - pixels per foot
+ * @param {number} alpha - opacity (1.0 for selected, 0.55 for others)
+ */
+function drawChairsForTable(chairs, ppf, alpha) {
+    const cw = CHAIR_WIDTH * ppf;
+    const cd = CHAIR_DEPTH * ppf;
+
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = cc().chairFill;
+    ctx.strokeStyle = cc().chairStroke;
+    ctx.lineWidth = 1;
+
+    for (const chair of chairs) {
+        const cx = chair.x * ppf;
+        const cy = chair.y * ppf;
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.rotate(chair.angle);
+
+        // Seat: rounded rectangle
+        roundRect(ctx, -cw / 2, -cd / 2, cw, cd, 3);
+        ctx.fill();
+        ctx.stroke();
+
+        // Backrest indicator: small arc on the far edge (away from table)
+        ctx.beginPath();
+        ctx.arc(0, -cd / 2, cw * 0.32, Math.PI * 0.15, Math.PI * 0.85);
+        ctx.stroke();
+
+        ctx.restore();
+    }
+
+    ctx.restore();
+}
+
+/**
  * Draw the conference table in top-down view.
  */
 function drawTable(ox, ry, wallThick, ppf) {
@@ -396,6 +533,10 @@ function drawTable(ox, ry, wallThick, ppf) {
             ctx.lineTo(x0, y0);
             ctx.fill(); ctx.stroke();
         }
+
+        // Chairs around the table
+        const chairs = getChairPositions(t);
+        drawChairsForTable(chairs, ppf, isSelected ? 1.0 : 0.55);
 
         // Label
         ctx.font = `400 ${Math.max(7, ppf * 0.28)}px 'JetBrains Mono', monospace`;

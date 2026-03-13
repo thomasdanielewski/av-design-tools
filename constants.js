@@ -11,6 +11,13 @@ const DEBOUNCE_RESIZE = 100;
 const DRAG_HINT_DELAY = 800;
 const SCALE_BAR_CANDIDATES = [1, 2, 5, 10, 20];
 
+/** Chair spacing in feet per seat (center-to-center) by density */
+const CHAIR_SPACING = { sparse: 3.0, normal: 2.0, dense: 1.5 };
+/** Chair dimensions in feet */
+const CHAIR_WIDTH = 1.5;   // seat width
+const CHAIR_DEPTH = 1.2;   // seat depth (front-to-back)
+const CHAIR_GAP = 0.35;    // gap between table edge and chair center
+
 /** Slider state keys that map to per-table properties */
 const TABLE_SLIDER_PROPS = new Set([
     'tableLength', 'tableWidth', 'tableDist',
@@ -27,5 +34,6 @@ const HASH_KEYS = {
     ic: 'includeCenter', im: 'includeMicPod',
     sc: 'showCamera', sm: 'showMic', sg: 'showGrid', sv: 'showViewAngle',
     vm: 'viewMode', vd: 'viewerDist', vo: 'viewerOffset', po: 'posture',
-    cx: 'centerPosX', cy: 'centerPosY'
+    cx: 'centerPosX', cy: 'centerPosY',
+    sd: 'seatingDensity'
 };

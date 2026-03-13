@@ -47,6 +47,8 @@ const CANVAS_THEME = {
         centerInner: 'rgba(91, 156, 245, 0.12)',
         micPodStroke: 'rgba(74, 222, 128, 0.30)',
         micPodDot: 'rgba(74, 222, 128, 0.50)',
+        chairFill: 'rgba(160, 162, 170, 0.18)',
+        chairStroke: 'rgba(160, 162, 170, 0.30)',
     },
     light: {
         bg: '#F2F3F5',
@@ -92,6 +94,8 @@ const CANVAS_THEME = {
         centerInner: 'rgba(91, 156, 245, 0.15)',
         micPodStroke: 'rgba(34, 180, 100, 0.35)',
         micPodDot: 'rgba(34, 180, 100, 0.50)',
+        chairFill: 'rgba(100, 102, 110, 0.15)',
+        chairStroke: 'rgba(100, 102, 110, 0.28)',
     }
 };
 

@@ -8,6 +8,7 @@ function updateHeaderDOM(eq) {
         `${formatFtIn(state.roomLength)} × ${formatFtIn(state.roomWidth)}`;
     DOM['header-device'].textContent =
         eq.name + (state.includeCenter ? ' + ' + EQUIPMENT[getCenterEqKey()].name : '');
+    DOM['header-capacity'].textContent = `Capacity: ${calcTotalCapacity()}`;
     DOM['mount-row'].style.display =
         (eq.type === 'bar') ? '' : 'none';
 
