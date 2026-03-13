@@ -420,6 +420,33 @@ function drawTable(ox, ry, wallThick, ppf) {
             ctx.setLineDash([]);
             ctx.restore();
         }
+
+        // Rotation handle — stem + dot extending from the front (top edge) of the selected table
+        if (isSelected) {
+            const stemLen = 20;
+            const dotR = 5;
+            ctx.save();
+            ctx.translate(tcx, tcy);
+            ctx.rotate(angle);
+            const handleY = -tl / 2 - stemLen;
+            // Stem line
+            ctx.strokeStyle = 'rgba(238, 50, 36, 0.70)';
+            ctx.lineWidth = 1.5;
+            ctx.setLineDash([]);
+            ctx.beginPath();
+            ctx.moveTo(0, -tl / 2);
+            ctx.lineTo(0, handleY);
+            ctx.stroke();
+            // Handle dot
+            ctx.fillStyle = 'rgba(238, 50, 36, 0.85)';
+            ctx.strokeStyle = cc().bg;
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.arc(0, handleY, dotR, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+            ctx.restore();
+        }
     });
 }
 

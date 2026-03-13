@@ -3,7 +3,10 @@
     "allow": [
       "Bash(wc -l /c/Users/Thomas/Documents/GitHub/av-design-tools/*.js)",
       "Bash(grep -n \"^//\" /c/Users/Thomas/Documents/GitHub/av-design-tools/app.js)",
-      "mcp__Claude_Preview__preview_start"
+      "mcp__Claude_Preview__preview_start",
+      "Bash(done)",
+      "Bash(grep -n \"^import\\\\|^export\\\\|^require\" /c/Users/Thomas/Documents/GitHub/av-design-tools/*.js)",
+      "Bash(grep -n \"^function render\\\\|^let render\\\\|^const render\" /c/Users/Thomas/Documents/GitHub/av-design-tools/*.js)"
     ]
   }
 }

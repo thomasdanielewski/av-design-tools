@@ -62,30 +62,47 @@ function isPointInTableHitbox(mx, my, t, ox, ry, wt, ppf) {
     return Math.abs(lx) <= tw / 2 + DRAG_TOLERANCE && Math.abs(ly) <= tl / 2 + DRAG_TOLERANCE;
 }
 
+/** Hit-test the rotation handle dot (12px radius) for a table */
+function isPointOnRotateHandle(mx, my, t, ox, ry, wt, ppf) {
+    const tcx = ox + t.x * ppf;
+    const tcy = ry + wt + t.dist * ppf + (t.length * ppf) / 2;
+    const tl = t.length * ppf;
+    const angle = t.rotation * Math.PI / 180;
+    const stemLen = 20;
+    const dist = tl / 2 + stemLen;
+    const hx = tcx + dist * Math.sin(angle);
+    const hy = tcy - dist * Math.cos(angle);
+    return Math.sqrt((mx - hx) ** 2 + (my - hy) ** 2) <= 12;
+}
+
 // ── Cursor feedback on hover ─────────────────────────────────
 canvas.addEventListener('mousemove', e => {
     const _rect = canvas.getBoundingClientRect();
     mousePos.x = e.clientX - _rect.left;
     mousePos.y = e.clientY - _rect.top;
 
-    if (state.viewMode !== 'top' || isDraggingTableId !== null || isDraggingCenter) return;
+    if (state.viewMode !== 'top' || isDraggingTableId !== null || isDraggingCenter || isDraggingRotate) return;
     const { mx, my, ppf, ox, ry, wt, cX, cY } = getDragMetrics(e);
 
+    // Rotation handle takes cursor priority over table body
+    const selT = getSelectedTable();
+    const onRotateHandle = selT ? isPointOnRotateHandle(mx, my, selT, ox, ry, wt, ppf) : false;
+
     let onTarget = false;
-
-    if (state.includeCenter) {
-        const ceq = EQUIPMENT[getCenterEqKey()];
-        const cs = Math.max(12, ceq.width * ppf * 3);
-        if (Math.sqrt((mx - cX) ** 2 + (my - cY) ** 2) <= cs) onTarget = true;
-    }
-
-    if (!onTarget) {
-        for (const t of state.tables) {
-            if (isPointInTableHitbox(mx, my, t, ox, ry, wt, ppf)) { onTarget = true; break; }
+    if (!onRotateHandle) {
+        if (state.includeCenter) {
+            const ceq = EQUIPMENT[getCenterEqKey()];
+            const cs = Math.max(12, ceq.width * ppf * 3);
+            if (Math.sqrt((mx - cX) ** 2 + (my - cY) ** 2) <= cs) onTarget = true;
+        }
+        if (!onTarget) {
+            for (const t of state.tables) {
+                if (isPointInTableHitbox(mx, my, t, ox, ry, wt, ppf)) { onTarget = true; break; }
+            }
         }
     }
 
-    canvas.style.cursor = onTarget ? 'grab' : '';
+    canvas.style.cursor = onRotateHandle ? 'crosshair' : (onTarget ? 'grab' : '');
     if (state.showViewAngle) scheduleRender();
 });
 
@@ -93,6 +110,8 @@ canvas.addEventListener('mousemove', e => {
 let isDraggingTableId = null;
 let dragTableOffset = null;
 let isDraggingCenter = false;
+let isDraggingRotate = false;
+let isDraggingRotateTableId = null;
 
 // ── Mouse down: start drag ───────────────────────────────────
 canvas.addEventListener('mousedown', e => {
@@ -109,6 +128,16 @@ canvas.addEventListener('mousedown', e => {
             pushHistory();
             return;
         }
+    }
+
+    // Rotation handle (selected table, checked before table body to prevent false drags)
+    const selT = getSelectedTable();
+    if (selT && isPointOnRotateHandle(mx, my, selT, ox, ry, wt, ppf)) {
+        isDraggingRotate = true;
+        isDraggingRotateTableId = selT.id;
+        canvas.style.cursor = 'crosshair';
+        pushHistory();
+        return;
     }
 
     // Check tables in reverse order (topmost rendered last = visually on top)
@@ -129,7 +158,7 @@ canvas.addEventListener('mousedown', e => {
 
 // ── Mouse move: update position while dragging ───────────────
 canvas.addEventListener('mousemove', e => {
-    if (isDraggingTableId === null && !isDraggingCenter) return;
+    if (isDraggingTableId === null && !isDraggingCenter && !isDraggingRotate) return;
     const { mx, my, ppf, ox, ry, wt, tableX_px, ty2 } = getDragMetrics(e);
 
     if (isDraggingTableId !== null) {
@@ -163,6 +192,23 @@ canvas.addEventListener('mousemove', e => {
         ny = Math.max(-selT.length / 2, Math.min(ny, selT.length / 2));
         state.centerPos = { x: nx, y: ny };
         scheduleRender();
+    } else if (isDraggingRotate) {
+        const t = state.tables.find(tbl => tbl.id === isDraggingRotateTableId);
+        if (t) {
+            const tcx = ox + t.x * ppf;
+            const tcy = ry + wt + t.dist * ppf + (t.length * ppf) / 2;
+            const rawDeg = Math.atan2(mx - tcx, -(my - tcy)) * 180 / Math.PI;
+            const normalized = ((rawDeg % 360) + 360) % 360;
+            const snapped = Math.round(normalized / 10) * 10 % 360;
+            t.rotation = snapped;
+            if (t.id === state.selectedTableId) {
+                state.tableRotation = snapped;
+                DOM['table-rotation'].value = snapped;
+                DOM['val-table-rotation'].textContent = `${snapped}°`;
+                updateSliderTrack(DOM['table-rotation']);
+            }
+            scheduleRender();
+        }
     }
 });
 
@@ -170,6 +216,7 @@ canvas.addEventListener('mousemove', e => {
 canvas.addEventListener('mouseup', () => {
     isDraggingTableId = null; dragTableOffset = null;
     isDraggingCenter = false;
+    isDraggingRotate = false; isDraggingRotateTableId = null;
     canvas.style.cursor = '';
     serializeToHash();
 });
@@ -177,6 +224,7 @@ canvas.addEventListener('mouseup', () => {
 canvas.addEventListener('mouseleave', () => {
     isDraggingTableId = null; dragTableOffset = null;
     isDraggingCenter = false;
+    isDraggingRotate = false; isDraggingRotateTableId = null;
     canvas.style.cursor = '';
     mousePos = { x: -9999, y: -9999 };
     if (state.showViewAngle) scheduleRender();
