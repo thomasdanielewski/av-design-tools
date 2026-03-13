@@ -447,7 +447,7 @@ function renderPOV(cw, ch, dpr) {
 function updateInfoOverlay(eq, centerEq) {
     let rows = [
         ['Camera', eq.sensor],
-        ['H-FOV', eq.cameraFOV + '°' + (eq.cameraFOVTele ? ` / ${eq.cameraFOVTele}° tele` : '')],
+        ['H-FOV', eq.cameraFOV + '°' + (eq.cameraFOVTele ? ` / ${eq.cameraFOVTele}° tele` : '') + (eq.cameraFOVV ? ` × ${eq.cameraFOVV}° V` : '')],
         ['Cam Range', eq.cameraRange + ' ft'],
         ['Zoom', eq.zoom],
         ['Mics', eq.micDesc],

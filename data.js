@@ -83,7 +83,7 @@ const EQUIPMENT = {
     'rally-camera': {
         name: 'Rally Camera', brand: 'logitech',
         width: 0.498, depth: 0.498, height: 0.599, // 5.98 × 5.98 × 7.19 in (152 × 152 × 182.5 mm)
-        cameraFOV: 82, cameraRange: 23,
+        cameraFOV: 262, cameraFOVV: 192, cameraRange: 23,
         micCount: 0, micDesc: 'None (use Rally Mic Pod)',
         micRange: 0, micArc: 0,
         zoom: '15x HD (5x opt + 3x dig)', resolution: '4K/30fps',
