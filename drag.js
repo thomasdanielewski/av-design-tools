@@ -53,7 +53,7 @@ function getDragMetrics(e) {
     const my = (e.clientY - rect.top)  / viewportZoom;
 
     // Reuse the cached layout from getTopDownLayout() instead of duplicating math
-    const { ppf, ox, ry, wallThick: wt } = getTopDownLayout();
+    const { ppf, ox, oy, rw, rl, rx, ry, wallThick: wt } = getTopDownLayout();
 
     // Selected table center position in canvas px
     const selT = getSelectedTable();
@@ -64,31 +64,72 @@ function getDragMetrics(e) {
     const cX = tableX_px + state.centerPos.x * ppf;
     const cY = ty2 + state.centerPos.y * ppf;
 
-    // Display / video-bar position
+    // Display / video-bar position (wall-aware)
     const eq = EQUIPMENT[state.videoBar];
     const dispDepthPx = (1.12 / 12) * ppf;
     const dispWidthPx = (state.displaySize * 0.8715 / 12) * ppf;
     const eqWidthPx = eq.width * ppf;
     const eqDepthPx = Math.max(4, eq.depth * ppf);
-    const dispY = ry + wt + dispDepthPx / 2 + 2;
-    let mainDeviceY = dispY + dispDepthPx / 2 + eqDepthPx / 2 + 2;
-    if (eq.type === 'board') {
-        mainDeviceY = dispY + dispDepthPx / 2 + eqDepthPx / 2;
-    } else if (state.mountPos === 'above') {
-        mainDeviceY = dispY - dispDepthPx / 2 - eqDepthPx / 2 - 2;
-    }
-    const dispOx = ox + state.displayOffsetX * ppf;
 
-    return { mx, my, ppf, ox, ry, wt, ty2, tableX_px, cX, cY,
-             dispOx, dispY, dispWidthPx, dispDepthPx, eqWidthPx, eqDepthPx, mainDeviceY };
+    const dw = state.displayWall;
+    const offsetPx = state.displayOffsetX * ppf;
+    let dispX, dispY;
+
+    if (dw === 'north') {
+        dispX = ox + offsetPx;
+        dispY = ry + wt + dispDepthPx / 2 + 2;
+    } else if (dw === 'south') {
+        dispX = ox + offsetPx;
+        dispY = ry + rl - wt - dispDepthPx / 2 - 2;
+    } else if (dw === 'east') {
+        dispX = rx + rw - wt - dispDepthPx / 2 - 2;
+        dispY = oy + offsetPx;
+    } else { // west
+        dispX = rx + wt + dispDepthPx / 2 + 2;
+        dispY = oy + offsetPx;
+    }
+
+    const isHoriz = (dw === 'north' || dw === 'south');
+    const inwardSign = (dw === 'north' || dw === 'west') ? 1 : -1;
+
+    let eqOffset;
+    if (eq.type === 'board') {
+        eqOffset = (dispDepthPx / 2 + eqDepthPx / 2) * inwardSign;
+    } else if (state.mountPos === 'above') {
+        eqOffset = -(dispDepthPx / 2 + eqDepthPx / 2 + 2) * inwardSign;
+    } else {
+        eqOffset = (dispDepthPx / 2 + eqDepthPx / 2 + 2) * inwardSign;
+    }
+
+    let mainDeviceX, mainDeviceY;
+    if (isHoriz) {
+        mainDeviceX = dispX;
+        mainDeviceY = dispY + eqOffset;
+    } else {
+        mainDeviceX = dispX + eqOffset;
+        mainDeviceY = dispY;
+    }
+
+    return { mx, my, ppf, ox, oy, ry, wt, ty2, tableX_px, cX, cY,
+             dispOx: dispX, dispY, dispWidthPx, dispDepthPx, eqWidthPx, eqDepthPx,
+             mainDeviceX, mainDeviceY, isHoriz };
 }
 
 /** Hit-test the display + video bar area for lateral drag */
-function isPointOnDisplay(mx, my, dispOx, dispY, dispWidthPx, dispDepthPx, eqWidthPx, eqDepthPx, mainDeviceY) {
-    const hitHalfW = Math.max(dispWidthPx, eqWidthPx) / 2 + DRAG_TOLERANCE;
-    const yTop = Math.min(dispY - dispDepthPx / 2, mainDeviceY - eqDepthPx / 2) - DRAG_TOLERANCE;
-    const yBot = Math.max(dispY + dispDepthPx / 2, mainDeviceY + eqDepthPx / 2) + DRAG_TOLERANCE;
-    return Math.abs(mx - dispOx) <= hitHalfW && my >= yTop && my <= yBot;
+function isPointOnDisplay(mx, my, dispOx, dispY, dispWidthPx, dispDepthPx, eqWidthPx, eqDepthPx, mainDeviceX, mainDeviceY, isHoriz) {
+    if (isHoriz === undefined || isHoriz) {
+        // N/S walls: display spans horizontally
+        const hitHalfW = Math.max(dispWidthPx, eqWidthPx) / 2 + DRAG_TOLERANCE;
+        const yTop = Math.min(dispY - dispDepthPx / 2, mainDeviceY - eqDepthPx / 2) - DRAG_TOLERANCE;
+        const yBot = Math.max(dispY + dispDepthPx / 2, mainDeviceY + eqDepthPx / 2) + DRAG_TOLERANCE;
+        return Math.abs(mx - dispOx) <= hitHalfW && my >= yTop && my <= yBot;
+    } else {
+        // E/W walls: display spans vertically
+        const hitHalfH = Math.max(dispWidthPx, eqWidthPx) / 2 + DRAG_TOLERANCE;
+        const xLeft = Math.min(dispOx - dispDepthPx / 2, mainDeviceX - eqDepthPx / 2) - DRAG_TOLERANCE;
+        const xRight = Math.max(dispOx + dispDepthPx / 2, mainDeviceX + eqDepthPx / 2) + DRAG_TOLERANCE;
+        return Math.abs(my - dispY) <= hitHalfH && mx >= xLeft && mx <= xRight;
+    }
 }
 
 /** Hit-test a rotated table rectangle (with 4px tolerance) */
@@ -151,7 +192,7 @@ canvas.addEventListener('mousemove', e => {
         return;
     }
 
-    const { mx, my, ppf, ox, ry, wt, cX, cY, dispOx, dispY, dispWidthPx, dispDepthPx, eqWidthPx, eqDepthPx, mainDeviceY } = getDragMetrics(e);
+    const { mx, my, ppf, ox, ry, wt, cX, cY, dispOx, dispY, dispWidthPx, dispDepthPx, eqWidthPx, eqDepthPx, mainDeviceX, mainDeviceY, isHoriz } = getDragMetrics(e);
 
     // Rotation handle takes cursor priority over table body
     const selT = getSelectedTable();
@@ -164,7 +205,7 @@ canvas.addEventListener('mousemove', e => {
             const cs = Math.max(12, ceq.width * ppf * 3);
             if (Math.sqrt((mx - cX) ** 2 + (my - cY) ** 2) <= cs) onTarget = true;
         }
-        if (!onTarget && isPointOnDisplay(mx, my, dispOx, dispY, dispWidthPx, dispDepthPx, eqWidthPx, eqDepthPx, mainDeviceY)) {
+        if (!onTarget && isPointOnDisplay(mx, my, dispOx, dispY, dispWidthPx, dispDepthPx, eqWidthPx, eqDepthPx, mainDeviceX, mainDeviceY, isHoriz)) {
             onTarget = true;
         }
         if (!onTarget) {
@@ -196,6 +237,9 @@ function getPOVDisplayScreenBounds() {
     const vo = state.viewerOffset;
     const eye = state.posture === 'seated' ? 48 : 65;
     const s = 1000 / vd; // px per foot at the display wall
+    // frontWallWidth is used for drag bounds clamping
+    const isNS = (state.displayWall === 'north' || state.displayWall === 'south');
+    const frontWallWidth = isNS ? state.roomWidth : state.roomLength;
 
     const dox = state.displayOffsetX;
     const dwf = state.displaySize * 0.8715 / 12;
@@ -316,7 +360,7 @@ canvas.addEventListener('mousedown', e => {
     }
 
     if (state.viewMode !== 'top') return;
-    const { mx, my, ppf, ox, ry, wt, cX, cY, dispOx, dispY, dispWidthPx, dispDepthPx, eqWidthPx, eqDepthPx, mainDeviceY } = getDragMetrics(e);
+    const { mx, my, ppf, ox, ry, wt, cX, cY, dispOx, dispY, dispWidthPx, dispDepthPx, eqWidthPx, eqDepthPx, mainDeviceX, mainDeviceY, isHoriz } = getDragMetrics(e);
 
     // Center device takes priority
     if (state.includeCenter) {
@@ -331,9 +375,10 @@ canvas.addEventListener('mousedown', e => {
     }
 
     // Display / video-bar lateral drag
-    if (isPointOnDisplay(mx, my, dispOx, dispY, dispWidthPx, dispDepthPx, eqWidthPx, eqDepthPx, mainDeviceY)) {
+    if (isPointOnDisplay(mx, my, dispOx, dispY, dispWidthPx, dispDepthPx, eqWidthPx, eqDepthPx, mainDeviceX, mainDeviceY, isHoriz)) {
         isDraggingDisplay = true;
-        dragDisplayOffsetX = mx - dispOx;
+        // For N/S walls drag is horizontal; for E/W walls drag is vertical
+        dragDisplayOffsetX = isHoriz ? (mx - dispOx) : (my - dispY);
         canvas.style.cursor = 'grabbing';
         pushHistory();
         return;
@@ -388,7 +433,9 @@ canvas.addEventListener('mousemove', e => {
         // Horizontal: update displayOffsetX
         let nx = dragDisplayPOVStartOffset + (mx - dragDisplayPOVStartX) / s;
         const displayWidthFt = state.displaySize * 0.8715 / 12;
-        const maxOff = Math.min(15, state.roomWidth / 2 - displayWidthFt / 2);
+        const isNS_d = (state.displayWall === 'north' || state.displayWall === 'south');
+        const wallLen_d = isNS_d ? state.roomWidth : state.roomLength;
+        const maxOff = Math.min(15, wallLen_d / 2 - displayWidthFt / 2);
         nx = Math.round(Math.max(-maxOff, Math.min(maxOff, nx)) * 2) / 2;
         state.displayOffsetX = nx;
         DOM['display-offset-x'].value = nx;
@@ -425,7 +472,7 @@ canvas.addEventListener('mousemove', e => {
     }
 
     if (isDraggingTableId === null && !isDraggingCenter && !isDraggingDisplay && !isDraggingRotate) return;
-    const { mx, my, ppf, ox, ry, wt, tableX_px, ty2 } = getDragMetrics(e);
+    const { mx, my, ppf, ox, oy, ry, wt, tableX_px, ty2 } = getDragMetrics(e);
 
     if (isDraggingTableId !== null) {
         const t = state.tables.find(tbl => tbl.id === isDraggingTableId);
@@ -459,10 +506,14 @@ canvas.addEventListener('mousemove', e => {
         state.centerPos = { x: nx, y: ny };
         scheduleRender();
     } else if (isDraggingDisplay) {
-        const newDispOx = mx - dragDisplayOffsetX;
-        let nx = (newDispOx - ox) / ppf;
+        const dw = state.displayWall;
+        const isH = (dw === 'north' || dw === 'south');
+        const newDispPos = isH ? (mx - dragDisplayOffsetX) : (my - dragDisplayOffsetX);
+        const origin = isH ? ox : oy;
+        let nx = (newDispPos - origin) / ppf;
         const displayWidthFt = state.displaySize * 0.8715 / 12;
-        const maxOff = Math.min(15, state.roomWidth / 2 - displayWidthFt / 2);
+        const wallLen = isH ? state.roomWidth : state.roomLength;
+        const maxOff = Math.min(15, wallLen / 2 - displayWidthFt / 2);
         nx = Math.round(Math.max(-maxOff, Math.min(maxOff, nx)) * 2) / 2;
         state.displayOffsetX = nx;
         DOM['display-offset-x'].value = nx;

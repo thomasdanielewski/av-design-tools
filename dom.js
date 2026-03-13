@@ -38,7 +38,7 @@ function cacheDOMRefs() {
         'viewer-dist', 'viewer-offset', 'table-shape', 'video-bar',
         'include-center', 'include-micpod', 'show-camera', 'show-mic',
         'show-grid', 'show-view-angle', 'brand-toggle', 'display-count-toggle',
-        'mount-pos-toggle', 'view-mode-toggle', 'posture-toggle',
+        'display-wall-toggle', 'mount-pos-toggle', 'view-mode-toggle', 'posture-toggle',
         'pov-controls', 'cg-overlays', 'center-label', 'micpod-row',
         'mic-warning', 'mic-warning-btn', 'mic-warning-text',
         'room-warning', 'room-warning-text',

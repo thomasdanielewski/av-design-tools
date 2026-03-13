@@ -316,16 +316,30 @@ function checkRoomWarnings() {
                 }
             });
 
-            // Check display against door swing (only north wall doors can reach displays)
-            if (door.wall === 'north') {
+            // Check display against door swing (only doors on the display wall can reach displays)
+            if (door.wall === state.displayWall) {
                 const dispWidthFt = state.displaySize * 0.8715 / 12;
-                const dispCenterX = state.roomWidth / 2 + state.displayOffsetX;
-                const dispRect = {
-                    left: dispCenterX - dispWidthFt / 2,
-                    right: dispCenterX + dispWidthFt / 2,
-                    top: 0,
-                    bottom: 0.5 // small depth for display
-                };
+                const isHorizWall = (state.displayWall === 'north' || state.displayWall === 'south');
+                let dispRect;
+                if (isHorizWall) {
+                    const dispCenterX = state.roomWidth / 2 + state.displayOffsetX;
+                    const dispY = state.displayWall === 'north' ? 0 : state.roomLength - 0.5;
+                    dispRect = {
+                        left: dispCenterX - dispWidthFt / 2,
+                        right: dispCenterX + dispWidthFt / 2,
+                        top: dispY,
+                        bottom: dispY + 0.5
+                    };
+                } else {
+                    const dispCenterY = state.roomLength / 2 + state.displayOffsetX;
+                    const dispX = state.displayWall === 'west' ? 0 : state.roomWidth - 0.5;
+                    dispRect = {
+                        left: dispX,
+                        right: dispX + 0.5,
+                        top: dispCenterY - dispWidthFt / 2,
+                        bottom: dispCenterY + dispWidthFt / 2
+                    };
+                }
                 if (circleOverlapsAABB(swing, dispRect)) {
                     issues.push(`Display overlaps ${wallLabel} door swing area.`);
                 }

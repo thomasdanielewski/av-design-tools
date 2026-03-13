@@ -98,6 +98,11 @@ document.querySelectorAll('[data-action="set-brand"]').forEach(btn => {
     btn.addEventListener('click', () => setBrand(btn.dataset.val));
 });
 
+// ── Display wall toggle ─────────────────────────────────────
+document.querySelectorAll('[data-action="set-display-wall"]').forEach(btn => {
+    btn.addEventListener('click', () => setDisplayWall(btn.dataset.val));
+});
+
 // ── Display count toggle ─────────────────────────────────────
 document.querySelectorAll('[data-action="set-display-count"]').forEach(btn => {
     btn.addEventListener('click', () => setDisplayCount(parseInt(btn.dataset.val)));

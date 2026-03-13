@@ -22,15 +22,20 @@ function updateHeaderDOM(eq) {
 /**
  * Returns true if the current mousePos is inside the 60° viewing-angle cone.
  */
-function isMouseInViewCone(ox, dispY, rl, ppf) {
+function isMouseInViewCone(dispX, dispY, rl, ppf) {
     const vr = state.roomLength * ppf;
     const hv = deg2rad(30);
-    const dx = mousePos.x - ox;
+    const dx = mousePos.x - dispX;
     const dy = mousePos.y - dispY;
     const dist = Math.sqrt(dx * dx + dy * dy);
     if (dist > vr) return false;
     const angle = Math.atan2(dy, dx);
-    return Math.abs(angle - Math.PI / 2) <= hv;
+    const dw = state.displayWall;
+    const facing = dw === 'north' ? Math.PI / 2 : dw === 'south' ? -Math.PI / 2 : dw === 'east' ? Math.PI : 0;
+    let diff = angle - facing;
+    while (diff > Math.PI) diff -= 2 * Math.PI;
+    while (diff < -Math.PI) diff += 2 * Math.PI;
+    return Math.abs(diff) <= hv;
 }
 
 /**
@@ -98,7 +103,7 @@ function renderForeground() {
     if (state.viewMode === 'pov') return;
 
     invalidateThemeCache();
-    const { dpr, ppf, canvasW, canvasH, ox, ry, rw, rl, wallThick } = getTopDownLayout();
+    const { dpr, ppf, canvasW, canvasH, ox, oy, rw, rl, rx, ry, wallThick } = getTopDownLayout();
 
     // Size the foreground canvas to match the background canvas
     _sizeCanvas(fgCanvas, ctx, canvasW, canvasH, dpr);
@@ -113,19 +118,57 @@ function renderForeground() {
     const centerEq = EQUIPMENT[getCenterEqKey()];
     const micPodEq = getMicPodEq();
 
-    // Compute device positions
+    // Compute device positions based on display wall
     const dispWidthPx = (state.displaySize * 0.8715 / 12) * ppf;
     const dispDepthPx = (1.12 / 12) * ppf;
     const eqWidthPx = eq.width * ppf;
     const eqDepthPx = Math.max(4, eq.depth * ppf);
 
-    const dispY = ry + wallThick + dispDepthPx / 2 + 2;
-    const dispOx = ox + state.displayOffsetX * ppf;
-    let mainDeviceY = dispY + dispDepthPx / 2 + eqDepthPx / 2 + 2;
+    // Display position and facing angle depend on the selected wall.
+    // dispX/dispY = display center; mainDeviceX/Y = video bar center.
+    // facingAngle = direction the device faces into the room (radians).
+    let dispX, dispY, mainDeviceX, mainDeviceY, facingAngle;
+
+    const dw = state.displayWall;
+    const offsetPx = state.displayOffsetX * ppf;
+
+    if (dw === 'north') {
+        dispX = ox + offsetPx;
+        dispY = ry + wallThick + dispDepthPx / 2 + 2;
+        facingAngle = Math.PI / 2;
+    } else if (dw === 'south') {
+        dispX = ox + offsetPx;
+        dispY = ry + rl - wallThick - dispDepthPx / 2 - 2;
+        facingAngle = -Math.PI / 2;
+    } else if (dw === 'east') {
+        dispX = rx + rw - wallThick - dispDepthPx / 2 - 2;
+        dispY = oy + offsetPx;
+        facingAngle = Math.PI;
+    } else { // west
+        dispX = rx + wallThick + dispDepthPx / 2 + 2;
+        dispY = oy + offsetPx;
+        facingAngle = 0;
+    }
+
+    // Video bar / board offset from display (perpendicular to the wall)
+    const isHoriz = (dw === 'north' || dw === 'south');
+    const inwardSign = (dw === 'north' || dw === 'west') ? 1 : -1; // sign pointing into the room
+
+    let eqOffset; // perpendicular distance from display center to equipment center
     if (eq.type === 'board') {
-        mainDeviceY = dispY + dispDepthPx / 2 + eqDepthPx / 2;
+        eqOffset = (dispDepthPx / 2 + eqDepthPx / 2) * inwardSign;
     } else if (state.mountPos === 'above') {
-        mainDeviceY = dispY - dispDepthPx / 2 - eqDepthPx / 2 - 2;
+        eqOffset = -(dispDepthPx / 2 + eqDepthPx / 2 + 2) * inwardSign;
+    } else {
+        eqOffset = (dispDepthPx / 2 + eqDepthPx / 2 + 2) * inwardSign;
+    }
+
+    if (isHoriz) {
+        mainDeviceX = dispX;
+        mainDeviceY = dispY + eqOffset;
+    } else {
+        mainDeviceX = dispX + eqOffset;
+        mainDeviceY = dispY;
     }
 
     const selT = getSelectedTable();
@@ -138,12 +181,12 @@ function renderForeground() {
 
     // Viewing angle overlay
     if (state.showViewAngle) {
-        const hovered = isMouseInViewCone(dispOx, dispY, rl, ppf);
-        drawViewAngle(dispOx, dispY, rl, ppf, hovered);
+        const hovered = isMouseInViewCone(dispX, dispY, rl, ppf);
+        drawViewAngle(dispX, dispY, rl, ppf, hovered);
     }
 
     // Coverage arcs
-    drawCoverage(dispOx, mainDeviceY, eq, Math.PI / 2);
+    drawCoverage(mainDeviceX, mainDeviceY, eq, facingAngle);
     if (state.includeCenter) {
         drawCoverage(centerX, centerY, centerEq, 0);
     }
@@ -151,12 +194,12 @@ function renderForeground() {
         drawCoverage(micPodX, micPodY, micPodEq, 0);
     }
 
-    // Displays
-    drawDisplaysTopDown(dispOx, dispY, dispWidthPx, dispDepthPx, eq, eqWidthPx, eqDepthPx);
+    // Displays and equipment — use rotated drawing for E/W walls
+    const dispRotation = isHoriz ? 0 : Math.PI / 2;
+    drawDisplaysTopDown(dispX, dispY, dispWidthPx, dispDepthPx, eq, eqWidthPx, eqDepthPx, dispRotation);
 
-    // Video bar / board equipment
-    drawEquipmentTopDown(dispOx, ry, wallThick, dispY, dispDepthPx, dispWidthPx,
-        mainDeviceY, eq, eqWidthPx, eqDepthPx, ppf);
+    drawEquipmentTopDown(dispX, dispY, dispDepthPx, dispWidthPx,
+        mainDeviceX, mainDeviceY, eq, eqWidthPx, eqDepthPx, ppf, dispRotation);
 
     // Conference tables
     drawTable(ox, ry, wallThick, ppf);

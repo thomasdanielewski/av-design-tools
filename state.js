@@ -6,7 +6,7 @@ const state = {
     seatingDensity: 'normal',
     tables: [{ id: 1, shape: 'rectangular', length: 8, width: 4, x: 0, dist: 4, height: 30, rotation: 0 }],
     selectedTableId: 1,
-    displayCount: 1, displaySize: 65, displayElev: 54, displayOffsetX: 0,
+    displayCount: 1, displaySize: 65, displayElev: 54, displayOffsetX: 0, displayWall: 'north',
     brand: 'neat', videoBar: 'neat-bar-gen2',
     mountPos: 'below',
     includeCenter: false, includeMicPod: false,
@@ -216,8 +216,9 @@ function syncUIFromState() {
     DOM['show-grid'].checked = state.showGrid;
     DOM['show-view-angle'].checked = state.showViewAngle;
 
-    // Display count, posture, view mode
+    // Display count, wall, posture, view mode
     setDisplayCount(state.displayCount);
+    setDisplayWall(state.displayWall);
     setPosture(state.posture);
     setViewMode(state.viewMode);
 

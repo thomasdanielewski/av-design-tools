@@ -163,10 +163,18 @@ function drawRoom(rx, ry, rw, rl, ppf) {
     ctx.fill();
     ctx.stroke();
 
-    // Front wall accent strip (display wall)
+    // Display wall accent strip
     const wallThick = Math.max(3, ppf * 0.2);
     ctx.fillStyle = cc().wallAccent;
-    ctx.fillRect(rx, ry, rw, wallThick);
+    if (state.displayWall === 'south') {
+        ctx.fillRect(rx, ry + rl - wallThick, rw, wallThick);
+    } else if (state.displayWall === 'east') {
+        ctx.fillRect(rx + rw - wallThick, ry, wallThick, rl);
+    } else if (state.displayWall === 'west') {
+        ctx.fillRect(rx, ry, wallThick, rl);
+    } else {
+        ctx.fillRect(rx, ry, rw, wallThick);
+    }
 
     return wallThick;
 }
@@ -174,17 +182,19 @@ function drawRoom(rx, ry, rw, rl, ppf) {
 /**
  * Draw the viewing-angle cone (AVIXA 60° guideline).
  */
-function drawViewAngle(ox, dispY, rl, ppf, isHovered) {
+function drawViewAngle(dispX, dispY, rl, ppf, isHovered) {
     const vr = state.roomLength * ppf;
     const hv = deg2rad(30); // half of 60°
+    const dw = state.displayWall;
+    const facing = dw === 'north' ? Math.PI / 2 : dw === 'south' ? -Math.PI / 2 : dw === 'east' ? Math.PI : 0;
 
-    const g = ctx.createRadialGradient(ox, dispY, 0, ox, dispY, vr);
+    const g = ctx.createRadialGradient(dispX, dispY, 0, dispX, dispY, vr);
     g.addColorStop(0, cc().viewGradStart);
     g.addColorStop(1, cc().viewGradEnd);
     ctx.fillStyle = g;
     ctx.beginPath();
-    ctx.moveTo(ox, dispY);
-    ctx.arc(ox, dispY, vr, Math.PI / 2 - hv, Math.PI / 2 + hv);
+    ctx.moveTo(dispX, dispY);
+    ctx.arc(dispX, dispY, vr, facing - hv, facing + hv);
     ctx.closePath();
     ctx.fill();
 
@@ -194,21 +204,21 @@ function drawViewAngle(ox, dispY, rl, ppf, isHovered) {
     ctx.setLineDash([10, 10]);
 
     ctx.beginPath();
-    ctx.moveTo(ox, dispY);
-    ctx.lineTo(ox + Math.cos(Math.PI / 2 - hv) * vr, dispY + Math.sin(Math.PI / 2 - hv) * vr);
+    ctx.moveTo(dispX, dispY);
+    ctx.lineTo(dispX + Math.cos(facing - hv) * vr, dispY + Math.sin(facing - hv) * vr);
     ctx.stroke();
 
     ctx.beginPath();
-    ctx.moveTo(ox, dispY);
-    ctx.lineTo(ox + Math.cos(Math.PI / 2 + hv) * vr, dispY + Math.sin(Math.PI / 2 + hv) * vr);
+    ctx.moveTo(dispX, dispY);
+    ctx.lineTo(dispX + Math.cos(facing + hv) * vr, dispY + Math.sin(facing + hv) * vr);
     ctx.stroke();
 
     ctx.setLineDash([]);
 
     // Hover label
     if (isHovered) {
-        const labelX = ox;
-        const labelY = dispY + vr * 0.5;
+        const labelX = dispX + Math.cos(facing) * vr * 0.5;
+        const labelY = dispY + Math.sin(facing) * vr * 0.5;
         const text = 'Viewing Angle (60°)';
 
         ctx.font = '500 12px "Satoshi", sans-serif';
@@ -236,59 +246,79 @@ function drawViewAngle(ox, dispY, rl, ppf, isHovered) {
 
 /**
  * Draw the displays (top-down view, 1 or 2 screens).
+ * @param {number} rotation - Rotation angle in radians (0 for N/S, π/2 for E/W)
  */
-function drawDisplaysTopDown(ox, dispY, dispWidthPx, dispDepthPx, eq, eqWidthPx, eqDepthPx) {
+function drawDisplaysTopDown(ox, oy, dispWidthPx, dispDepthPx, eq, eqWidthPx, eqDepthPx, rotation) {
     if (eq.type !== 'board') {
+        ctx.save();
+        ctx.translate(ox, oy);
+        if (rotation) ctx.rotate(rotation);
         if (state.displayCount === 1) {
-            drawDisplay(ox - dispWidthPx / 2, dispY, dispWidthPx, dispDepthPx);
+            drawDisplay(-dispWidthPx / 2, -dispDepthPx / 2, dispWidthPx, dispDepthPx);
         } else {
             const gap = 8;
-            drawDisplay(ox - dispWidthPx - gap / 2, dispY, dispWidthPx, dispDepthPx);
-            drawDisplay(ox + gap / 2, dispY, dispWidthPx, dispDepthPx);
+            drawDisplay(-dispWidthPx - gap / 2, -dispDepthPx / 2, dispWidthPx, dispDepthPx);
+            drawDisplay(gap / 2, -dispDepthPx / 2, dispWidthPx, dispDepthPx);
         }
+        ctx.restore();
     }
 }
 
 /**
  * Draw the video bar or board device in top-down view.
+ * @param {number} rotation - Rotation angle in radians (0 for N/S, π/2 for E/W)
  */
-function drawEquipmentTopDown(ox, ry, wallThick, dispY, dispDepthPx, dispWidthPx,
-    mainDeviceY, eq, eqWidthPx, eqDepthPx, ppf) {
+function drawEquipmentTopDown(dispX, dispY, dispDepthPx, dispWidthPx,
+    mainDeviceX, mainDeviceY, eq, eqWidthPx, eqDepthPx, ppf, rotation) {
     if (eq.type === 'board') {
         // Board: large rectangular unit with screen built in
-        const bx = ox - eqWidthPx / 2;
-        const by = ry + wallThick + 2;
+        ctx.save();
+        ctx.translate(dispX, dispY);
+        if (rotation) ctx.rotate(rotation);
+
+        // Board positioned flush against wall (shifted toward wall from display center)
+        const dw = state.displayWall;
+        const inwardSign = (dw === 'north' || dw === 'west') ? 1 : -1;
+        const boardOffY = -(dispDepthPx / 2) * inwardSign + (rotation ? 0 : 0);
+        // In the local rotated frame: draw from the wall side
+        const by = -eqDepthPx / 2;
+
         ctx.save();
         ctx.shadowColor = cc().equipmentGlow;
         ctx.shadowBlur = 12;
         ctx.fillStyle = cc().surface;
         ctx.strokeStyle = cc().equipmentStroke;
         ctx.lineWidth = 1.5;
-        roundRect(ctx, bx, by, eqWidthPx, eqDepthPx, 3);
+        roundRect(ctx, -eqWidthPx / 2, by, eqWidthPx, eqDepthPx, 3);
         ctx.fill();
         ctx.restore();
         ctx.strokeStyle = cc().equipmentStroke;
         ctx.lineWidth = 1.5;
-        roundRect(ctx, bx, by, eqWidthPx, eqDepthPx, 3);
+        roundRect(ctx, -eqWidthPx / 2, by, eqWidthPx, eqDepthPx, 3);
         ctx.stroke();
 
         // Translucent fill + label
         ctx.fillStyle = cc().equipmentFill;
-        ctx.fillRect(bx + 2, by + 2, eqWidthPx - 4, eqDepthPx - 4);
+        ctx.fillRect(-eqWidthPx / 2 + 2, by + 2, eqWidthPx - 4, eqDepthPx - 4);
         ctx.font = `600 ${Math.max(8, ppf * 0.3)}px 'Satoshi', sans-serif`;
         ctx.fillStyle = '#EE3224';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillText(eq.name, ox, by + eqDepthPx / 2);
+        ctx.fillText(eq.name, 0, by + eqDepthPx / 2);
 
-        // If dual display, draw secondary screen below the board
+        // If dual display, draw secondary screen offset from board
         if (state.displayCount === 2) {
-            drawDisplay(ox - dispWidthPx / 2, by + eqDepthPx + 4, dispWidthPx, dispDepthPx);
+            drawDisplay(-dispWidthPx / 2, by + eqDepthPx + 4, dispWidthPx, dispDepthPx);
         }
+        ctx.restore();
     } else {
         // Standard video bar: small rectangle with center lens dot
-        const bx = ox - eqWidthPx / 2;
-        const by = mainDeviceY - eqDepthPx / 2;
+        ctx.save();
+        ctx.translate(mainDeviceX, mainDeviceY);
+        if (rotation) ctx.rotate(rotation);
+
+        const bx = -eqWidthPx / 2;
+        const by = -eqDepthPx / 2;
         ctx.save();
         ctx.shadowColor = cc().equipmentGlow;
         ctx.shadowBlur = 8;
@@ -306,8 +336,9 @@ function drawEquipmentTopDown(ox, ry, wallThick, dispY, dispDepthPx, dispWidthPx
         // Lens indicator dot (no glow)
         ctx.fillStyle = cc().lensDot;
         ctx.beginPath();
-        ctx.arc(ox, mainDeviceY, Math.max(2, ppf * 0.08), 0, Math.PI * 2);
+        ctx.arc(0, 0, Math.max(2, ppf * 0.08), 0, Math.PI * 2);
         ctx.fill();
+        ctx.restore();
     }
 }
 
