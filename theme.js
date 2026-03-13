@@ -34,6 +34,19 @@ const CANVAS_THEME = {
         povDimDash: 'rgba(139,141,149,0.40)',
         povDimTick: 'rgba(139,141,149,0.70)',
         povBadgeStroke: 'rgba(139,141,149,0.35)',
+        // Equipment & device drawing colors
+        equipmentGlow: 'rgba(91, 156, 245, 0.20)',
+        equipmentStroke: 'rgba(91, 156, 245, 0.25)',
+        equipmentStrokeBright: 'rgba(91, 156, 245, 0.30)',
+        equipmentFill: 'rgba(91, 156, 245, 0.05)',
+        lensDot: 'rgba(91, 156, 245, 0.60)',
+        selectionRing: 'rgba(238, 50, 36, 0.45)',
+        rotateHandle: 'rgba(238, 50, 36, 0.70)',
+        rotateHandleFill: 'rgba(238, 50, 36, 0.85)',
+        centerStroke: 'rgba(91, 156, 245, 0.30)',
+        centerInner: 'rgba(91, 156, 245, 0.12)',
+        micPodStroke: 'rgba(74, 222, 128, 0.30)',
+        micPodDot: 'rgba(74, 222, 128, 0.50)',
     },
     light: {
         bg: '#F2F3F5',
@@ -66,14 +79,31 @@ const CANVAS_THEME = {
         povDimDash: 'rgba(80,82,90,0.40)',
         povDimTick: 'rgba(80,82,90,0.70)',
         povBadgeStroke: 'rgba(80,82,90,0.35)',
+        // Equipment & device drawing colors
+        equipmentGlow: 'rgba(91, 156, 245, 0.15)',
+        equipmentStroke: 'rgba(80, 108, 160, 0.30)',
+        equipmentStrokeBright: 'rgba(80, 108, 160, 0.35)',
+        equipmentFill: 'rgba(91, 156, 245, 0.06)',
+        lensDot: 'rgba(91, 156, 245, 0.55)',
+        selectionRing: 'rgba(217, 42, 29, 0.40)',
+        rotateHandle: 'rgba(217, 42, 29, 0.65)',
+        rotateHandleFill: 'rgba(217, 42, 29, 0.80)',
+        centerStroke: 'rgba(80, 108, 160, 0.35)',
+        centerInner: 'rgba(91, 156, 245, 0.15)',
+        micPodStroke: 'rgba(34, 180, 100, 0.35)',
+        micPodDot: 'rgba(34, 180, 100, 0.50)',
     }
 };
 
-/** Return current canvas color palette based on active theme */
+/** Return current canvas color palette based on active theme (cached per frame) */
+let _ccCache = null;
 function cc() {
+    if (_ccCache) return _ccCache;
     const theme = document.documentElement.getAttribute('data-theme') || 'dark';
-    return CANVAS_THEME[theme] || CANVAS_THEME.dark;
+    _ccCache = CANVAS_THEME[theme] || CANVAS_THEME.dark;
+    return _ccCache;
 }
+function invalidateThemeCache() { _ccCache = null; }
 
 // ── Theme Toggle (Light / Dark) ──────────────────────────────
 
@@ -85,6 +115,7 @@ function initTheme() {
 
 function applyTheme(theme) {
     document.documentElement.setAttribute('data-theme', theme);
+    invalidateThemeCache();
     document.querySelector('meta[name="color-scheme"]')
         ?.setAttribute('content', theme);
     const btn = document.getElementById('theme-toggle');

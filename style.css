@@ -4,8 +4,7 @@
    ══════════════════════════════════════════════════════════════ */
 
 /* ── Font Stack ── */
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap');
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&display=swap');
+/* Google Fonts loaded via <link> tags in index.html for non-blocking rendering */
 
 /* Geist Sans — self-hosted via jsDelivr CDN */
 @font-face {
@@ -982,7 +981,17 @@ select:focus {
 }
 
 .arr-pill:active {
-    transform: scale(0.97);
+    transform: scale(0.94);
+    background: var(--red-dim);
+    border-color: var(--red);
+    color: var(--red);
+    transition-duration: 0.08s;
+}
+
+@keyframes arrangementFlash {
+    0% { box-shadow: 0 0 0 0 var(--red-dim); }
+    50% { box-shadow: 0 0 0 6px var(--red-dim); }
+    100% { box-shadow: 0 0 0 0 transparent; }
 }
 
 
@@ -1153,9 +1162,21 @@ select:focus {
     min-height: 0;
     min-width: 0;
     background:
+        radial-gradient(ellipse at 30% 20%, rgba(91, 156, 245, 0.015) 0%, transparent 60%),
+        radial-gradient(ellipse at 70% 80%, rgba(238, 50, 36, 0.01) 0%, transparent 50%),
         radial-gradient(circle, rgba(255, 255, 255, 0.025) 1px, transparent 1px),
         var(--bg-base);
-    background-size: 28px 28px;
+    background-size: 100% 100%, 100% 100%, 28px 28px, 100%;
+}
+
+/* Vignette overlay */
+.canvas-container::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: radial-gradient(ellipse at center, transparent 50%, rgba(0, 0, 0, 0.12) 100%);
+    z-index: 1;
 }
 
 /* Stacked canvas layout */
@@ -1235,6 +1256,22 @@ select:focus {
 /* ══════════════════════════════════════════════════════════════
    INFO OVERLAY — Frosted Glass Panel
    ══════════════════════════════════════════════════════════════ */
+.info-overlay::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 16px;
+    right: 16px;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--red), transparent);
+    opacity: 0.4;
+    border-radius: 1px;
+}
+
+.info-overlay.minimized::before {
+    display: none;
+}
+
 .info-overlay {
     position: absolute;
     bottom: var(--space-lg);
@@ -1390,7 +1427,9 @@ select:focus {
     font-weight: 400;
 }
 
-.tooltip-container:hover .tooltip-text {
+.tooltip-container:hover .tooltip-text,
+.tooltip-container:focus-within .tooltip-text,
+.tooltip-container:focus .tooltip-text {
     visibility: visible;
     opacity: 1;
     transform: translateX(-50%) translateY(0);
@@ -1783,9 +1822,15 @@ select:focus {
 
 [data-theme="light"] .canvas-container {
     background:
+        radial-gradient(ellipse at 30% 20%, rgba(91, 156, 245, 0.025) 0%, transparent 60%),
+        radial-gradient(ellipse at 70% 80%, rgba(217, 42, 29, 0.015) 0%, transparent 50%),
         radial-gradient(circle, rgba(0, 0, 0, 0.04) 1px, transparent 1px),
         var(--bg-base);
-    background-size: 28px 28px;
+    background-size: 100% 100%, 100% 100%, 28px 28px, 100%;
+}
+
+[data-theme="light"] .canvas-container::after {
+    background: radial-gradient(ellipse at center, transparent 50%, rgba(0, 0, 0, 0.04) 100%);
 }
 
 [data-theme="light"] .canvas-header .legend-item:hover {
@@ -1835,9 +1880,36 @@ select:focus {
 
 
 /* ══════════════════════════════════════════════════════════════
-   ACCESSIBILITY — Focus-Visible States
+   ACCESSIBILITY — Skip Link & Focus-Visible States
    ══════════════════════════════════════════════════════════════ */
-*:focus {
+.skip-link {
+    position: absolute;
+    left: -9999px;
+    top: auto;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    z-index: 9999;
+}
+
+.skip-link:focus {
+    position: fixed;
+    top: var(--space-md);
+    left: 50%;
+    transform: translateX(-50%);
+    width: auto;
+    height: auto;
+    padding: 10px 20px;
+    background: var(--red);
+    color: white;
+    border-radius: var(--radius-sm);
+    font-family: var(--font-display);
+    font-weight: 600;
+    text-decoration: none;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+}
+
+*:focus:not(:focus-visible) {
     outline: none;
 }
 

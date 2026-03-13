@@ -15,7 +15,11 @@ function setBrand(brand) {
     // Highlight the active brand button
     DOM['brand-toggle']
         .querySelectorAll('.brand-btn')
-        .forEach(b => b.classList.toggle('active', b.dataset.val === brand));
+        .forEach(b => {
+            const isActive = b.dataset.val === brand;
+            b.classList.toggle('active', isActive);
+            b.setAttribute('aria-pressed', isActive);
+        });
 
     // Rebuild video bar <select> with brand-filtered options
     const sel = DOM['video-bar'];
@@ -54,7 +58,11 @@ function setDisplayCount(n) {
     state.displayCount = n;
     DOM['display-count-toggle']
         .querySelectorAll('.toggle-btn')
-        .forEach(b => b.classList.toggle('active', parseInt(b.dataset.val) === n));
+        .forEach(b => {
+            const isActive = parseInt(b.dataset.val) === n;
+            b.classList.toggle('active', isActive);
+            b.setAttribute('aria-pressed', isActive);
+        });
     if (!_suppressHistory) pushHistory();
     render();
 }
@@ -64,7 +72,11 @@ function setMountPos(p) {
     state.mountPos = p;
     DOM['mount-pos-toggle']
         .querySelectorAll('.toggle-btn')
-        .forEach(b => b.classList.toggle('active', b.dataset.val === p));
+        .forEach(b => {
+            const isActive = b.dataset.val === p;
+            b.classList.toggle('active', isActive);
+            b.setAttribute('aria-pressed', isActive);
+        });
     if (!_suppressHistory) pushHistory();
     render();
 }
@@ -74,7 +86,11 @@ function setViewMode(m) {
     state.viewMode = m;
     DOM['view-mode-toggle']
         .querySelectorAll('.toggle-btn')
-        .forEach(b => b.classList.toggle('active', b.dataset.val === m));
+        .forEach(b => {
+            const isActive = b.dataset.val === m;
+            b.classList.toggle('active', isActive);
+            b.setAttribute('aria-pressed', isActive);
+        });
 
     if (m === 'pov') {
         DOM['pov-controls'].style.display = 'block';
@@ -117,7 +133,11 @@ function setPosture(p) {
     state.posture = p;
     DOM['posture-toggle']
         .querySelectorAll('.toggle-btn')
-        .forEach(b => b.classList.toggle('active', b.dataset.val === p));
+        .forEach(b => {
+            const isActive = b.dataset.val === p;
+            b.classList.toggle('active', isActive);
+            b.setAttribute('aria-pressed', isActive);
+        });
     if (!_suppressHistory) pushHistory();
     render();
 }

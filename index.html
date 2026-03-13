@@ -8,10 +8,13 @@
     <title>AV Room Planner</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&display=swap">
     <link rel="stylesheet" href="style.css?v=2">
 </head>
 
 <body>
+    <a href="#fg-canvas" class="skip-link">Skip to canvas</a>
     <aside class="sidebar" aria-label="Controls">
         <div class="sidebar-header">
             <h1><span class="icon">◇</span> AV Room Planner</h1>
@@ -218,7 +221,7 @@
                     </div>
                     <div class="check-row" id="micpod-row" style="display:none">
                         <span style="display:flex;align-items:center">Rally Mic Pod (Far End)
-                            <div class="tooltip-container">
+                            <div class="tooltip-container" tabindex="0" role="note">
                                 <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
                                     style="color:var(--text-muted);cursor:help">
@@ -271,7 +274,7 @@
                 <div class="control-group-body">
                     <div class="check-row">
                         <span style="display:flex;align-items:center">Viewing Angle (60°)
-                            <div class="tooltip-container">
+                            <div class="tooltip-container" tabindex="0" role="note">
                                 <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
                                     style="color:var(--text-muted);cursor:help">
@@ -378,7 +381,7 @@
         <div class="canvas-container">
             <div class="canvas-stack">
                 <canvas id="bg-canvas" aria-hidden="true"></canvas>
-                <canvas id="fg-canvas" role="img" aria-label="Conference room layout diagram showing tables, displays, and AV equipment coverage areas"></canvas>
+                <canvas id="fg-canvas" tabindex="0" role="img" aria-label="Conference room layout diagram showing tables, displays, and AV equipment coverage areas"></canvas>
             </div>
         </div>
         <div class="info-overlay" id="info-overlay">

@@ -52,21 +52,8 @@ function getDragMetrics(e) {
     const mx = (e.clientX - rect.left) / viewportZoom;
     const my = (e.clientY - rect.top)  / viewportZoom;
 
-    const c = document.querySelector('.canvas-container');
-    const cw = c.clientWidth - 64;   // match render.js (_topDownLayout uses -64)
-    const ch = c.clientHeight - 64;
-
-    const padF = 2;
-    const totalW = state.roomWidth + padF * 2;
-    const totalH = state.roomLength + padF * 2;
-
-    const scale = Math.min(cw / totalW, ch / totalH);
-    const ppf = scale;
-
-    const ox = (totalW * scale / 2);
-    const oy = (padF * scale + (state.roomLength * scale) / 2);
-    const ry = oy - (state.roomLength * scale) / 2;
-    const wt = Math.max(3, ppf * 0.2);
+    // Reuse the cached layout from getTopDownLayout() instead of duplicating math
+    const { ppf, ox, ry, wallThick: wt } = getTopDownLayout();
 
     // Selected table center position in canvas px
     const selT = getSelectedTable();
