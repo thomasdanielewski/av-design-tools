@@ -95,10 +95,20 @@ const state = {
 };
 
 // ── Canvas Setup ─────────────────────────────────────────────
-const canvas = document.getElementById('canvas');
-const ctx = canvas.getContext('2d');
+// Two stacked canvases:
+//   bgCanvas — static room outline, grid, wall accents, dimension labels
+//   fgCanvas — movable tables, equipment, coverage overlays
+const bgCanvas = document.getElementById('bg-canvas');
+const bgCtx = bgCanvas.getContext('2d');
 
-// Global pixels-per-foot used by drawCoverage (set during render)
+const fgCanvas = document.getElementById('fg-canvas');
+// ctx always points to fgCtx; renderBackground() temporarily redirects it to bgCtx.
+let ctx = fgCanvas.getContext('2d');
+
+// Backward-compat alias used by drag handlers, cursor management, and export
+const canvas = fgCanvas;
+
+// Global pixels-per-foot used by drawCoverage (set during renderForeground)
 let ppf_g = 1;
 
 // Global mouse position in canvas CSS pixels (updated on mousemove)
@@ -183,16 +193,30 @@ function roundRect(c, x, y, w, h, r) {
 }
 
 // ── requestAnimationFrame Debouncing ─────────────────────────
-// Wraps render() so that rapid-fire slider events are coalesced
-// to at most one repaint per display refresh (≈60 Hz).
+// scheduleRender()          → repaints only the foreground canvas (tables,
+//                             equipment, coverage overlays).  Called by drag
+//                             handlers so the background is never redrawn.
+// scheduleBackgroundRender() → repaints background then foreground; called
+//                             when room dimensions or grid settings change.
 let _renderPending = false;
+let _bgRenderPending = false;
 
 function scheduleRender() {
     if (_renderPending) return;
     _renderPending = true;
     requestAnimationFrame(() => {
         _renderPending = false;
-        render();
+        renderForeground();
+    });
+}
+
+function scheduleBackgroundRender() {
+    if (_bgRenderPending) return;
+    _bgRenderPending = true;
+    requestAnimationFrame(() => {
+        _bgRenderPending = false;
+        renderBackground();
+        renderForeground();
     });
 }
 
@@ -322,10 +346,15 @@ function setViewMode(m) {
     if (!_suppressHistory) pushHistory();
 
     // Animated view transition: zoom-fade out → render → zoom-fade in
+    // Animate both layers so the full frame (bg + fg) transitions together.
+    bgCanvas.style.opacity = '0';
+    bgCanvas.style.transform = 'scale(1.04)';
     canvas.style.opacity = '0';
     canvas.style.transform = 'scale(1.04)';
     setTimeout(() => {
         render();
+        bgCanvas.style.transform = 'scale(1)';
+        bgCanvas.style.opacity = '1';
         canvas.style.transform = 'scale(1)';
         canvas.style.opacity = '1';
     }, 180);
@@ -534,7 +563,7 @@ document.querySelectorAll('.control-label .value[data-slider]').forEach(badge =>
 
 const TABLE_SLIDER_PROPS = new Set(['tableLength', 'tableWidth', 'tableDist', 'tableHeight', 'tableRotation', 'tableX']);
 
-function bindSlider(id, sk, vl) {
+function bindSlider(id, sk, vl, triggersBg = false) {
     const unit = (sk === 'displaySize' || sk === 'displayElev' || sk === 'tableHeight') ? 'in'
         : sk === 'tableRotation' ? 'deg'
         : 'ft';
@@ -562,7 +591,8 @@ function bindSlider(id, sk, vl) {
         badge.classList.add('value-updated');
 
         debouncedPushHistory();
-        scheduleRender();
+        if (triggersBg) scheduleBackgroundRender();
+        else scheduleRender();
     });
 }
 
@@ -606,11 +636,12 @@ function bindSelect(id, sk) {
     });
 }
 
-function bindCheckbox(id, sk) {
+function bindCheckbox(id, sk, triggersBg = false) {
     (DOM[id] || document.getElementById(id)).addEventListener('change', function () {
         state[sk] = this.checked;
         pushHistory();
-        render();
+        if (triggersBg) { renderBackground(); renderForeground(); }
+        else render();
     });
 }
 
@@ -808,9 +839,10 @@ function applyArrangement(name) {
 }
 
 // Wire up all sliders
-bindSlider('room-length', 'roomLength', 'val-room-length');
-bindSlider('room-width', 'roomWidth', 'val-room-width');
-bindSlider('room-ceiling-height', 'ceilingHeight', 'val-room-ceiling-height');
+// Room dimension sliders regenerate the background canvas (grid + room outline)
+bindSlider('room-length', 'roomLength', 'val-room-length', true);
+bindSlider('room-width', 'roomWidth', 'val-room-width', true);
+bindSlider('room-ceiling-height', 'ceilingHeight', 'val-room-ceiling-height', true);
 bindSlider('table-rotation', 'tableRotation', 'val-table-rotation');
 bindSlider('table-x', 'tableX', 'val-table-x');
 bindSlider('table-length', 'tableLength', 'val-table-length');
@@ -832,7 +864,8 @@ bindCheckbox('include-micpod', 'includeMicPod');
 bindCheckbox('show-view-angle', 'showViewAngle');
 bindCheckbox('show-camera', 'showCamera');
 bindCheckbox('show-mic', 'showMic');
-bindCheckbox('show-grid', 'showGrid');
+// Grid lives on the background canvas — toggling it must redraw that layer
+bindCheckbox('show-grid', 'showGrid', true);
 
 // ── Download / Export / Import ───────────────────────────────
 
@@ -850,9 +883,10 @@ function downloadLayout() {
     exportCtx.fillStyle = cc().exportBg;
     exportCtx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
 
-    // 2. Composite the live canvas (already fully rendered at DPR
-    //    resolution) on top pixel-for-pixel.
-    exportCtx.drawImage(canvas, 0, 0);
+    // 2. Composite background then foreground canvas pixel-for-pixel
+    //    so the exported PNG matches the on-screen stacked appearance.
+    exportCtx.drawImage(bgCanvas, 0, 0);
+    exportCtx.drawImage(fgCanvas, 0, 0);
 
     // 3. Trigger the download at full quality.
     const timestamp = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
@@ -1537,59 +1571,107 @@ function isMouseInViewCone(ox, dispY, rl, ppf) {
     return Math.abs(angle - Math.PI / 2) <= hv;
 }
 
-function render() {
+// ── Shared layout helper ─────────────────────────────────────
+// Computes the pixel-coordinate system used by both render layers.
+function _topDownLayout() {
     const dpr = window.devicePixelRatio || 1;
     const container = document.querySelector('.canvas-container');
     const cw = container.clientWidth - 64;
     const ch = container.clientHeight - 64;
 
-    // Delegate to POV renderer if in first-person mode
-    if (state.viewMode === 'pov') {
-        renderPOV(cw, ch, dpr);
-        return;
-    }
-
-    // ── Canvas sizing ────────────────────────────────────
-    const padF = 2; // padding in feet around the room
+    const padF = 2;
     const totalW = state.roomWidth + padF * 2;
     const totalH = state.roomLength + padF * 2;
     const scale = Math.min(cw / totalW, ch / totalH);
+    const ppf = scale;
 
-    canvas.width = Math.floor(totalW * scale) * dpr;
-    canvas.height = Math.floor(totalH * scale) * dpr;
-    canvas.style.width = Math.floor(totalW * scale) + 'px';
-    canvas.style.height = Math.floor(totalH * scale) + 'px';
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    // Ensure sub-pixel AA quality on high-DPI displays
-    ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = 'high';
+    const canvasW = Math.floor(totalW * scale);
+    const canvasH = Math.floor(totalH * scale);
+    // Use the non-floored value for ox/oy so room elements are pixel-accurately
+    // centred (matches original render() calculation).
+    const ox = (totalW * scale) / 2;
+    const oy = padF * ppf + (state.roomLength * ppf) / 2;
+    const rw = state.roomWidth * ppf;
+    const rl = state.roomLength * ppf;
+    const rx = ox - rw / 2;
+    const ry = oy - rl / 2;
+    const wallThick = Math.max(3, ppf * 0.2);
 
-    // ── Coordinate system ────────────────────────────────
-    const ppf = scale;     // pixels per foot
-    ppf_g = ppf;           // expose globally for drawCoverage
-    const ox = (totalW * scale) / 2;                   // room center X
-    const oy = padF * ppf + (state.roomLength * ppf) / 2; // room center Y
-    const rw = state.roomWidth * ppf;                  // room width px
-    const rl = state.roomLength * ppf;                 // room length px
-    const rx = ox - rw / 2;                            // room left edge
-    const ry = oy - rl / 2;                            // room top edge
+    return { dpr, ppf, canvasW, canvasH, ox, oy, rw, rl, rx, ry, wallThick };
+}
 
-    // ── Equipment lookup ─────────────────────────────────
-    const eq = EQUIPMENT[state.videoBar];
-    const centerEq = EQUIPMENT[getCenterEqKey()];
-    const micPodEq = getMicPodEq();
+/**
+ * Render the static background layer: canvas fill, grid, room outline,
+ * wall accent, dimension labels, and scale bar.
+ * Only call when room dimensions or grid settings change.
+ */
+function renderBackground() {
+    if (state.viewMode === 'pov') return; // POV uses fg only
 
-    // ── Background ───────────────────────────────────────
+    const { dpr, ppf, canvasW, canvasH, ox, oy, rw, rl, rx, ry } = _topDownLayout();
+
+    // Size the background canvas
+    bgCanvas.width = canvasW * dpr;
+    bgCanvas.height = canvasH * dpr;
+    bgCanvas.style.width = canvasW + 'px';
+    bgCanvas.style.height = canvasH + 'px';
+    bgCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    bgCtx.imageSmoothingEnabled = true;
+    bgCtx.imageSmoothingQuality = 'high';
+
+    // Temporarily redirect the global ctx so all drawXxx helpers use bgCtx
+    const _savedCtx = ctx;
+    ctx = bgCtx;
+
+    // ── Canvas background ────────────────────────────────
     ctx.fillStyle = cc().bg;
-    ctx.fillRect(0, 0, canvas.width / dpr, canvas.height / dpr);
+    ctx.fillRect(0, 0, canvasW, canvasH);
 
     // ── Grid ─────────────────────────────────────────────
     if (state.showGrid) {
         drawGrid(rx, ry, rw, rl, ppf);
     }
 
-    // ── Room walls ───────────────────────────────────────
-    const wallThick = drawRoom(rx, ry, rw, rl, ppf);
+    // ── Room outline and front wall accent ───────────────
+    drawRoom(rx, ry, rw, rl, ppf);
+
+    // ── Dimension labels ─────────────────────────────────
+    drawDimensionLabels(ox, oy, rx, ry, rl, ppf);
+
+    // ── Scale bar ────────────────────────────────────────
+    drawScaleBar(rx, ry, rl, ppf);
+
+    ctx = _savedCtx; // restore foreground context
+}
+
+/**
+ * Render the foreground layer: coverage overlays, displays, equipment,
+ * tables, and companion devices.  Background is transparent so bgCanvas
+ * shows through.  Safe to call every drag frame without touching bgCanvas.
+ */
+function renderForeground() {
+    if (state.viewMode === 'pov') return; // POV uses fg only
+
+    const { dpr, ppf, canvasW, canvasH, ox, ry, rw, rl, wallThick } = _topDownLayout();
+
+    // Size the foreground canvas to match the background canvas
+    fgCanvas.width = canvasW * dpr;
+    fgCanvas.height = canvasH * dpr;
+    fgCanvas.style.width = canvasW + 'px';
+    fgCanvas.style.height = canvasH + 'px';
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+
+    // ── Clear to transparent (background shows through) ──
+    ctx.clearRect(0, 0, canvasW, canvasH);
+
+    ppf_g = ppf; // expose globally for drawCoverage
+
+    // ── Equipment lookup ─────────────────────────────────
+    const eq = EQUIPMENT[state.videoBar];
+    const centerEq = EQUIPMENT[getCenterEqKey()];
+    const micPodEq = getMicPodEq();
 
     // ── Compute device positions ─────────────────────────
     const dispWidthPx = (state.displaySize * 0.8715 / 12) * ppf;
@@ -1635,7 +1717,7 @@ function render() {
     drawEquipmentTopDown(ox, ry, wallThick, dispY, dispDepthPx, dispWidthPx,
         mainDeviceY, eq, eqWidthPx, eqDepthPx, ppf);
 
-    // ── Conference table ─────────────────────────────────
+    // ── Conference tables ────────────────────────────────
     drawTable(ox, ry, wallThick, ppf);
 
     // ── Center companion device ──────────────────────────
@@ -1648,14 +1730,28 @@ function render() {
         drawMicPod(micPodX, micPodY, micPodEq, ppf);
     }
 
-    // ── Dimension labels ─────────────────────────────────
-    drawDimensionLabels(ox, oy, rx, ry, rl, ppf);
-
-    // ── Scale bar ────────────────────────────────────────
-    drawScaleBar(rx, ry, rl, ppf);
-
     // ── Update DOM header and info ───────────────────────
     updateHeaderDOM(eq);
+}
+
+/**
+ * Full render: repaints both background and foreground (or the POV view).
+ * Use this for major state changes (theme switch, view mode, undo/redo, etc.).
+ * Hot drag path uses scheduleRender() → renderForeground() only.
+ */
+function render() {
+    const dpr = window.devicePixelRatio || 1;
+    const container = document.querySelector('.canvas-container');
+    const cw = container.clientWidth - 64;
+    const ch = container.clientHeight - 64;
+
+    if (state.viewMode === 'pov') {
+        renderPOV(cw, ch, dpr);
+        return;
+    }
+
+    renderBackground();
+    renderForeground();
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -1664,6 +1760,7 @@ function render() {
 
 function renderPOV(cw, ch, dpr) {
     // ── Canvas sizing ────────────────────────────────────
+    // Foreground canvas carries the full POV scene (opaque gradient bg).
     canvas.width = cw * dpr;
     canvas.height = ch * dpr;
     canvas.style.width = cw + 'px';
@@ -1672,6 +1769,14 @@ function renderPOV(cw, ch, dpr) {
     // Ensure sub-pixel AA quality on high-DPI displays
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = 'high';
+
+    // bgCanvas is in normal flow and sets .canvas-stack's size; keep it in
+    // sync and blank so it doesn't peek through at mismatched dimensions.
+    bgCanvas.width = cw * dpr;
+    bgCanvas.height = ch * dpr;
+    bgCanvas.style.width = cw + 'px';
+    bgCanvas.style.height = ch + 'px';
+    bgCtx.clearRect(0, 0, cw, ch);
 
     // ── Sky / floor gradient background ──────────────────
     const g = ctx.createLinearGradient(0, 0, 0, ch);

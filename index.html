@@ -368,7 +368,12 @@
                 </div>
             </div>
         </div>
-        <div class="canvas-container"><canvas id="canvas"></canvas></div>
+        <div class="canvas-container">
+            <div class="canvas-stack">
+                <canvas id="bg-canvas"></canvas>
+                <canvas id="fg-canvas"></canvas>
+            </div>
+        </div>
         <div class="info-overlay" id="info-overlay">
             <button class="info-specs-tab" data-action="toggle-overlay">Specs ▸</button>
             <div class="info-overlay-header">
