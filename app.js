@@ -77,7 +77,7 @@ function cc() {
 
 // ── Application State ────────────────────────────────────────
 const state = {
-    roomLength: 20, roomWidth: 15,
+    roomLength: 20, roomWidth: 15, ceilingHeight: 9,
     tableLength: 8, tableWidth: 4, tableDist: 4,
     tableShape: 'rectangular', tableHeight: 30,
     displayCount: 1, displaySize: 65, displayElev: 54,
@@ -107,7 +107,7 @@ let mousePos = { x: 0, y: 0 };
 const DOM = {};
 function cacheDOMRefs() {
     const ids = [
-        'room-length', 'room-width', 'table-length', 'table-width',
+        'room-length', 'room-width', 'room-ceiling-height', 'table-length', 'table-width',
         'table-height', 'table-dist', 'display-size', 'display-elev',
         'viewer-dist', 'viewer-offset', 'table-shape', 'video-bar',
         'include-center', 'include-micpod', 'show-camera', 'show-mic',
@@ -120,7 +120,7 @@ function cacheDOMRefs() {
         'info-content', 'info-title', 'undo-btn', 'redo-btn', 'share-btn',
         'legend-camera', 'legend-mic', 'download-btn', 'export-btn',
         'import-btn', 'import-file-input', 'expand-all-btn', 'collapse-all-btn',
-        'val-room-length', 'val-room-width', 'val-table-length', 'val-table-width',
+        'val-room-length', 'val-room-width', 'val-room-ceiling-height', 'val-table-length', 'val-table-width',
         'val-table-height', 'val-table-dist', 'val-display-size', 'val-display-elev',
         'val-viewer-dist', 'val-viewer-offset'
     ];
@@ -600,6 +600,7 @@ function bindCheckbox(id, sk) {
 // Wire up all sliders
 bindSlider('room-length', 'roomLength', 'val-room-length');
 bindSlider('room-width', 'roomWidth', 'val-room-width');
+bindSlider('room-ceiling-height', 'ceilingHeight', 'val-room-ceiling-height');
 bindSlider('table-length', 'tableLength', 'val-table-length');
 bindSlider('table-width', 'tableWidth', 'val-table-width');
 bindSlider('table-height', 'tableHeight', 'val-table-height');
@@ -1461,6 +1462,126 @@ function renderPOV(cw, ch, dpr) {
         };
     }
 
+    // ── Room sketch: walls, ceiling, floor lines ─────────
+    {
+        const ceilHI = state.ceilingHeight * 12; // ceiling height in inches
+        const rHW = state.roomWidth / 2;          // half-width in feet
+        const nearZ = Math.max(0.1, vd - 0.3);   // close-to-viewer clip depth
+
+        // Front wall corners (z=0, the display wall)
+        const fBL = proj(-rHW, 0, 0);
+        const fBR = proj(rHW, 0, 0);
+        const fTL = proj(-rHW, ceilHI, 0);
+        const fTR = proj(rHW, ceilHI, 0);
+
+        // Perspective corners near viewer
+        const nBL = proj(-rHW, 0, nearZ);
+        const nBR = proj(rHW, 0, nearZ);
+        const nTL = proj(-rHW, ceilHI, nearZ);
+        const nTR = proj(rHW, ceilHI, nearZ);
+
+        ctx.save();
+        ctx.strokeStyle = cc().povDimDash;
+        ctx.lineWidth = 1;
+        ctx.setLineDash([5, 5]);
+
+        // Front wall rectangle
+        ctx.beginPath();
+        ctx.moveTo(fBL.x, fBL.y);
+        ctx.lineTo(fBR.x, fBR.y);
+        ctx.lineTo(fTR.x, fTR.y);
+        ctx.lineTo(fTL.x, fTL.y);
+        ctx.closePath();
+        ctx.stroke();
+
+        // Left wall: floor edge and ceiling edge receding to viewer
+        ctx.beginPath(); ctx.moveTo(fBL.x, fBL.y); ctx.lineTo(nBL.x, nBL.y); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(fTL.x, fTL.y); ctx.lineTo(nTL.x, nTL.y); ctx.stroke();
+
+        // Right wall: floor edge and ceiling edge
+        ctx.beginPath(); ctx.moveTo(fBR.x, fBR.y); ctx.lineTo(nBR.x, nBR.y); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(fTR.x, fTR.y); ctx.lineTo(nTR.x, nTR.y); ctx.stroke();
+
+        ctx.setLineDash([]);
+        ctx.restore();
+
+        // ── Ceiling height callout (left of front wall) ───
+        {
+            const dimX = Math.min(fBL.x, fTL.x) - 28;
+            const tw = 5;
+
+            ctx.strokeStyle = cc().povDimDash;
+            ctx.lineWidth = 1.5;
+            ctx.setLineDash([4, 4]);
+            ctx.beginPath(); ctx.moveTo(dimX, fBL.y); ctx.lineTo(dimX, fTL.y); ctx.stroke();
+            ctx.setLineDash([]);
+
+            ctx.strokeStyle = cc().povDimTick;
+            ctx.lineWidth = 1.5;
+            ctx.beginPath(); ctx.moveTo(dimX - tw, fBL.y); ctx.lineTo(dimX + tw, fBL.y); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(dimX - tw, fTL.y); ctx.lineTo(dimX + tw, fTL.y); ctx.stroke();
+
+            const lbl = formatFtIn(state.ceilingHeight);
+            ctx.font = "600 11px 'JetBrains Mono', monospace";
+            const lw = ctx.measureText(lbl).width + 14;
+            const lhb = 20;
+            const ly = (fBL.y + fTL.y) / 2;
+
+            ctx.fillStyle = cc().surface;
+            ctx.strokeStyle = cc().povBadgeStroke;
+            ctx.lineWidth = 1.5;
+            roundRect(ctx, dimX - lw / 2, ly - lhb / 2 - 5, lw, lhb + 10, 4);
+            ctx.fill();
+            ctx.stroke();
+
+            ctx.fillStyle = cc().labelBright;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(lbl, dimX, ly - 3);
+            ctx.font = "500 8px 'JetBrains Mono', monospace";
+            ctx.fillStyle = cc().label;
+            ctx.fillText('CLG HT', dimX, ly + 8);
+        }
+
+        // ── Room width callout (above front wall top edge) ─
+        {
+            const dimY = fTL.y - 20;
+            const tw = 5;
+
+            ctx.strokeStyle = cc().povDimDash;
+            ctx.lineWidth = 1.5;
+            ctx.setLineDash([4, 4]);
+            ctx.beginPath(); ctx.moveTo(fTL.x, dimY); ctx.lineTo(fTR.x, dimY); ctx.stroke();
+            ctx.setLineDash([]);
+
+            ctx.strokeStyle = cc().povDimTick;
+            ctx.lineWidth = 1.5;
+            ctx.beginPath(); ctx.moveTo(fTL.x, dimY - tw); ctx.lineTo(fTL.x, dimY + tw); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(fTR.x, dimY - tw); ctx.lineTo(fTR.x, dimY + tw); ctx.stroke();
+
+            const lbl = formatFtIn(state.roomWidth);
+            ctx.font = "600 11px 'JetBrains Mono', monospace";
+            const lw = ctx.measureText(lbl).width + 14;
+            const lhb = 20;
+            const lx = (fTL.x + fTR.x) / 2;
+
+            ctx.fillStyle = cc().surface;
+            ctx.strokeStyle = cc().povBadgeStroke;
+            ctx.lineWidth = 1.5;
+            roundRect(ctx, lx - lw / 2, dimY - lhb / 2 - 5, lw, lhb + 10, 4);
+            ctx.fill();
+            ctx.stroke();
+
+            ctx.fillStyle = cc().labelBright;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(lbl, lx, dimY - 3);
+            ctx.font = "500 8px 'JetBrains Mono', monospace";
+            ctx.fillStyle = cc().label;
+            ctx.fillText('WIDTH', lx, dimY + 8);
+        }
+    }
+
     // ── Equipment and display geometry ───────────────────
     const eq = EQUIPMENT[state.videoBar];
     const dwf = (state.displaySize * 0.8715 / 12); // display width in feet
@@ -1845,7 +1966,7 @@ function redo() {
 // ═══════════════════════════════════════════════════════════════
 
 const HASH_KEYS = {
-    rl: 'roomLength', rw: 'roomWidth',
+    rl: 'roomLength', rw: 'roomWidth', rch: 'ceilingHeight',
     tl: 'tableLength', tw: 'tableWidth', td: 'tableDist',
     th: 'tableHeight', ts: 'tableShape',
     dc: 'displayCount', ds: 'displaySize', de: 'displayElev',
@@ -1908,6 +2029,7 @@ function syncUIFromState() {
     const sliderMap = {
         'room-length': ['roomLength', 'val-room-length', 'ft'],
         'room-width': ['roomWidth', 'val-room-width', 'ft'],
+        'room-ceiling-height': ['ceilingHeight', 'val-room-ceiling-height', 'ft'],
         'table-length': ['tableLength', 'val-table-length', 'ft'],
         'table-width': ['tableWidth', 'val-table-width', 'ft'],
         'table-height': ['tableHeight', 'val-table-height', 'in'],
