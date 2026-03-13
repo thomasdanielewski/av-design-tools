@@ -15,7 +15,9 @@ const state = {
     viewMode: 'top',
     centerPos: { x: 0, y: 0 },
     viewerDist: 12, viewerOffset: 0,
-    posture: 'seated'
+    posture: 'seated',
+    structuralElements: [],
+    selectedElementId: null
 };
 
 // ── Undo / Redo ──────────────────────────────────────────────
@@ -96,6 +98,10 @@ function serializeToHash() {
     // Serialize full tables array + selected id
     params.set('tb', JSON.stringify(state.tables));
     params.set('stid', state.selectedTableId);
+    // Serialize structural elements
+    if (state.structuralElements && state.structuralElements.length > 0) {
+        params.set('se', JSON.stringify(state.structuralElements));
+    }
     history.replaceState
         ? window.history.replaceState(null, '', '#' + params.toString())
         : (window.location.hash = params.toString());
@@ -124,6 +130,10 @@ function loadFromHash() {
                 height: state.tableHeight, rotation: state.tableRotation }];
         }
         if (params.has('stid')) state.selectedTableId = parseInt(params.get('stid')) || 1;
+        // Load structural elements
+        if (params.has('se')) {
+            try { state.structuralElements = JSON.parse(params.get('se')); } catch (_) {}
+        }
         // Ensure selectedTableId points to an existing table
         if (!state.tables.find(t => t.id === state.selectedTableId)) state.selectedTableId = state.tables[0].id;
         // Sync flat state from selected table
@@ -210,4 +220,7 @@ function syncUIFromState() {
     setDisplayCount(state.displayCount);
     setPosture(state.posture);
     setViewMode(state.viewMode);
+
+    // Structural elements
+    syncStructuralUI();
 }

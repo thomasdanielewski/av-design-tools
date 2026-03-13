@@ -725,3 +725,195 @@ function drawScaleBar(rx, ry, rl, ppf) {
     ctx.textBaseline = 'bottom';
     ctx.fillText(barLabel, bx + barPx / 2, by - tickH - 2);
 }
+
+/**
+ * Compute the pixel position and orientation of a structural element on a wall.
+ * Returns { x, y, isHorizontal, swingDir } in canvas coordinates.
+ */
+function getElementWallCoords(el, rx, ry, rw, rl, ppf, wallThick) {
+    const pos = el.position * ppf;
+    const w = el.width * ppf;
+    let x, y, isHorizontal;
+    // swingDir: which direction the door swings (into the room)
+    let swingDirX = 0, swingDirY = 0;
+
+    if (el.wall === 'north') {
+        x = rx + pos;
+        y = ry;
+        isHorizontal = true;
+        swingDirY = 1; // swings into room (downward)
+    } else if (el.wall === 'south') {
+        x = rx + pos;
+        y = ry + rl;
+        isHorizontal = true;
+        swingDirY = -1; // swings into room (upward)
+    } else if (el.wall === 'west') {
+        x = rx;
+        y = ry + pos;
+        isHorizontal = false;
+        swingDirX = 1; // swings into room (rightward)
+    } else { // east
+        x = rx + rw;
+        y = ry + pos;
+        isHorizontal = false;
+        swingDirX = -1; // swings into room (leftward)
+    }
+
+    return { x, y, isHorizontal, w, swingDirX, swingDirY };
+}
+
+/**
+ * Draw structural elements (windows and doors) on the room outline.
+ */
+function drawStructuralElements(rx, ry, rw, rl, ppf, wallThick) {
+    if (!state.structuralElements || state.structuralElements.length === 0) return;
+
+    for (const el of state.structuralElements) {
+        const { x, y, isHorizontal, w, swingDirX, swingDirY } =
+            getElementWallCoords(el, rx, ry, rw, rl, ppf, wallThick);
+        const isSelected = el.id === state.selectedElementId;
+
+        if (el.type === 'window') {
+            drawWindowElement(x, y, w, isHorizontal, wallThick, isSelected);
+        } else {
+            drawDoorElement(x, y, w, isHorizontal, wallThick, swingDirX, swingDirY, ppf, el, isSelected);
+        }
+    }
+}
+
+/**
+ * Draw a window opening on a wall.
+ */
+function drawWindowElement(x, y, w, isHorizontal, wallThick, isSelected) {
+    ctx.save();
+
+    // Clear the wall section to show an opening
+    ctx.globalCompositeOperation = 'destination-out';
+    if (isHorizontal) {
+        ctx.fillRect(x, y - 1, w, wallThick + 2);
+    } else {
+        ctx.fillRect(x - 1, y, wallThick + 2, w);
+    }
+    ctx.globalCompositeOperation = 'source-over';
+
+    // Draw window frame (light blue fill with border)
+    ctx.fillStyle = isSelected ? 'rgba(99, 180, 255, 0.35)' : 'rgba(99, 180, 255, 0.2)';
+    ctx.strokeStyle = isSelected ? 'rgba(99, 180, 255, 0.9)' : 'rgba(99, 180, 255, 0.6)';
+    ctx.lineWidth = 1.5;
+
+    if (isHorizontal) {
+        ctx.fillRect(x, y, w, wallThick);
+        ctx.strokeRect(x, y, w, wallThick);
+        // Center mullion line
+        const midX = x + w / 2;
+        ctx.beginPath();
+        ctx.moveTo(midX, y);
+        ctx.lineTo(midX, y + wallThick);
+        ctx.stroke();
+    } else {
+        ctx.fillRect(x, y, wallThick, w);
+        ctx.strokeRect(x, y, wallThick, w);
+        const midY = y + w / 2;
+        ctx.beginPath();
+        ctx.moveTo(x, midY);
+        ctx.lineTo(x + wallThick, midY);
+        ctx.stroke();
+    }
+
+    ctx.restore();
+}
+
+/**
+ * Draw a door opening with swing arc on a wall.
+ */
+function drawDoorElement(x, y, w, isHorizontal, wallThick, swingDirX, swingDirY, ppf, el, isSelected) {
+    ctx.save();
+
+    // Clear the wall section to show an opening
+    ctx.globalCompositeOperation = 'destination-out';
+    if (isHorizontal) {
+        ctx.fillRect(x, y - 1, w, wallThick + 2);
+    } else {
+        ctx.fillRect(x - 1, y, wallThick + 2, w);
+    }
+    ctx.globalCompositeOperation = 'source-over';
+
+    // Door opening edges (two short perpendicular lines at the opening edges)
+    ctx.strokeStyle = isSelected ? '#6366f1' : cc().roomStroke;
+    ctx.lineWidth = 1.5;
+
+    const swingRadius = el.width * ppf;
+    // Hinge is at the start of the opening (position side)
+    let hingeX, hingeY, startAngle, endAngle;
+
+    if (isHorizontal) {
+        // Draw opening edge marks
+        ctx.beginPath();
+        ctx.moveTo(x, y); ctx.lineTo(x, y + wallThick);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(x + w, y); ctx.lineTo(x + w, y + wallThick);
+        ctx.stroke();
+
+        // Hinge at the left edge of opening; door swings into room
+        hingeX = x;
+        hingeY = (swingDirY > 0) ? y + wallThick : y;
+        if (swingDirY > 0) {
+            // North wall: swing downward
+            startAngle = 0;
+            endAngle = Math.PI / 2;
+        } else {
+            // South wall: swing upward
+            startAngle = -Math.PI / 2;
+            endAngle = 0;
+        }
+    } else {
+        // Draw opening edge marks
+        ctx.beginPath();
+        ctx.moveTo(x, y); ctx.lineTo(x + wallThick, y);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(x, y + w); ctx.lineTo(x + wallThick, y + w);
+        ctx.stroke();
+
+        // Hinge at the top edge of opening; door swings into room
+        hingeX = (swingDirX > 0) ? x + wallThick : x;
+        hingeY = y;
+        if (swingDirX > 0) {
+            // West wall: swing rightward
+            startAngle = 0;
+            endAngle = Math.PI / 2;
+        } else {
+            // East wall: swing leftward
+            startAngle = Math.PI / 2;
+            endAngle = Math.PI;
+        }
+    }
+
+    // Draw door swing arc (dashed)
+    ctx.strokeStyle = isSelected ? 'rgba(239, 68, 68, 0.6)' : 'rgba(239, 68, 68, 0.3)';
+    ctx.fillStyle = isSelected ? 'rgba(239, 68, 68, 0.08)' : 'rgba(239, 68, 68, 0.04)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 3]);
+    ctx.beginPath();
+    ctx.moveTo(hingeX, hingeY);
+    ctx.arc(hingeX, hingeY, swingRadius, startAngle, endAngle);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Draw the door panel line (solid line from hinge to arc edge, representing the door leaf)
+    ctx.strokeStyle = isSelected ? 'rgba(239, 68, 68, 0.8)' : 'rgba(239, 68, 68, 0.5)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(hingeX, hingeY);
+    if (isHorizontal) {
+        ctx.lineTo(hingeX + w, hingeY);
+    } else {
+        ctx.lineTo(hingeX, hingeY + w);
+    }
+    ctx.stroke();
+
+    ctx.restore();
+}
