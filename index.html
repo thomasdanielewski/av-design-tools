@@ -111,6 +111,34 @@
                         </div>
                         <input type="range" id="table-dist" min="0" max="30" step="0.5" value="4">
                     </div>
+                    <div class="control-row">
+                        <div class="control-label"><span>Rotation</span><span class="value" id="val-table-rotation"
+                                data-slider="table-rotation" data-key="tableRotation" data-unit="deg">0°</span>
+                        </div>
+                        <input type="range" id="table-rotation" min="0" max="350" step="10" value="0">
+                    </div>
+                    <div class="control-row">
+                        <div class="control-label"><span>Side Offset</span><span class="value" id="val-table-x"
+                                data-slider="table-x" data-key="tableX" data-unit="ft">0' 0"</span>
+                        </div>
+                        <input type="range" id="table-x" min="-20" max="20" step="0.5" value="0">
+                    </div>
+                    <!-- Table manager: list + add/remove + arrangements -->
+                    <div class="table-manager">
+                        <div class="table-manager-header">
+                            <span>Tables</span>
+                            <div class="table-manager-actions">
+                                <button class="table-action-btn" id="add-table-btn" title="Add a new table">+ Add</button>
+                                <button class="table-action-btn table-action-remove" id="remove-table-btn" title="Remove selected table" disabled>Remove</button>
+                            </div>
+                        </div>
+                        <div id="table-list" class="table-list"></div>
+                        <div class="table-arrangements">
+                            <button class="arr-pill" data-arrangement="u-shape">U-Shape</button>
+                            <button class="arr-pill" data-arrangement="classroom">Classroom</button>
+                            <button class="arr-pill" data-arrangement="pods">Pods</button>
+                        </div>
+                    </div>
                     <div class="room-warning" id="room-warning">
                         <div class="room-warning-header"><span class="room-warning-dot"></span> Layout Conflict</div>
                         <div class="room-warning-text" id="room-warning-text"></div>

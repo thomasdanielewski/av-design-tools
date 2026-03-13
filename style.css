@@ -794,6 +794,129 @@ select:focus {
 
 
 /* ══════════════════════════════════════════════════════════════
+   TABLE MANAGER — multi-table list, add/remove, arrangements
+   ══════════════════════════════════════════════════════════════ */
+.table-manager {
+    margin-top: var(--space-lg);
+    padding-top: var(--space-md);
+    border-top: 1px solid var(--border-subtle);
+}
+
+.table-manager-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--space-sm);
+}
+
+.table-manager-header > span {
+    font-size: var(--text-base);
+    font-weight: 500;
+    color: var(--text-secondary);
+}
+
+.table-manager-actions {
+    display: flex;
+    gap: 6px;
+}
+
+.table-action-btn {
+    padding: 3px 10px;
+    background: transparent;
+    border: 1px solid var(--border-default);
+    border-radius: 6px;
+    color: var(--text-tertiary);
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s var(--ease-out);
+}
+
+.table-action-btn:hover:not(:disabled) {
+    border-color: var(--border-focus);
+    color: var(--text-secondary);
+    background: var(--bg-hover);
+}
+
+.table-action-btn:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+}
+
+.table-action-remove:hover:not(:disabled) {
+    border-color: var(--red);
+    color: var(--red);
+    background: var(--red-dim);
+}
+
+.table-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: var(--space-md);
+    min-height: 28px;
+}
+
+.table-pill {
+    padding: 4px 12px;
+    background: transparent;
+    border: 1px solid var(--border-default);
+    border-radius: 100px;
+    color: var(--text-tertiary);
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s var(--ease-out);
+    white-space: nowrap;
+}
+
+.table-pill:hover {
+    border-color: var(--border-focus);
+    color: var(--text-secondary);
+    background: var(--bg-hover);
+}
+
+.table-pill.active {
+    border-color: var(--red);
+    color: var(--red);
+    background: var(--red-dim);
+}
+
+.table-arrangements {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.arr-pill {
+    padding: 4px 10px;
+    background: transparent;
+    border: 1px solid var(--border-subtle);
+    border-radius: 6px;
+    color: var(--text-tertiary);
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s var(--ease-out);
+    white-space: nowrap;
+}
+
+.arr-pill:hover {
+    border-color: var(--border-focus);
+    color: var(--text-secondary);
+    background: var(--bg-hover);
+    transform: translateY(-1px);
+}
+
+.arr-pill:active {
+    transform: scale(0.97);
+}
+
+
+/* ══════════════════════════════════════════════════════════════
    PRIMARY ACTIONS — Download & Export/Import
    ══════════════════════════════════════════════════════════════ */
 .download-btn {
