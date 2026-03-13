@@ -19,6 +19,7 @@ bindSlider('table-height', 'tableHeight', 'val-table-height');
 bindSlider('table-dist', 'tableDist', 'val-table-dist');
 bindSlider('display-size', 'displaySize', 'val-display-size');
 bindSlider('display-elev', 'displayElev', 'val-display-elev');
+bindSlider('display-offset-x', 'displayOffsetX', 'val-display-offset-x');
 bindSlider('viewer-dist', 'viewerDist', 'val-viewer-dist');
 bindSlider('viewer-offset', 'viewerOffset', 'val-viewer-offset');
 

@@ -5,7 +5,7 @@ const state = {
     tableShape: 'rectangular', tableHeight: 30, tableX: 0, tableRotation: 0,
     tables: [{ id: 1, shape: 'rectangular', length: 8, width: 4, x: 0, dist: 4, height: 30, rotation: 0 }],
     selectedTableId: 1,
-    displayCount: 1, displaySize: 65, displayElev: 54,
+    displayCount: 1, displaySize: 65, displayElev: 54, displayOffsetX: 0,
     brand: 'neat', videoBar: 'neat-bar-gen2',
     mountPos: 'below',
     includeCenter: false, includeMicPod: false,
@@ -159,6 +159,7 @@ function syncUIFromState() {
         'table-x': ['tableX', 'val-table-x', 'ft'],
         'display-size': ['displaySize', 'val-display-size', 'in'],
         'display-elev': ['displayElev', 'val-display-elev', 'in'],
+        'display-offset-x': ['displayOffsetX', 'val-display-offset-x', 'ft'],
         'viewer-dist': ['viewerDist', 'val-viewer-dist', 'ft'],
         'viewer-offset': ['viewerOffset', 'val-viewer-offset', 'ft'],
     };

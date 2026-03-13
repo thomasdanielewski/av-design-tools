@@ -137,6 +137,7 @@ function renderForeground() {
     const eqDepthPx = Math.max(4, eq.depth * ppf);
 
     const dispY = ry + wallThick + dispDepthPx / 2 + 2;
+    const dispOx = ox + state.displayOffsetX * ppf;
     let mainDeviceY = dispY + dispDepthPx / 2 + eqDepthPx / 2 + 2;
     if (eq.type === 'board') {
         mainDeviceY = dispY + dispDepthPx / 2 + eqDepthPx / 2;
@@ -154,12 +155,12 @@ function renderForeground() {
 
     // Viewing angle overlay
     if (state.showViewAngle) {
-        const hovered = isMouseInViewCone(ox, dispY, rl, ppf);
-        drawViewAngle(ox, dispY, rl, ppf, hovered);
+        const hovered = isMouseInViewCone(dispOx, dispY, rl, ppf);
+        drawViewAngle(dispOx, dispY, rl, ppf, hovered);
     }
 
     // Coverage arcs
-    drawCoverage(ox, mainDeviceY, eq, Math.PI / 2);
+    drawCoverage(dispOx, mainDeviceY, eq, Math.PI / 2);
     if (state.includeCenter) {
         drawCoverage(centerX, centerY, centerEq, 0);
     }
@@ -168,10 +169,10 @@ function renderForeground() {
     }
 
     // Displays
-    drawDisplaysTopDown(ox, dispY, dispWidthPx, dispDepthPx, eq, eqWidthPx, eqDepthPx);
+    drawDisplaysTopDown(dispOx, dispY, dispWidthPx, dispDepthPx, eq, eqWidthPx, eqDepthPx);
 
     // Video bar / board equipment
-    drawEquipmentTopDown(ox, ry, wallThick, dispY, dispDepthPx, dispWidthPx,
+    drawEquipmentTopDown(dispOx, ry, wallThick, dispY, dispDepthPx, dispWidthPx,
         mainDeviceY, eq, eqWidthPx, eqDepthPx, ppf);
 
     // Conference tables

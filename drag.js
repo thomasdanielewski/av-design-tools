@@ -47,7 +47,31 @@ function getDragMetrics(e) {
     const cX = tableX_px + state.centerPos.x * ppf;
     const cY = ty2 + state.centerPos.y * ppf;
 
-    return { mx, my, ppf, ox, ry, wt, ty2, tableX_px, cX, cY };
+    // Display / video-bar position
+    const eq = EQUIPMENT[state.videoBar];
+    const dispDepthPx = (1.12 / 12) * ppf;
+    const dispWidthPx = (state.displaySize * 0.8715 / 12) * ppf;
+    const eqWidthPx = eq.width * ppf;
+    const eqDepthPx = Math.max(4, eq.depth * ppf);
+    const dispY = ry + wt + dispDepthPx / 2 + 2;
+    let mainDeviceY = dispY + dispDepthPx / 2 + eqDepthPx / 2 + 2;
+    if (eq.type === 'board') {
+        mainDeviceY = dispY + dispDepthPx / 2 + eqDepthPx / 2;
+    } else if (state.mountPos === 'above') {
+        mainDeviceY = dispY - dispDepthPx / 2 - eqDepthPx / 2 - 2;
+    }
+    const dispOx = ox + state.displayOffsetX * ppf;
+
+    return { mx, my, ppf, ox, ry, wt, ty2, tableX_px, cX, cY,
+             dispOx, dispY, dispWidthPx, dispDepthPx, eqWidthPx, eqDepthPx, mainDeviceY };
+}
+
+/** Hit-test the display + video bar area for lateral drag */
+function isPointOnDisplay(mx, my, dispOx, dispY, dispWidthPx, dispDepthPx, eqWidthPx, eqDepthPx, mainDeviceY) {
+    const hitHalfW = Math.max(dispWidthPx, eqWidthPx) / 2 + DRAG_TOLERANCE;
+    const yTop = Math.min(dispY - dispDepthPx / 2, mainDeviceY - eqDepthPx / 2) - DRAG_TOLERANCE;
+    const yBot = Math.max(dispY + dispDepthPx / 2, mainDeviceY + eqDepthPx / 2) + DRAG_TOLERANCE;
+    return Math.abs(mx - dispOx) <= hitHalfW && my >= yTop && my <= yBot;
 }
 
 /** Hit-test a rotated table rectangle (with 4px tolerance) */
@@ -81,8 +105,8 @@ canvas.addEventListener('mousemove', e => {
     mousePos.x = e.clientX - _rect.left;
     mousePos.y = e.clientY - _rect.top;
 
-    if (state.viewMode !== 'top' || isDraggingTableId !== null || isDraggingCenter || isDraggingRotate) return;
-    const { mx, my, ppf, ox, ry, wt, cX, cY } = getDragMetrics(e);
+    if (state.viewMode !== 'top' || isDraggingTableId !== null || isDraggingCenter || isDraggingDisplay || isDraggingRotate) return;
+    const { mx, my, ppf, ox, ry, wt, cX, cY, dispOx, dispY, dispWidthPx, dispDepthPx, eqWidthPx, eqDepthPx, mainDeviceY } = getDragMetrics(e);
 
     // Rotation handle takes cursor priority over table body
     const selT = getSelectedTable();
@@ -94,6 +118,9 @@ canvas.addEventListener('mousemove', e => {
             const ceq = EQUIPMENT[getCenterEqKey()];
             const cs = Math.max(12, ceq.width * ppf * 3);
             if (Math.sqrt((mx - cX) ** 2 + (my - cY) ** 2) <= cs) onTarget = true;
+        }
+        if (!onTarget && isPointOnDisplay(mx, my, dispOx, dispY, dispWidthPx, dispDepthPx, eqWidthPx, eqDepthPx, mainDeviceY)) {
+            onTarget = true;
         }
         if (!onTarget) {
             for (const t of state.tables) {
@@ -110,13 +137,15 @@ canvas.addEventListener('mousemove', e => {
 let isDraggingTableId = null;
 let dragTableOffset = null;
 let isDraggingCenter = false;
+let isDraggingDisplay = false;
+let dragDisplayOffsetX = 0;
 let isDraggingRotate = false;
 let isDraggingRotateTableId = null;
 
 // ── Mouse down: start drag ───────────────────────────────────
 canvas.addEventListener('mousedown', e => {
     if (state.viewMode !== 'top') return;
-    const { mx, my, ppf, ox, ry, wt, cX, cY } = getDragMetrics(e);
+    const { mx, my, ppf, ox, ry, wt, cX, cY, dispOx, dispY, dispWidthPx, dispDepthPx, eqWidthPx, eqDepthPx, mainDeviceY } = getDragMetrics(e);
 
     // Center device takes priority
     if (state.includeCenter) {
@@ -128,6 +157,15 @@ canvas.addEventListener('mousedown', e => {
             pushHistory();
             return;
         }
+    }
+
+    // Display / video-bar lateral drag
+    if (isPointOnDisplay(mx, my, dispOx, dispY, dispWidthPx, dispDepthPx, eqWidthPx, eqDepthPx, mainDeviceY)) {
+        isDraggingDisplay = true;
+        dragDisplayOffsetX = mx - dispOx;
+        canvas.style.cursor = 'grabbing';
+        pushHistory();
+        return;
     }
 
     // Rotation handle (selected table, checked before table body to prevent false drags)
@@ -158,7 +196,7 @@ canvas.addEventListener('mousedown', e => {
 
 // ── Mouse move: update position while dragging ───────────────
 canvas.addEventListener('mousemove', e => {
-    if (isDraggingTableId === null && !isDraggingCenter && !isDraggingRotate) return;
+    if (isDraggingTableId === null && !isDraggingCenter && !isDraggingDisplay && !isDraggingRotate) return;
     const { mx, my, ppf, ox, ry, wt, tableX_px, ty2 } = getDragMetrics(e);
 
     if (isDraggingTableId !== null) {
@@ -192,6 +230,17 @@ canvas.addEventListener('mousemove', e => {
         ny = Math.max(-selT.length / 2, Math.min(ny, selT.length / 2));
         state.centerPos = { x: nx, y: ny };
         scheduleRender();
+    } else if (isDraggingDisplay) {
+        const newDispOx = mx - dragDisplayOffsetX;
+        let nx = (newDispOx - ox) / ppf;
+        const displayWidthFt = state.displaySize * 0.8715 / 12;
+        const maxOff = Math.min(15, state.roomWidth / 2 - displayWidthFt / 2);
+        nx = Math.round(Math.max(-maxOff, Math.min(maxOff, nx)) * 2) / 2;
+        state.displayOffsetX = nx;
+        DOM['display-offset-x'].value = nx;
+        DOM['val-display-offset-x'].textContent = formatFtIn(nx);
+        updateSliderTrack(DOM['display-offset-x']);
+        scheduleRender();
     } else if (isDraggingRotate) {
         const t = state.tables.find(tbl => tbl.id === isDraggingRotateTableId);
         if (t) {
@@ -216,6 +265,7 @@ canvas.addEventListener('mousemove', e => {
 canvas.addEventListener('mouseup', () => {
     isDraggingTableId = null; dragTableOffset = null;
     isDraggingCenter = false;
+    isDraggingDisplay = false; dragDisplayOffsetX = 0;
     isDraggingRotate = false; isDraggingRotateTableId = null;
     canvas.style.cursor = '';
     serializeToHash();
@@ -224,6 +274,7 @@ canvas.addEventListener('mouseup', () => {
 canvas.addEventListener('mouseleave', () => {
     isDraggingTableId = null; dragTableOffset = null;
     isDraggingCenter = false;
+    isDraggingDisplay = false; dragDisplayOffsetX = 0;
     isDraggingRotate = false; isDraggingRotateTableId = null;
     canvas.style.cursor = '';
     mousePos = { x: -9999, y: -9999 };

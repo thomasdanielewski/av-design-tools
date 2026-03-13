@@ -26,7 +26,7 @@ function cacheDOMRefs() {
         'room-length', 'room-width', 'room-ceiling-height', 'table-length', 'table-width',
         'table-height', 'table-dist', 'table-rotation', 'table-x',
         'table-list', 'add-table-btn', 'remove-table-btn',
-        'display-size', 'display-elev',
+        'display-size', 'display-elev', 'display-offset-x',
         'viewer-dist', 'viewer-offset', 'table-shape', 'video-bar',
         'include-center', 'include-micpod', 'show-camera', 'show-mic',
         'show-grid', 'show-view-angle', 'brand-toggle', 'display-count-toggle',
@@ -40,7 +40,7 @@ function cacheDOMRefs() {
         'import-btn', 'import-file-input', 'expand-all-btn', 'collapse-all-btn',
         'val-room-length', 'val-room-width', 'val-room-ceiling-height', 'val-table-length', 'val-table-width',
         'val-table-height', 'val-table-dist', 'val-table-rotation', 'val-table-x',
-        'val-display-size', 'val-display-elev',
+        'val-display-size', 'val-display-elev', 'val-display-offset-x',
         'val-viewer-dist', 'val-viewer-offset'
     ];
     ids.forEach(id => { DOM[id] = document.getElementById(id); });
