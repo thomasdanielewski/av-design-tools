@@ -132,8 +132,8 @@ function makeEditable(badge) {
     inp.max = max;
     inp.step = step;
     inp.title = unit === 'ft'
-        ? 'Enter value in feet (decimals ok, e.g. 12.5)'
-        : 'Enter value in inches';
+        ? (state.units === 'metric' ? 'Enter value in feet (stored internally)' : 'Enter value in feet (decimals ok, e.g. 12.5)')
+        : (state.units === 'metric' ? 'Enter value in inches (stored internally)' : 'Enter value in inches');
 
     badge.textContent = '';
     badge.appendChild(inp);
@@ -171,7 +171,7 @@ function makeEditable(badge) {
     inp.addEventListener('keydown', e => {
         if (e.key === 'Enter') { e.preventDefault(); inp.blur(); }
         if (e.key === 'Escape') {
-            badge.textContent = unit === 'in' ? `${currentVal}"` : formatFtIn(currentVal);
+            badge.textContent = formatValue(currentVal, unit);
         }
     });
     inp.addEventListener('blur', commit);

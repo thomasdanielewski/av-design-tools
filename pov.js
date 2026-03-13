@@ -387,7 +387,7 @@ function renderPOV(cw, ch, dpr) {
 
     // ── Lens height dimension callout ────────────────────
     {
-        const ch2 = Math.round(dvc);
+        const ch2In = Math.round(dvc);
         const pF = proj(0, 0, dz);
         const pL = proj(0, dvc, dz);
         const re = (state.displayCount === 1)
@@ -413,7 +413,7 @@ function renderPOV(cw, ch, dpr) {
         ctx.beginPath(); ctx.moveTo(lx - tw2, pF.y); ctx.lineTo(lx + tw2, pF.y); ctx.stroke();
 
         // Label badge
-        const lb = `${ch2}"`;
+        const lb = state.units === 'metric' ? formatMetricCm(convertInToMetric(ch2In)) : `${ch2In}"`;
         ctx.font = "600 13px 'JetBrains Mono', monospace";
         const lw2 = ctx.measureText(lb).width + 16;
         const lh = 22;
@@ -466,7 +466,7 @@ function renderPOV(cw, ch, dpr) {
     // ── Update DOM ───────────────────────────────────────
     const wallLabel = { north: 'N', south: 'S', east: 'E', west: 'W' }[dw];
     DOM['header-room'].textContent =
-        `POV: ${formatFtIn(vd)} from display (${wallLabel})`;
+        `POV: ${formatFtIn(vd)} from display (${wallLabel})`;  // formatFtIn handles metric
     DOM['header-device'].textContent =
         eq.name + (state.includeCenter ? ' + ' + EQUIPMENT[getCenterEqKey()].name : '');
     updateInfoOverlay(eq, state.includeCenter ? EQUIPMENT[getCenterEqKey()] : null);
@@ -478,13 +478,16 @@ function renderPOV(cw, ch, dpr) {
 // ── Info Overlay ─────────────────────────────────────────────
 
 function updateInfoOverlay(eq, centerEq) {
+    const fmtRange = (ft) => state.units === 'metric'
+        ? formatMetric(convertToMetric(ft))
+        : ft + ' ft';
     let rows = [
         ['Camera', eq.sensor],
         ['H-FOV', eq.cameraFOV + '°' + (eq.cameraFOVTele ? ` / ${eq.cameraFOVTele}° tele` : '') + (eq.cameraFOVV ? ` × ${eq.cameraFOVV}° V` : '')],
-        ['Cam Range', eq.cameraRange + ' ft'],
+        ['Cam Range', fmtRange(eq.cameraRange)],
         ['Zoom', eq.zoom],
         ['Mics', eq.micDesc],
-        ['Mic Range', eq.micRange + ' ft']
+        ['Mic Range', fmtRange(eq.micRange)]
     ];
 
     if (centerEq) {
@@ -494,7 +497,7 @@ function updateInfoOverlay(eq, centerEq) {
             ['Center Cam', centerEq.sensor],
             ['Center FOV', centerEq.cameraFOV >= 315 ? '315°+' : centerEq.cameraFOV + '°'],
             ['Center Mics', centerEq.micDesc],
-            ['Center Mic ⌀', centerEq.micRange + ' ft']
+            ['Center Mic ⌀', fmtRange(centerEq.micRange)]
         );
     }
 
@@ -503,7 +506,7 @@ function updateInfoOverlay(eq, centerEq) {
         rows.push(
             ['---', '---'],
             ['Mic Pod', mp.name],
-            ['Pod Range', mp.micRange + ' ft'],
+            ['Pod Range', fmtRange(mp.micRange)],
             ['Pod Mics', mp.micDesc]
         );
     }

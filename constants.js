@@ -40,5 +40,6 @@ const HASH_KEYS = {
     sc: 'showCamera', sm: 'showMic', sg: 'showGrid', sv: 'showViewAngle',
     vm: 'viewMode', vd: 'viewerDist', vo: 'viewerOffset', po: 'posture',
     cx: 'centerPosX', cy: 'centerPosY',
-    sd: 'seatingDensity'
+    sd: 'seatingDensity',
+    un: 'units'
 };
