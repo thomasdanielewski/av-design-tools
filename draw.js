@@ -138,16 +138,19 @@ function drawGrid(rx, ry, rw, rl, ppf) {
     ctx.font = `500 ${Math.max(9, ppf * 0.4)}px 'JetBrains Mono', monospace`;
     ctx.fillStyle = cc().gridAxis;
 
+    const isMetric = state.units === 'metric';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
     for (let f = GRID_SPACING; f < state.roomWidth; f += GRID_SPACING) {
-        ctx.fillText(f + "'", rx + f * ppf, ry + rl + 5);
+        const label = isMetric ? formatMetric(convertToMetric(f)) : f + "'";
+        ctx.fillText(label, rx + f * ppf, ry + rl + 5);
     }
 
     ctx.textAlign = 'right';
     ctx.textBaseline = 'middle';
     for (let f = GRID_SPACING; f < state.roomLength; f += GRID_SPACING) {
-        ctx.fillText(f + "'", rx - 6, ry + f * ppf);
+        const label = isMetric ? formatMetric(convertToMetric(f)) : f + "'";
+        ctx.fillText(label, rx - 6, ry + f * ppf);
     }
 }
 
