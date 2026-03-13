@@ -18,6 +18,14 @@ let ppf_g = 1;
 // Global mouse position in canvas CSS pixels (updated on mousemove)
 let mousePos = { x: 0, y: 0 };
 
+// Viewport pan and zoom for the top-down view (not persisted to URL/history).
+// Pan is in screen pixels (applied as CSS translate); zoom is a unitless multiplier.
+let viewportZoom = 1.0;
+let viewportPanX = 0;
+let viewportPanY = 0;
+const VIEWPORT_ZOOM_MIN = 0.25;
+const VIEWPORT_ZOOM_MAX = 5.0;
+
 // ── DOM Element Cache ────────────────────────────────────────
 // Eliminates repeated getElementById calls on every render/input.
 const DOM = {};

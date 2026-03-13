@@ -15,16 +15,41 @@ function showDragHint(msg) {
 }
 
 /**
+ * Apply the current viewportZoom / viewportPanX / viewportPanY as a CSS
+ * transform on the .canvas-stack element.  transform-origin is forced to
+ * "0 0" so that cursor-centred zoom math (Δpan = mouse × (1 − factor))
+ * works correctly.
+ */
+function applyViewportTransform() {
+    const stack = document.querySelector('.canvas-stack');
+    if (!stack) return;
+    stack.style.transformOrigin = '0 0';
+    if (viewportZoom === 1 && viewportPanX === 0 && viewportPanY === 0) {
+        stack.style.transform = '';
+    } else {
+        stack.style.transform =
+            `translate(${viewportPanX}px,${viewportPanY}px) scale(${viewportZoom})`;
+    }
+}
+
+/**
  * Compute the layout metrics needed for drag hit-testing.
+ *
+ * Mouse coordinates are converted from screen space to canvas space by
+ * dividing by viewportZoom (the CSS transform scale).  All other metrics
+ * (ppf, ox, ry …) are in the same canvas-pixel coordinate system used by
+ * _topDownLayout() and the draw helpers — viewportZoom does NOT factor into
+ * ppf here because the CSS transform handles the visual scaling.
  */
 function getDragMetrics(e) {
     const rect = canvas.getBoundingClientRect();
-    const mx = e.clientX - rect.left;
-    const my = e.clientY - rect.top;
+    // Divide by viewportZoom to convert from screen-space → canvas-space.
+    const mx = (e.clientX - rect.left) / viewportZoom;
+    const my = (e.clientY - rect.top)  / viewportZoom;
 
     const c = document.querySelector('.canvas-container');
-    const cw = c.clientWidth - 60;
-    const ch = c.clientHeight - 60;
+    const cw = c.clientWidth - 64;   // match render.js (_topDownLayout uses -64)
+    const ch = c.clientHeight - 64;
 
     const padF = 2;
     const totalW = state.roomWidth + padF * 2;
@@ -102,8 +127,12 @@ function isPointOnRotateHandle(mx, my, t, ox, ry, wt, ppf) {
 // ── Cursor feedback on hover ─────────────────────────────────
 canvas.addEventListener('mousemove', e => {
     const _rect = canvas.getBoundingClientRect();
-    mousePos.x = e.clientX - _rect.left;
-    mousePos.y = e.clientY - _rect.top;
+    // In top-down view the canvas-stack has a CSS scale applied, so divide by
+    // viewportZoom to convert from screen-space → canvas-space coordinates.
+    // In POV mode the transform is cleared, so always use 1.
+    const _mzoom = (state.viewMode === 'top') ? viewportZoom : 1;
+    mousePos.x = (e.clientX - _rect.left) / _mzoom;
+    mousePos.y = (e.clientY - _rect.top)  / _mzoom;
 
     // POV mode: display is grabbable, background shows pan cursor
     if (state.viewMode === 'pov') {
@@ -117,7 +146,15 @@ canvas.addEventListener('mousemove', e => {
         return;
     }
 
-    if (state.viewMode !== 'top' || isDraggingTableId !== null || isDraggingCenter || isDraggingDisplay || isDraggingRotate) return;
+    if (state.viewMode !== 'top' || isPanning || isDraggingTableId !== null || isDraggingCenter || isDraggingDisplay || isDraggingRotate) return;
+
+    // Space-pan mode: show grab hand, skip normal hit-testing.
+    if (isSpaceDown) {
+        canvas.style.cursor = 'grab';
+        if (state.showViewAngle) scheduleRender();
+        return;
+    }
+
     const { mx, my, ppf, ox, ry, wt, cX, cY, dispOx, dispY, dispWidthPx, dispDepthPx, eqWidthPx, eqDepthPx, mainDeviceY } = getDragMetrics(e);
 
     // Rotation handle takes cursor priority over table body
@@ -206,6 +243,7 @@ function getPOVDisplayScreenBounds() {
 // ── Drag state ───────────────────────────────────────────────
 let isDraggingTableId = null;
 let dragTableOffset = null;
+let dragTableGhost = null; // snapshot of table position/rotation at drag start
 let isDraggingCenter = false;
 let isDraggingDisplay = false;
 let dragDisplayOffsetX = 0;
@@ -220,8 +258,28 @@ let dragViewerOffsetStartVal = 0;
 let isDraggingRotate = false;
 let isDraggingRotateTableId = null;
 
+// ── Viewport pan state (middle-click or Space+left-drag) ─────
+let isPanning = false;
+let isSpaceDown = false;
+let panStartX = 0;
+let panStartY = 0;
+let panStartOffsetX = 0;
+let panStartOffsetY = 0;
+
 // ── Mouse down: start drag ───────────────────────────────────
 canvas.addEventListener('mousedown', e => {
+    // Viewport pan: middle-click or Space+left-click (top-down only).
+    if (state.viewMode === 'top' && (e.button === 1 || (e.button === 0 && isSpaceDown))) {
+        e.preventDefault();
+        isPanning = true;
+        panStartX = e.clientX;
+        panStartY = e.clientY;
+        panStartOffsetX = viewportPanX;
+        panStartOffsetY = viewportPanY;
+        canvas.style.cursor = 'grabbing';
+        return;
+    }
+
     // POV mode: display drag or viewer pan
     if (state.viewMode === 'pov') {
         const rect = canvas.getBoundingClientRect();
@@ -286,6 +344,7 @@ canvas.addEventListener('mousedown', e => {
         if (isPointInTableHitbox(mx, my, t, ox, ry, wt, ppf)) {
             if (t.id !== state.selectedTableId) selectTable(t.id);
             isDraggingTableId = t.id;
+            dragTableGhost = { x: t.x, dist: t.dist, rotation: t.rotation, shape: t.shape, width: t.width, length: t.length };
             const tcx = ox + t.x * ppf;
             const tcy = ry + wt + t.dist * ppf + (t.length * ppf) / 2;
             dragTableOffset = { x: mx - tcx, y: my - tcy };
@@ -298,6 +357,15 @@ canvas.addEventListener('mousedown', e => {
 
 // ── Mouse move: update position while dragging ───────────────
 canvas.addEventListener('mousemove', e => {
+    // Viewport pan (middle-click or Space+drag): update CSS transform directly,
+    // no canvas re-render needed.
+    if (isPanning) {
+        viewportPanX = panStartOffsetX + (e.clientX - panStartX);
+        viewportPanY = panStartOffsetY + (e.clientY - panStartY);
+        applyViewportTransform();
+        return;
+    }
+
     // POV display drag is handled independently
     if (isDraggingDisplayPOV) {
         const rect = canvas.getBoundingClientRect();
@@ -411,18 +479,21 @@ canvas.addEventListener('mousemove', e => {
 
 // ── Mouse up / leave: end drag ───────────────────────────────
 canvas.addEventListener('mouseup', () => {
-    isDraggingTableId = null; dragTableOffset = null;
+    isPanning = false;
+    isDraggingTableId = null; dragTableOffset = null; dragTableGhost = null;
     isDraggingCenter = false;
     isDraggingDisplay = false; dragDisplayOffsetX = 0;
     isDraggingDisplayPOV = false; dragDisplayPOVStartX = 0; dragDisplayPOVStartY = 0; dragDisplayPOVStartOffset = 0; dragDisplayPOVStartElev = 0;
     isDraggingViewerOffset = false; dragViewerOffsetStartX = 0; dragViewerOffsetStartVal = 0;
     isDraggingRotate = false; isDraggingRotateTableId = null;
-    canvas.style.cursor = '';
+    // Restore grab cursor if space is still held after pan ends.
+    canvas.style.cursor = isSpaceDown ? 'grab' : '';
     serializeToHash();
 });
 
 canvas.addEventListener('mouseleave', () => {
-    isDraggingTableId = null; dragTableOffset = null;
+    isPanning = false;
+    isDraggingTableId = null; dragTableOffset = null; dragTableGhost = null;
     isDraggingCenter = false;
     isDraggingDisplay = false; dragDisplayOffsetX = 0;
     isDraggingDisplayPOV = false; dragDisplayPOVStartX = 0; dragDisplayPOVStartY = 0; dragDisplayPOVStartOffset = 0; dragDisplayPOVStartElev = 0;
@@ -435,17 +506,67 @@ canvas.addEventListener('mouseleave', () => {
 
 // ── Scroll wheel: adjust viewer distance in POV mode ─────────
 canvas.addEventListener('wheel', e => {
-    if (state.viewMode !== 'pov') return;
     e.preventDefault();
-    const step = 0.5;
-    const delta = e.deltaY > 0 ? step : -step;
-    const minDist = parseFloat(DOM['viewer-dist'].min);
-    const maxDist = parseFloat(DOM['viewer-dist'].max);
-    const nv = Math.round(Math.max(minDist, Math.min(maxDist, state.viewerDist + delta)) * 2) / 2;
-    state.viewerDist = nv;
-    DOM['viewer-dist'].value = nv;
-    DOM['val-viewer-dist'].textContent = formatFtIn(nv);
-    updateSliderTrack(DOM['viewer-dist']);
-    debouncedPushHistory();
-    scheduleRender();
+
+    // POV mode: scroll adjusts viewer distance.
+    if (state.viewMode === 'pov') {
+        const step = 0.5;
+        const delta = e.deltaY > 0 ? step : -step;
+        const minDist = parseFloat(DOM['viewer-dist'].min);
+        const maxDist = parseFloat(DOM['viewer-dist'].max);
+        const nv = Math.round(Math.max(minDist, Math.min(maxDist, state.viewerDist + delta)) * 2) / 2;
+        state.viewerDist = nv;
+        DOM['viewer-dist'].value = nv;
+        DOM['val-viewer-dist'].textContent = formatFtIn(nv);
+        updateSliderTrack(DOM['viewer-dist']);
+        debouncedPushHistory();
+        scheduleRender();
+        return;
+    }
+
+    // Top-down mode: scroll zooms the canvas, centred on the cursor.
+    if (state.viewMode !== 'top') return;
+    const zoomStep = e.deltaY < 0 ? 1.1 : 1 / 1.1;
+    const oldZoom  = viewportZoom;
+    viewportZoom   = Math.max(VIEWPORT_ZOOM_MIN, Math.min(VIEWPORT_ZOOM_MAX, viewportZoom * zoomStep));
+    const factor   = viewportZoom / oldZoom;
+
+    // Adjust pan so the canvas point under the cursor stays fixed on screen.
+    // Uses screen-space mouse coords (not canvas-space) — see applyViewportTransform docs.
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left;   // screen-space offset from canvas left
+    const my = e.clientY - rect.top;
+    viewportPanX += mx * (1 - factor);
+    viewportPanY += my * (1 - factor);
+
+    applyViewportTransform();
 }, { passive: false });
+
+// ── Spacebar: toggle pan mode ────────────────────────────────
+document.addEventListener('keydown', e => {
+    if (e.code === 'Space' && !e.repeat &&
+            !document.activeElement?.matches('input, textarea, select')) {
+        if (state.viewMode === 'top') {
+            e.preventDefault();
+            isSpaceDown = true;
+            if (!isPanning) canvas.style.cursor = 'grab';
+        }
+    }
+});
+
+document.addEventListener('keyup', e => {
+    if (e.code === 'Space') {
+        isSpaceDown = false;
+        isPanning = false;
+        if (state.viewMode === 'top') canvas.style.cursor = '';
+    }
+});
+
+// ── Double-click: reset zoom and pan to defaults ─────────────
+canvas.addEventListener('dblclick', e => {
+    if (state.viewMode !== 'top') return;
+    viewportZoom = 1.0;
+    viewportPanX = 0;
+    viewportPanY = 0;
+    applyViewportTransform();
+});

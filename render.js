@@ -190,6 +190,11 @@ function renderForeground() {
 
     // Update DOM header and info
     updateHeaderDOM(eq);
+
+    // Re-apply the CSS pan/zoom transform after every foreground paint so that
+    // any render path (scheduleRender, scheduleBackgroundRender, render) keeps
+    // the viewport transform in sync.
+    applyViewportTransform();
 }
 
 /**
@@ -202,6 +207,9 @@ function render() {
     const ch = container.clientHeight - 64;
 
     if (state.viewMode === 'pov') {
+        // Clear the CSS viewport transform — POV renders directly to the canvas.
+        const stack = document.querySelector('.canvas-stack');
+        if (stack) stack.style.transform = '';
         renderPOV(cw, ch, dpr);
         return;
     }

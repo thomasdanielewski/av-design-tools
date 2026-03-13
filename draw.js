@@ -355,6 +355,50 @@ function drawEquipmentTopDown(ox, ry, wallThick, dispY, dispDepthPx, dispWidthPx
  * Draw the conference table in top-down view.
  */
 function drawTable(ox, ry, wallThick, ppf) {
+    // Ghost outline: show original position while dragging a table
+    if (isDraggingTableId !== null && dragTableGhost) {
+        const g = dragTableGhost;
+        const tl = g.length * ppf;
+        const tw = g.width * ppf;
+        const tcx = ox + g.x * ppf;
+        const tcy = ry + wallThick + g.dist * ppf + tl / 2;
+        const angle = g.rotation * Math.PI / 180;
+        const x0 = -tw / 2, y0 = -tl / 2;
+
+        ctx.save();
+        ctx.translate(tcx, tcy);
+        ctx.rotate(angle);
+        ctx.globalAlpha = 0.35;
+        ctx.strokeStyle = cc().tableStroke;
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([5, 4]);
+
+        if (g.shape === 'rectangular') {
+            roundRect(ctx, x0, y0, tw, tl, 6);
+            ctx.stroke();
+        } else if (g.shape === 'oval') {
+            ctx.beginPath();
+            ctx.ellipse(0, 0, tw / 2, tl / 2, 0, 0, Math.PI * 2);
+            ctx.stroke();
+        } else if (g.shape === 'circle') {
+            ctx.beginPath();
+            ctx.arc(0, 0, Math.min(tw, tl) / 2, 0, Math.PI * 2);
+            ctx.stroke();
+        } else if (g.shape === 'd-shape') {
+            ctx.beginPath();
+            ctx.moveTo(x0, y0);
+            ctx.lineTo(x0 + tw, y0);
+            ctx.lineTo(x0 + tw, y0 + tl - tw / 2);
+            ctx.arc(0, y0 + tl - tw / 2, tw / 2, 0, Math.PI);
+            ctx.lineTo(x0, y0);
+            ctx.stroke();
+        }
+
+        ctx.setLineDash([]);
+        ctx.globalAlpha = 1.0;
+        ctx.restore();
+    }
+
     state.tables.forEach(t => {
         const isSelected = t.id === state.selectedTableId;
         const tl = t.length * ppf;
