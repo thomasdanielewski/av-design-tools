@@ -80,6 +80,7 @@ document.getElementById('remove-element-btn').addEventListener('click', removeEl
 document.getElementById('element-wall').addEventListener('change', onElementWallChange);
 document.getElementById('element-position').addEventListener('input', onElementPositionInput);
 document.getElementById('element-width').addEventListener('input', onElementWidthInput);
+document.getElementById('flip-swing-btn').addEventListener('click', flipSwing);
 
 // ── Room preset pills ────────────────────────────────────────
 document.querySelectorAll('.preset-pill[data-preset-len]').forEach(btn => {

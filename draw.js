@@ -843,8 +843,10 @@ function drawDoorElement(x, y, w, isHorizontal, wallThick, swingDirX, swingDirY,
     ctx.lineWidth = 1.5;
 
     const swingRadius = el.width * ppf;
-    // Hinge is at the start of the opening (position side)
+    const inv = !!el.swingInverted;
     let hingeX, hingeY, startAngle, endAngle;
+    // panelDX/panelDY: direction from hinge to the free end of the door leaf
+    let panelDX = 0, panelDY = 0;
 
     if (isHorizontal) {
         // Draw opening edge marks
@@ -855,17 +857,19 @@ function drawDoorElement(x, y, w, isHorizontal, wallThick, swingDirX, swingDirY,
         ctx.moveTo(x + w, y); ctx.lineTo(x + w, y + wallThick);
         ctx.stroke();
 
-        // Hinge at the left edge of opening; door swings into room
-        hingeX = x;
+        // Normal: hinge at left edge. Inverted: hinge at right edge.
+        hingeX = inv ? x + w : x;
         hingeY = (swingDirY > 0) ? y + wallThick : y;
+        panelDX = inv ? -w : w;
+
         if (swingDirY > 0) {
-            // North wall: swing downward
-            startAngle = 0;
-            endAngle = Math.PI / 2;
+            // North wall swings downward
+            startAngle = inv ? Math.PI / 2 : 0;
+            endAngle   = inv ? Math.PI     : Math.PI / 2;
         } else {
-            // South wall: swing upward
-            startAngle = -Math.PI / 2;
-            endAngle = 0;
+            // South wall swings upward
+            startAngle = inv ? -Math.PI     : -Math.PI / 2;
+            endAngle   = inv ? -Math.PI / 2 : 0;
         }
     } else {
         // Draw opening edge marks
@@ -876,17 +880,19 @@ function drawDoorElement(x, y, w, isHorizontal, wallThick, swingDirX, swingDirY,
         ctx.moveTo(x, y + w); ctx.lineTo(x + wallThick, y + w);
         ctx.stroke();
 
-        // Hinge at the top edge of opening; door swings into room
+        // Normal: hinge at top edge. Inverted: hinge at bottom edge.
         hingeX = (swingDirX > 0) ? x + wallThick : x;
-        hingeY = y;
+        hingeY = inv ? y + w : y;
+        panelDY = inv ? -w : w;
+
         if (swingDirX > 0) {
-            // West wall: swing rightward
-            startAngle = 0;
-            endAngle = Math.PI / 2;
+            // West wall swings rightward
+            startAngle = inv ? -Math.PI / 2 : 0;
+            endAngle   = inv ? 0             : Math.PI / 2;
         } else {
-            // East wall: swing leftward
-            startAngle = Math.PI / 2;
-            endAngle = Math.PI;
+            // East wall swings leftward
+            startAngle = inv ? Math.PI     : Math.PI / 2;
+            endAngle   = inv ? Math.PI * 3 / 2 : Math.PI;
         }
     }
 
@@ -903,16 +909,12 @@ function drawDoorElement(x, y, w, isHorizontal, wallThick, swingDirX, swingDirY,
     ctx.stroke();
     ctx.setLineDash([]);
 
-    // Draw the door panel line (solid line from hinge to arc edge, representing the door leaf)
+    // Draw the door panel (from hinge to the free end of the door leaf)
     ctx.strokeStyle = isSelected ? 'rgba(239, 68, 68, 0.8)' : 'rgba(239, 68, 68, 0.5)';
     ctx.lineWidth = 2;
     ctx.beginPath();
     ctx.moveTo(hingeX, hingeY);
-    if (isHorizontal) {
-        ctx.lineTo(hingeX + w, hingeY);
-    } else {
-        ctx.lineTo(hingeX, hingeY + w);
-    }
+    ctx.lineTo(hingeX + panelDX, hingeY + panelDY);
     ctx.stroke();
 
     ctx.restore();
