@@ -529,19 +529,8 @@ function bindSlider(id, sk, vl) {
     (DOM[id] || document.getElementById(id)).addEventListener('input', function () {
         let v = parseFloat(this.value);
 
-        // Mirror circle table sync — clamp to the overlapping range of both sliders
+        // Mirror circle table sync — ranges are kept equal by syncCircleSliderRanges()
         if (state.tableShape === 'circle' && (sk === 'tableLength' || sk === 'tableWidth')) {
-            const circleMin = Math.max(
-                parseFloat(DOM['table-length'].min),
-                parseFloat(DOM['table-width'].min)
-            );
-            const circleMax = Math.min(
-                parseFloat(DOM['table-length'].max),
-                parseFloat(DOM['table-width'].max)
-            );
-            v = Math.min(circleMax, Math.max(circleMin, v));
-            this.value = v; // snap dragged slider thumb to clamped value
-
             const other = sk === 'tableLength' ? 'tableWidth' : 'tableLength';
             const otherSlider = sk === 'tableLength' ? 'table-width' : 'table-length';
             const otherVal = sk === 'tableLength' ? 'val-table-width' : 'val-table-length';
@@ -568,15 +557,21 @@ function bindSelect(id, sk) {
     (DOM[id] || document.getElementById(id)).addEventListener('change', function () {
         state[sk] = this.value;
 
-        // When switching to circle, enforce equal length/width
-        if (sk === 'tableShape' && this.value === 'circle') {
-            const m = Math.max(state.tableLength, state.tableWidth);
-            state.tableLength = m;
-            state.tableWidth = m;
-            DOM['table-length'].value = m;
-            DOM['table-width'].value = m;
-            DOM['val-table-length'].textContent = formatFtIn(m);
-            DOM['val-table-width'].textContent = formatFtIn(m);
+        // When table shape changes, align slider ranges first, then enforce equal values
+        if (sk === 'tableShape') {
+            syncCircleSliderRanges();
+            if (this.value === 'circle') {
+                const maxVal = parseFloat(DOM['table-width'].max);
+                const m = Math.min(maxVal, Math.max(state.tableLength, state.tableWidth));
+                state.tableLength = m;
+                state.tableWidth = m;
+                DOM['table-length'].value = m;
+                DOM['table-width'].value = m;
+                DOM['val-table-length'].textContent = formatFtIn(m);
+                DOM['val-table-width'].textContent = formatFtIn(m);
+                updateSliderTrack(DOM['table-length']);
+                updateSliderTrack(DOM['table-width']);
+            }
         }
 
         // Auto-scale display size for specific board models
@@ -603,6 +598,22 @@ function bindCheckbox(id, sk) {
         pushHistory();
         render();
     });
+}
+
+/** Align table-length slider range to match table-width when circle is active,
+ *  so both thumbs always sit at the same proportional position. */
+function syncCircleSliderRanges() {
+    const lenSlider = DOM['table-length'];
+    const widSlider = DOM['table-width'];
+    if (state.tableShape === 'circle') {
+        lenSlider.min = widSlider.min;
+        lenSlider.max = widSlider.max;
+    } else {
+        lenSlider.min = 4;
+        lenSlider.max = 24;
+    }
+    updateSliderTrack(lenSlider);
+    updateSliderTrack(widSlider);
 }
 
 // Wire up all sliders
@@ -2033,6 +2044,9 @@ function copyShareLink() {
 // Used after undo/redo or config import to push state → DOM.
 
 function syncUIFromState() {
+    // Align circle slider ranges before setting values
+    syncCircleSliderRanges();
+
     // Sliders + value badges
     const sliderMap = {
         'room-length': ['roomLength', 'val-room-length', 'ft'],
