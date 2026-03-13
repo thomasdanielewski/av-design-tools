@@ -211,7 +211,9 @@ let isDraggingDisplay = false;
 let dragDisplayOffsetX = 0;
 let isDraggingDisplayPOV = false;
 let dragDisplayPOVStartX = 0;
+let dragDisplayPOVStartY = 0;
 let dragDisplayPOVStartOffset = 0;
+let dragDisplayPOVStartElev = 0;
 let isDraggingRotate = false;
 let isDraggingRotateTableId = null;
 
@@ -226,7 +228,9 @@ canvas.addEventListener('mousedown', e => {
         if (mx >= b.left && mx <= b.right && my >= b.top && my <= b.bot) {
             isDraggingDisplayPOV = true;
             dragDisplayPOVStartX = mx;
+            dragDisplayPOVStartY = my;
             dragDisplayPOVStartOffset = state.displayOffsetX;
+            dragDisplayPOVStartElev = state.displayElev;
             canvas.style.cursor = 'grabbing';
             pushHistory();
         }
@@ -289,7 +293,10 @@ canvas.addEventListener('mousemove', e => {
     if (isDraggingDisplayPOV) {
         const rect = canvas.getBoundingClientRect();
         const mx = e.clientX - rect.left;
+        const my = e.clientY - rect.top;
         const { s } = getPOVDisplayScreenBounds();
+
+        // Horizontal: update displayOffsetX
         let nx = dragDisplayPOVStartOffset + (mx - dragDisplayPOVStartX) / s;
         const displayWidthFt = state.displaySize * 0.8715 / 12;
         const maxOff = Math.min(15, state.roomWidth / 2 - displayWidthFt / 2);
@@ -298,6 +305,15 @@ canvas.addEventListener('mousemove', e => {
         DOM['display-offset-x'].value = nx;
         DOM['val-display-offset-x'].textContent = formatFtIn(nx);
         updateSliderTrack(DOM['display-offset-x']);
+
+        // Vertical: update displayElev (screen Y increases downward, world Y increases upward)
+        let ne = Math.round(dragDisplayPOVStartElev - (my - dragDisplayPOVStartY) * 12 / s);
+        ne = Math.max(+DOM['display-elev'].min, Math.min(+DOM['display-elev'].max, ne));
+        state.displayElev = ne;
+        DOM['display-elev'].value = ne;
+        DOM['val-display-elev'].textContent = `${ne}"`;
+        updateSliderTrack(DOM['display-elev']);
+
         scheduleRender();
         return;
     }
@@ -372,7 +388,7 @@ canvas.addEventListener('mouseup', () => {
     isDraggingTableId = null; dragTableOffset = null;
     isDraggingCenter = false;
     isDraggingDisplay = false; dragDisplayOffsetX = 0;
-    isDraggingDisplayPOV = false; dragDisplayPOVStartX = 0; dragDisplayPOVStartOffset = 0;
+    isDraggingDisplayPOV = false; dragDisplayPOVStartX = 0; dragDisplayPOVStartY = 0; dragDisplayPOVStartOffset = 0; dragDisplayPOVStartElev = 0;
     isDraggingRotate = false; isDraggingRotateTableId = null;
     canvas.style.cursor = '';
     serializeToHash();
@@ -382,7 +398,7 @@ canvas.addEventListener('mouseleave', () => {
     isDraggingTableId = null; dragTableOffset = null;
     isDraggingCenter = false;
     isDraggingDisplay = false; dragDisplayOffsetX = 0;
-    isDraggingDisplayPOV = false; dragDisplayPOVStartX = 0; dragDisplayPOVStartOffset = 0;
+    isDraggingDisplayPOV = false; dragDisplayPOVStartX = 0; dragDisplayPOVStartY = 0; dragDisplayPOVStartOffset = 0; dragDisplayPOVStartElev = 0;
     isDraggingRotate = false; isDraggingRotateTableId = null;
     canvas.style.cursor = '';
     mousePos = { x: -9999, y: -9999 };
