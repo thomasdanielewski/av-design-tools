@@ -204,6 +204,12 @@ function checkMicRange() {
     // Always remove old listener to prevent leak — re-added below only when needed
     b.removeEventListener('click', enableCompanion);
 
+    // Rally Camera has no microphones and is not compatible with Logitech Sight
+    if (eq.micRange === 0) {
+        w.classList.remove('visible');
+        return;
+    }
+
     if (ex && !state.includeCenter) {
         // Warn user: mic can't reach the table's far edge
         w.classList.add('visible');
