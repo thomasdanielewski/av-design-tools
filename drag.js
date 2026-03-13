@@ -35,7 +35,60 @@ function applyViewportTransform() {
         stack.style.transform =
             `translate(${viewportPanX}px,${viewportPanY}px) scale(${viewportZoom})`;
     }
+    updateZoomLabel();
 }
+
+/** Update the zoom percentage label */
+function updateZoomLabel() {
+    const el = document.getElementById('zoom-level');
+    if (el) el.textContent = Math.round(viewportZoom * 100) + '%';
+}
+
+// ── Zoom toolbar controls ────────────────────────────────────
+(function initZoomControls() {
+    const zoomInBtn   = document.getElementById('zoom-in-btn');
+    const zoomOutBtn  = document.getElementById('zoom-out-btn');
+    const zoomResetBtn = document.getElementById('zoom-reset-btn');
+    if (!zoomInBtn) return;
+
+    function zoomByStep(stepDelta) {
+        const container = document.querySelector('.canvas-container');
+        if (!container) return;
+        const rect = container.getBoundingClientRect();
+        // Zoom toward the center of the visible canvas area
+        const cx = rect.width / 2;
+        const cy = rect.height / 2;
+
+        const oldZoom = viewportZoom;
+        viewportZoom = Math.max(VIEWPORT_ZOOM_MIN,
+            Math.min(VIEWPORT_ZOOM_MAX, viewportZoom + stepDelta));
+        const factor = viewportZoom / oldZoom;
+
+        viewportPanX += cx * (1 - factor);
+        viewportPanY += cy * (1 - factor);
+        markViewportDirty();
+        applyViewportTransform();
+    }
+
+    zoomInBtn.addEventListener('click', () => zoomByStep(0.2));
+    zoomOutBtn.addEventListener('click', () => zoomByStep(-0.2));
+
+    zoomResetBtn.addEventListener('click', () => {
+        const stack = document.querySelector('.canvas-stack');
+        if (stack) {
+            stack.style.transition = 'transform 0.3s cubic-bezier(0.22, 1, 0.36, 1)';
+            stack.addEventListener('transitionend', function handler() {
+                stack.style.transition = '';
+                stack.removeEventListener('transitionend', handler);
+            });
+        }
+        viewportZoom = 1.0;
+        viewportPanX = 0;
+        viewportPanY = 0;
+        markViewportDirty();
+        applyViewportTransform();
+    });
+})();
 
 /**
  * Compute the layout metrics needed for drag hit-testing.
