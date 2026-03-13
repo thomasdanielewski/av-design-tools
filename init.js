@@ -52,8 +52,16 @@ document.getElementById('collapse-all-btn').addEventListener('click', () => {
 
 // ── Collapsible group titles ─────────────────────────────────
 document.querySelectorAll('[data-toggle-group]').forEach(el => {
+    el.setAttribute('tabindex', '0');
+    el.setAttribute('role', 'button');
     el.addEventListener('click', () => {
         toggleGroup(el.dataset.toggleGroup);
+    });
+    el.addEventListener('keydown', e => {
+        if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            toggleGroup(el.dataset.toggleGroup);
+        }
     });
 });
 

@@ -126,6 +126,10 @@ function setPosture(p) {
 
 function collapseGroup(el) {
     const body = el.querySelector('.control-group-body');
+    // Move focus out of collapsing body to prevent focus trap
+    if (body.contains(document.activeElement)) {
+        el.querySelector('.control-group-title')?.focus();
+    }
     body.style.overflow = 'hidden';
     body.style.maxHeight = body.scrollHeight + 'px';
     body.style.opacity = '1';

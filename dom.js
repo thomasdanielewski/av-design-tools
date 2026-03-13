@@ -62,6 +62,8 @@ function showToast(message, type = 'info') {
     if (!container) {
         container = document.createElement('div');
         container.id = 'toast-container';
+        container.setAttribute('role', 'status');
+        container.setAttribute('aria-live', 'polite');
         document.body.appendChild(container);
     }
     const toast = document.createElement('div');
@@ -74,6 +76,8 @@ function showToast(message, type = 'info') {
     setTimeout(() => {
         toast.classList.remove('toast-visible');
         toast.addEventListener('transitionend', () => toast.remove());
+        // Fallback cleanup if transitionend never fires (e.g., prefers-reduced-motion)
+        setTimeout(() => { if (toast.parentNode) toast.remove(); }, 500);
     }, TOAST_DURATION);
 }
 

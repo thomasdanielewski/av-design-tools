@@ -42,6 +42,18 @@ function importConfig(event) {
         try {
             const parsed = JSON.parse(e.target.result);
             const snap = parsed.state || parsed;
+            // Validate required keys exist and have correct types
+            const requiredNums = ['roomLength', 'roomWidth', 'ceilingHeight', 'displaySize', 'displayElev'];
+            for (const k of requiredNums) {
+                if (snap[k] !== undefined && typeof snap[k] !== 'number') {
+                    showToast('Invalid config: expected numeric values.', 'error');
+                    return;
+                }
+            }
+            if (snap.tables && !Array.isArray(snap.tables)) {
+                showToast('Invalid config: tables must be an array.', 'error');
+                return;
+            }
             _suppressHistory = true;
             Object.assign(state, snap);
             if (snap.centerPos) state.centerPos = snap.centerPos;
@@ -49,6 +61,7 @@ function importConfig(event) {
             syncUIFromState();
             pushHistory();
             render();
+            showToast('Configuration imported successfully.', 'success');
         } catch (err) {
             showToast('Could not import: invalid JSON config file.', 'error');
         }

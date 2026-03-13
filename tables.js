@@ -289,7 +289,11 @@ function checkRoomWarnings() {
     }
 
     if (issues.length) {
-        t.innerHTML = issues.join('<br>');
+        t.textContent = '';
+        issues.forEach((msg, i) => {
+            if (i > 0) t.appendChild(document.createElement('br'));
+            t.appendChild(document.createTextNode(msg));
+        });
         w.classList.add('visible');
     } else {
         w.classList.remove('visible');

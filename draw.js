@@ -45,114 +45,59 @@ function drawDisplayPOV(x, y, w, h) {
  * @param {object} device  - EQUIPMENT entry
  * @param {number} facingAngle - Angle the device faces (radians)
  */
+/** Shared helper: draw a single coverage arc (full-circle or sector). */
+function _drawCoverageArc(devX, devY, radius, facingAngle, arcDeg, fillColor, strokeColor, lineWidth, dashPattern) {
+    ctx.fillStyle = fillColor;
+    ctx.strokeStyle = strokeColor;
+    ctx.lineWidth = lineWidth;
+
+    if (arcDeg >= 315) {
+        ctx.beginPath();
+        ctx.arc(devX, devY, radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.setLineDash(dashPattern);
+        ctx.stroke();
+        ctx.setLineDash([]);
+    } else {
+        const ha = deg2rad(arcDeg / 2);
+        ctx.beginPath();
+        ctx.moveTo(devX, devY);
+        ctx.arc(devX, devY, radius, facingAngle - ha, facingAngle + ha);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.setLineDash(dashPattern);
+        ctx.beginPath();
+        ctx.arc(devX, devY, radius, facingAngle - ha, facingAngle + ha);
+        ctx.stroke();
+
+        // Radial edge lines
+        ctx.beginPath();
+        ctx.moveTo(devX, devY);
+        ctx.lineTo(devX + Math.cos(facingAngle - ha) * radius, devY + Math.sin(facingAngle - ha) * radius);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(devX, devY);
+        ctx.lineTo(devX + Math.cos(facingAngle + ha) * radius, devY + Math.sin(facingAngle + ha) * radius);
+        ctx.stroke();
+        ctx.setLineDash([]);
+    }
+}
+
 function drawCoverage(devX, devY, device, facingAngle) {
-    // ── Mic pickup range ────────────────────────────────
     if (state.showMic) {
-        const mr = device.micRange * ppf_g;
-
-        ctx.fillStyle = 'rgba(74, 222, 128, 0.08)';
-        ctx.strokeStyle = 'rgba(74, 222, 128, 0.20)';
-        ctx.lineWidth = 1;
-
-        if (device.micArc === 360) {
-            // Full-circle mic coverage
-            ctx.beginPath();
-            ctx.arc(devX, devY, mr, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.setLineDash([4, 4]);
-            ctx.stroke();
-            ctx.setLineDash([]);
-        } else {
-            // Arc-shaped mic coverage
-            const ha = deg2rad(device.micArc / 2);
-            ctx.beginPath();
-            ctx.moveTo(devX, devY);
-            ctx.arc(devX, devY, mr, facingAngle - ha, facingAngle + ha);
-            ctx.closePath();
-            ctx.fill();
-
-            // Dashed arc border
-            ctx.setLineDash([4, 4]);
-            ctx.beginPath();
-            ctx.arc(devX, devY, mr, facingAngle - ha, facingAngle + ha);
-            ctx.stroke();
-            ctx.setLineDash([]);
-
-            // Radial edge lines
-            ctx.beginPath();
-            ctx.moveTo(devX, devY);
-            ctx.lineTo(devX + Math.cos(facingAngle - ha) * mr, devY + Math.sin(facingAngle - ha) * mr);
-            ctx.stroke();
-            ctx.beginPath();
-            ctx.moveTo(devX, devY);
-            ctx.lineTo(devX + Math.cos(facingAngle + ha) * mr, devY + Math.sin(facingAngle + ha) * mr);
-            ctx.stroke();
-        }
+        _drawCoverageArc(devX, devY, device.micRange * ppf_g, facingAngle,
+            device.micArc, 'rgba(74, 222, 128, 0.08)', 'rgba(74, 222, 128, 0.20)', 1, [4, 4]);
     }
 
-    // ── Camera FOV coverage ─────────────────────────────
     if (state.showCamera && device.cameraFOV > 0) {
-        const rp = device.cameraRange * ppf_g;
+        _drawCoverageArc(devX, devY, device.cameraRange * ppf_g, facingAngle,
+            device.cameraFOV, 'rgba(91, 156, 245, 0.08)', 'rgba(91, 156, 245, 0.20)', 1.2, [6, 3]);
 
-        ctx.fillStyle = 'rgba(91, 156, 245, 0.08)';
-        ctx.strokeStyle = 'rgba(91, 156, 245, 0.20)';
-        ctx.lineWidth = 1.2;
-
-        if (device.cameraFOV >= 315) {
-            // Effectively full-circle camera coverage
-            ctx.beginPath();
-            ctx.arc(devX, devY, rp, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.setLineDash([6, 3]);
-            ctx.stroke();
-            ctx.setLineDash([]);
-        } else {
-            // Arc-shaped camera FOV
-            const hf = deg2rad(device.cameraFOV / 2);
-            ctx.beginPath();
-            ctx.moveTo(devX, devY);
-            ctx.arc(devX, devY, rp, facingAngle - hf, facingAngle + hf);
-            ctx.closePath();
-            ctx.fill();
-
-            // Dashed edge lines
-            ctx.setLineDash([6, 3]);
-            ctx.beginPath();
-            ctx.moveTo(devX, devY);
-            ctx.lineTo(devX + Math.cos(facingAngle - hf) * rp, devY + Math.sin(facingAngle - hf) * rp);
-            ctx.stroke();
-            ctx.beginPath();
-            ctx.moveTo(devX, devY);
-            ctx.lineTo(devX + Math.cos(facingAngle + hf) * rp, devY + Math.sin(facingAngle + hf) * rp);
-            ctx.stroke();
-            ctx.beginPath();
-            ctx.arc(devX, devY, rp, facingAngle - hf, facingAngle + hf);
-            ctx.stroke();
-            ctx.setLineDash([]);
-
-            // Optional telephoto FOV overlay
-            if (device.cameraFOVTele) {
-                const ht = deg2rad(device.cameraFOVTele / 2);
-                ctx.fillStyle = 'rgba(91, 156, 245, 0.04)';
-                ctx.strokeStyle = 'rgba(91, 156, 245, 0.12)';
-                ctx.setLineDash([3, 5]);
-
-                ctx.beginPath();
-                ctx.moveTo(devX, devY);
-                ctx.arc(devX, devY, rp, facingAngle - ht, facingAngle + ht);
-                ctx.closePath();
-                ctx.fill();
-
-                ctx.beginPath();
-                ctx.moveTo(devX, devY);
-                ctx.lineTo(devX + Math.cos(facingAngle - ht) * rp, devY + Math.sin(facingAngle - ht) * rp);
-                ctx.stroke();
-                ctx.beginPath();
-                ctx.moveTo(devX, devY);
-                ctx.lineTo(devX + Math.cos(facingAngle + ht) * rp, devY + Math.sin(facingAngle + ht) * rp);
-                ctx.stroke();
-                ctx.setLineDash([]);
-            }
+        // Optional telephoto FOV overlay
+        if (device.cameraFOVTele && device.cameraFOV < 315) {
+            _drawCoverageArc(devX, devY, device.cameraRange * ppf_g, facingAngle,
+                device.cameraFOVTele, 'rgba(91, 156, 245, 0.04)', 'rgba(91, 156, 245, 0.12)', 1.2, [3, 5]);
         }
     }
 }

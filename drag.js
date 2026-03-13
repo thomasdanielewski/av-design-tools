@@ -20,7 +20,12 @@ function showDragHint(msg) {
  * "0 0" so that cursor-centred zoom math (Δpan = mouse × (1 − factor))
  * works correctly.
  */
+let _viewportDirty = true;
+function markViewportDirty() { _viewportDirty = true; }
+
 function applyViewportTransform() {
+    if (!_viewportDirty) return;
+    _viewportDirty = false;
     const stack = document.querySelector('.canvas-stack');
     if (!stack) return;
     stack.style.transformOrigin = '0 0';
@@ -125,6 +130,7 @@ function isPointOnRotateHandle(mx, my, t, ox, ry, wt, ppf) {
 }
 
 // ── Cursor feedback on hover ─────────────────────────────────
+let _lastViewAngleX = -9999, _lastViewAngleY = -9999;
 canvas.addEventListener('mousemove', e => {
     const _rect = canvas.getBoundingClientRect();
     // In top-down view the canvas-stack has a CSS scale applied, so divide by
@@ -151,7 +157,10 @@ canvas.addEventListener('mousemove', e => {
     // Space-pan mode: show grab hand, skip normal hit-testing.
     if (isSpaceDown) {
         canvas.style.cursor = 'grab';
-        if (state.showViewAngle) scheduleRender();
+        if (state.showViewAngle && (Math.abs(mousePos.x - _lastViewAngleX) > 2 || Math.abs(mousePos.y - _lastViewAngleY) > 2)) {
+            _lastViewAngleX = mousePos.x; _lastViewAngleY = mousePos.y;
+            scheduleRender();
+        }
         return;
     }
 
@@ -179,7 +188,10 @@ canvas.addEventListener('mousemove', e => {
     }
 
     canvas.style.cursor = onRotateHandle ? 'crosshair' : (onTarget ? 'grab' : '');
-    if (state.showViewAngle) scheduleRender();
+    if (state.showViewAngle && (Math.abs(mousePos.x - _lastViewAngleX) > 2 || Math.abs(mousePos.y - _lastViewAngleY) > 2)) {
+        _lastViewAngleX = mousePos.x; _lastViewAngleY = mousePos.y;
+        scheduleRender();
+    }
 });
 
 /**
@@ -243,7 +255,7 @@ function getPOVDisplayScreenBounds() {
 // ── Drag state ───────────────────────────────────────────────
 let isDraggingTableId = null;
 let dragTableOffset = null;
-let dragTableGhost = null; // snapshot of table position/rotation at drag start
+let dragTableGhost = null;
 let isDraggingCenter = false;
 let isDraggingDisplay = false;
 let dragDisplayOffsetX = 0;
@@ -265,6 +277,18 @@ let panStartX = 0;
 let panStartY = 0;
 let panStartOffsetX = 0;
 let panStartOffsetY = 0;
+
+/** Reset all drag flags to idle state */
+function resetDrag() {
+    isPanning = false;
+    isDraggingTableId = null; dragTableOffset = null; dragTableGhost = null;
+    isDraggingCenter = false;
+    isDraggingDisplay = false; dragDisplayOffsetX = 0;
+    isDraggingDisplayPOV = false; dragDisplayPOVStartX = 0; dragDisplayPOVStartY = 0;
+    dragDisplayPOVStartOffset = 0; dragDisplayPOVStartElev = 0;
+    isDraggingViewerOffset = false; dragViewerOffsetStartX = 0; dragViewerOffsetStartVal = 0;
+    isDraggingRotate = false; isDraggingRotateTableId = null;
+}
 
 // ── Mouse down: start drag ───────────────────────────────────
 canvas.addEventListener('mousedown', e => {
@@ -362,6 +386,7 @@ canvas.addEventListener('mousemove', e => {
     if (isPanning) {
         viewportPanX = panStartOffsetX + (e.clientX - panStartX);
         viewportPanY = panStartOffsetY + (e.clientY - panStartY);
+        markViewportDirty();
         applyViewportTransform();
         return;
     }
@@ -479,26 +504,13 @@ canvas.addEventListener('mousemove', e => {
 
 // ── Mouse up / leave: end drag ───────────────────────────────
 canvas.addEventListener('mouseup', () => {
-    isPanning = false;
-    isDraggingTableId = null; dragTableOffset = null; dragTableGhost = null;
-    isDraggingCenter = false;
-    isDraggingDisplay = false; dragDisplayOffsetX = 0;
-    isDraggingDisplayPOV = false; dragDisplayPOVStartX = 0; dragDisplayPOVStartY = 0; dragDisplayPOVStartOffset = 0; dragDisplayPOVStartElev = 0;
-    isDraggingViewerOffset = false; dragViewerOffsetStartX = 0; dragViewerOffsetStartVal = 0;
-    isDraggingRotate = false; isDraggingRotateTableId = null;
-    // Restore grab cursor if space is still held after pan ends.
+    resetDrag();
     canvas.style.cursor = isSpaceDown ? 'grab' : '';
     serializeToHash();
 });
 
 canvas.addEventListener('mouseleave', () => {
-    isPanning = false;
-    isDraggingTableId = null; dragTableOffset = null; dragTableGhost = null;
-    isDraggingCenter = false;
-    isDraggingDisplay = false; dragDisplayOffsetX = 0;
-    isDraggingDisplayPOV = false; dragDisplayPOVStartX = 0; dragDisplayPOVStartY = 0; dragDisplayPOVStartOffset = 0; dragDisplayPOVStartElev = 0;
-    isDraggingViewerOffset = false; dragViewerOffsetStartX = 0; dragViewerOffsetStartVal = 0;
-    isDraggingRotate = false; isDraggingRotateTableId = null;
+    resetDrag();
     canvas.style.cursor = '';
     mousePos = { x: -9999, y: -9999 };
     if (state.showViewAngle) scheduleRender();
@@ -539,6 +551,7 @@ canvas.addEventListener('wheel', e => {
     viewportPanX += mx * (1 - factor);
     viewportPanY += my * (1 - factor);
 
+    markViewportDirty();
     applyViewportTransform();
 }, { passive: false });
 
@@ -568,5 +581,6 @@ canvas.addEventListener('dblclick', e => {
     viewportZoom = 1.0;
     viewportPanX = 0;
     viewportPanY = 0;
+    markViewportDirty();
     applyViewportTransform();
 });

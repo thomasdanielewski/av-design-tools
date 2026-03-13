@@ -12,7 +12,7 @@
 </head>
 
 <body>
-    <div class="sidebar">
+    <aside class="sidebar" aria-label="Controls">
         <div class="sidebar-header">
             <h1><span class="icon">◇</span> AV Room Planner</h1>
             <p>Conference room visualization tool</p>
@@ -27,7 +27,7 @@
 
             <!-- Room Dimensions -->
             <div class="control-group" aria-expanded="true" id="cg-room">
-                <div class="control-group-title" data-toggle-group="cg-room">Room Dimensions<svg class="cg-chevron"
+                <div class="control-group-title" data-toggle-group="cg-room">Room Dimensions<svg class="cg-chevron" aria-hidden="true"
                         width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
                         stroke-linecap="round" stroke-linejoin="round">
                         <polyline points="6 9 12 15 18 9"></polyline>
@@ -46,19 +46,19 @@
                             title="40×24 ft">Boardroom</button>
                     </div>
                     <div class="control-row">
-                        <div class="control-label"><span>Length</span><span class="value" id="val-room-length"
+                        <div class="control-label"><label for="room-length">Length</label><span class="value" id="val-room-length"
                                 data-slider="room-length" data-key="roomLength" data-unit="ft">20' 0"</span>
                         </div>
                         <input type="range" id="room-length" min="8" max="60" step="0.5" value="20">
                     </div>
                     <div class="control-row">
-                        <div class="control-label"><span>Width</span><span class="value" id="val-room-width"
+                        <div class="control-label"><label for="room-width">Width</label><span class="value" id="val-room-width"
                                 data-slider="room-width" data-key="roomWidth" data-unit="ft">15' 0"</span>
                         </div>
                         <input type="range" id="room-width" min="8" max="60" step="0.5" value="15">
                     </div>
                     <div class="control-row">
-                        <div class="control-label"><span>Ceiling Height</span><span class="value" id="val-room-ceiling-height"
+                        <div class="control-label"><label for="room-ceiling-height">Ceiling Height</label><span class="value" id="val-room-ceiling-height"
                                 data-slider="room-ceiling-height" data-key="ceilingHeight" data-unit="ft">9' 0"</span>
                         </div>
                         <input type="range" id="room-ceiling-height" min="7" max="20" step="0.5" value="9">
@@ -68,14 +68,14 @@
 
             <!-- Table -->
             <div class="control-group" aria-expanded="false" id="cg-table">
-                <div class="control-group-title" data-toggle-group="cg-table">Table<svg class="cg-chevron" width="12"
+                <div class="control-group-title" data-toggle-group="cg-table">Table<svg class="cg-chevron" aria-hidden="true" width="12"
                         height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
                         stroke-linecap="round" stroke-linejoin="round">
                         <polyline points="6 9 12 15 18 9"></polyline>
                     </svg></div>
                 <div class="control-group-body">
                     <div class="control-row">
-                        <div class="control-label"><span>Shape</span></div>
+                        <div class="control-label"><label for="table-shape">Shape</label></div>
                         <select id="table-shape">
                             <option value="rectangular">Rectangular</option>
                             <option value="oval">Oval</option>
@@ -84,41 +84,41 @@
                         </select>
                     </div>
                     <div class="control-row">
-                        <div class="control-label"><span>Table Length</span><span class="value" id="val-table-length"
+                        <div class="control-label"><label for="table-length">Table Length</label><span class="value" id="val-table-length"
                                 data-slider="table-length" data-key="tableLength" data-unit="ft">8'
                                 0"</span>
                         </div>
                         <input type="range" id="table-length" min="4" max="24" step="0.5" value="8">
                     </div>
                     <div class="control-row">
-                        <div class="control-label"><span>Table Width</span><span class="value" id="val-table-width"
+                        <div class="control-label"><label for="table-width">Table Width</label><span class="value" id="val-table-width"
                                 data-slider="table-width" data-key="tableWidth" data-unit="ft">4'
                                 0"</span>
                         </div>
                         <input type="range" id="table-width" min="2" max="8" step="0.5" value="4">
                     </div>
                     <div class="control-row">
-                        <div class="control-label"><span>Table Height (AFF)</span><span class="value"
+                        <div class="control-label"><label for="table-height">Table Height (AFF)</label><span class="value"
                                 id="val-table-height" data-slider="table-height" data-key="tableHeight"
                                 data-unit="in">30"</span>
                         </div>
                         <input type="range" id="table-height" min="24" max="42" step="1" value="30">
                     </div>
                     <div class="control-row">
-                        <div class="control-label"><span>Distance from Display</span><span class="value"
+                        <div class="control-label"><label for="table-dist">Distance from Display</label><span class="value"
                                 id="val-table-dist" data-slider="table-dist" data-key="tableDist" data-unit="ft">4'
                                 0"</span>
                         </div>
                         <input type="range" id="table-dist" min="0" max="30" step="0.5" value="4">
                     </div>
                     <div class="control-row">
-                        <div class="control-label"><span>Rotation</span><span class="value" id="val-table-rotation"
+                        <div class="control-label"><label for="table-rotation">Rotation</label><span class="value" id="val-table-rotation"
                                 data-slider="table-rotation" data-key="tableRotation" data-unit="deg">0°</span>
                         </div>
                         <input type="range" id="table-rotation" min="0" max="350" step="10" value="0">
                     </div>
                     <div class="control-row">
-                        <div class="control-label"><span>Side Offset</span><span class="value" id="val-table-x"
+                        <div class="control-label"><label for="table-x">Side Offset</label><span class="value" id="val-table-x"
                                 data-slider="table-x" data-key="tableX" data-unit="ft">0' 0"</span>
                         </div>
                         <input type="range" id="table-x" min="-20" max="20" step="0.5" value="0">
@@ -139,7 +139,7 @@
                             <button class="arr-pill" data-arrangement="pods">Pods</button>
                         </div>
                     </div>
-                    <div class="room-warning" id="room-warning">
+                    <div class="room-warning" id="room-warning" aria-live="assertive">
                         <div class="room-warning-header"><span class="room-warning-dot"></span> Layout Conflict</div>
                         <div class="room-warning-text" id="room-warning-text"></div>
                     </div>
@@ -148,14 +148,14 @@
 
             <!-- Display -->
             <div class="control-group" aria-expanded="false" id="cg-display">
-                <div class="control-group-title" data-toggle-group="cg-display">Display<svg class="cg-chevron"
+                <div class="control-group-title" data-toggle-group="cg-display">Display<svg class="cg-chevron" aria-hidden="true"
                         width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
                         stroke-linecap="round" stroke-linejoin="round">
                         <polyline points="6 9 12 15 18 9"></polyline>
                     </svg></div>
                 <div class="control-group-body">
                     <div class="control-row">
-                        <div class="control-label"><span>Number of Displays</span></div>
+                        <div class="control-label"><label>Number of Displays</label></div>
                         <div class="toggle-group" id="display-count-toggle">
                             <button class="toggle-btn active" data-val="1"
                                 data-action="set-display-count">Single</button>
@@ -163,21 +163,21 @@
                         </div>
                     </div>
                     <div class="control-row">
-                        <div class="control-label"><span>Display Size (Diagonal)</span><span class="value"
+                        <div class="control-label"><label for="display-size">Display Size (Diagonal)</label><span class="value"
                                 id="val-display-size" data-slider="display-size" data-key="displaySize"
                                 data-unit="in">65"</span>
                         </div>
                         <input type="range" id="display-size" min="40" max="100" step="5" value="65">
                     </div>
                     <div class="control-row">
-                        <div class="control-label"><span>Display Elevation (Center)</span><span class="value"
+                        <div class="control-label"><label for="display-elev">Display Elevation (Center)</label><span class="value"
                                 id="val-display-elev" data-slider="display-elev" data-key="displayElev"
                                 data-unit="in">54"</span>
                         </div>
                         <input type="range" id="display-elev" min="40" max="84" step="1" value="54">
                     </div>
                     <div class="control-row">
-                        <div class="control-label"><span>Display Offset (Lateral)</span><span class="value"
+                        <div class="control-label"><label for="display-offset-x">Display Offset (Lateral)</label><span class="value"
                                 id="val-display-offset-x" data-slider="display-offset-x" data-key="displayOffsetX"
                                 data-unit="ft">0'0"</span>
                         </div>
@@ -188,7 +188,7 @@
 
             <!-- AV Equipment -->
             <div class="control-group" aria-expanded="true" id="cg-equipment">
-                <div class="control-group-title" data-toggle-group="cg-equipment">AV Equipment<svg class="cg-chevron"
+                <div class="control-group-title" data-toggle-group="cg-equipment">AV Equipment<svg class="cg-chevron" aria-hidden="true"
                         width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
                         stroke-linecap="round" stroke-linejoin="round">
                         <polyline points="6 9 12 15 18 9"></polyline>
@@ -199,11 +199,11 @@
                         <button class="brand-btn logi-btn" data-val="logitech" data-action="set-brand">logitech</button>
                     </div>
                     <div class="control-row">
-                        <div class="control-label"><span>Video Bar</span></div>
+                        <div class="control-label"><label for="video-bar">Video Bar</label></div>
                         <select id="video-bar"></select>
                     </div>
                     <div class="control-row" id="mount-row">
-                        <div class="control-label"><span>Mount Position</span></div>
+                        <div class="control-label"><label>Mount Position</label></div>
                         <div class="toggle-group" id="mount-pos-toggle">
                             <button class="toggle-btn" data-val="above" data-action="set-mount-pos">Above
                                 Display</button>
@@ -219,7 +219,7 @@
                     <div class="check-row" id="micpod-row" style="display:none">
                         <span style="display:flex;align-items:center">Rally Mic Pod (Far End)
                             <div class="tooltip-container">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
                                     style="color:var(--text-muted);cursor:help">
                                     <circle cx="12" cy="12" r="10"></circle>
@@ -234,7 +234,7 @@
                         <label class="switch"><input type="checkbox" id="include-micpod"><span
                                 class="slider"></span></label>
                     </div>
-                    <div class="mic-warning" id="mic-warning">
+                    <div class="mic-warning" id="mic-warning" aria-live="assertive">
                         <div class="mic-warning-header"><span class="mic-warning-dot"></span> Coverage Warning</div>
                         <div class="mic-warning-text" id="mic-warning-text"></div>
                         <button class="mic-warning-btn" id="mic-warning-btn"><span>+</span> Add companion</button>
@@ -244,7 +244,7 @@
 
             <!-- View Mode -->
             <div class="control-group" aria-expanded="false" id="cg-viewmode">
-                <div class="control-group-title" data-toggle-group="cg-viewmode">View Mode<svg class="cg-chevron"
+                <div class="control-group-title" data-toggle-group="cg-viewmode">View Mode<svg class="cg-chevron" aria-hidden="true"
                         width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
                         stroke-linecap="round" stroke-linejoin="round">
                         <polyline points="6 9 12 15 18 9"></polyline>
@@ -264,7 +264,7 @@
             <!-- Coverage Overlays -->
             <div class="control-group" aria-expanded="false" id="cg-overlays">
                 <div class="control-group-title" data-toggle-group="cg-overlays">Coverage Overlays<svg
-                        class="cg-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        class="cg-chevron" aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                         stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                         <polyline points="6 9 12 15 18 9"></polyline>
                     </svg></div>
@@ -272,7 +272,7 @@
                     <div class="check-row">
                         <span style="display:flex;align-items:center">Viewing Angle (60°)
                             <div class="tooltip-container">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
                                     style="color:var(--text-muted);cursor:help">
                                     <circle cx="12" cy="12" r="10"></circle>
@@ -297,28 +297,28 @@
 
             <!-- POV Settings (hidden by default) -->
             <div class="control-group" id="pov-controls" aria-expanded="true" style="display:none">
-                <div class="control-group-title" data-toggle-group="pov-controls">POV Settings<svg class="cg-chevron"
+                <div class="control-group-title" data-toggle-group="pov-controls">POV Settings<svg class="cg-chevron" aria-hidden="true"
                         width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
                         stroke-linecap="round" stroke-linejoin="round">
                         <polyline points="6 9 12 15 18 9"></polyline>
                     </svg></div>
                 <div class="control-group-body">
                     <div class="control-row">
-                        <div class="control-label"><span>Viewer Distance</span><span class="value" id="val-viewer-dist"
+                        <div class="control-label"><label for="viewer-dist">Viewer Distance</label><span class="value" id="val-viewer-dist"
                                 data-slider="viewer-dist" data-key="viewerDist" data-unit="ft">12'
                                 0"</span>
                         </div>
                         <input type="range" id="viewer-dist" min="1" max="60" step="0.5" value="12">
                     </div>
                     <div class="control-row">
-                        <div class="control-label"><span>Viewer Offset (L/R)</span><span class="value"
+                        <div class="control-label"><label for="viewer-offset">Viewer Offset (L/R)</label><span class="value"
                                 id="val-viewer-offset" data-slider="viewer-offset" data-key="viewerOffset"
                                 data-unit="ft">0' 0"</span>
                         </div>
                         <input type="range" id="viewer-offset" min="-15" max="15" step="0.5" value="0">
                     </div>
                     <div class="control-row">
-                        <div class="control-label"><span>Posture</span></div>
+                        <div class="control-label"><label>Posture</label></div>
                         <div class="toggle-group" id="posture-toggle">
                             <button class="toggle-btn active" data-val="seated"
                                 data-action="set-posture">Seated</button>
@@ -340,9 +340,9 @@
                 </div>
             </div>
         </div>
-    </div>
+    </aside>
 
-    <div class="main">
+    <main class="main">
         <div class="canvas-header">
             <div class="room-info">
                 <div class="info-item"><span class="dot"
@@ -377,8 +377,8 @@
         </div>
         <div class="canvas-container">
             <div class="canvas-stack">
-                <canvas id="bg-canvas"></canvas>
-                <canvas id="fg-canvas"></canvas>
+                <canvas id="bg-canvas" aria-hidden="true"></canvas>
+                <canvas id="fg-canvas" role="img" aria-label="Conference room layout diagram showing tables, displays, and AV equipment coverage areas"></canvas>
             </div>
         </div>
         <div class="info-overlay" id="info-overlay">
@@ -389,7 +389,7 @@
             </div>
             <div id="info-content"></div>
         </div>
-    </div>
+    </main>
 
     <script src="data.js?v=3"></script>
     <script src="constants.js?v=3"></script>

@@ -31,6 +31,14 @@ function debouncedPushHistory() {
     _historyDebounceTimer = setTimeout(() => pushHistory(), DEBOUNCE_HISTORY);
 }
 
+// Debounced serializeToHash — prevents URL serialization on every render frame.
+// Instead, updates the hash 300ms after the last state change.
+let _hashDebounceTimer = null;
+function debouncedSerializeToHash() {
+    clearTimeout(_hashDebounceTimer);
+    _hashDebounceTimer = setTimeout(serializeToHash, DEBOUNCE_HISTORY);
+}
+
 function snapshotState() {
     return JSON.parse(JSON.stringify(state));
 }

@@ -58,9 +58,9 @@
     --border-default: rgba(255, 255, 255, 0.09);
     --border-focus: rgba(255, 255, 255, 0.18);
 
-    /* Text — high-contrast hierarchy */
+    /* Text — high-contrast hierarchy (WCAG AA: ≥4.5:1 on --bg-base) */
     --text-primary: rgba(255, 255, 255, 0.92);
-    --text-secondary: rgba(255, 255, 255, 0.56);
+    --text-secondary: rgba(255, 255, 255, 0.64);
     --text-tertiary: rgba(255, 255, 255, 0.30);
 
     /* Scrollbar */
@@ -465,10 +465,12 @@ body {
     margin-bottom: var(--space-sm);
 }
 
-.control-label span {
+.control-label span,
+.control-label label {
     font-size: var(--text-base);
     font-weight: 500;
     color: var(--text-secondary);
+    cursor: default;
 }
 
 .control-label .value {
@@ -1222,8 +1224,11 @@ select:focus {
 
 .undo-btn:disabled,
 .redo-btn:disabled {
-    opacity: 0.20;
+    opacity: 0.25;
     cursor: not-allowed;
+    color: var(--text-tertiary);
+    pointer-events: none;
+    filter: saturate(0);
 }
 
 
@@ -1975,7 +1980,8 @@ select:focus-visible {
         padding: 12px var(--space-md);
     }
 
-    .control-label span {
+    .control-label span,
+    .control-label label {
         font-size: var(--text-sm);
     }
 

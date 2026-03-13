@@ -439,7 +439,7 @@ function renderPOV(cw, ch, dpr) {
     updateInfoOverlay(eq, state.includeCenter ? EQUIPMENT[getCenterEqKey()] : null);
     checkMicRange();
     updateLegendState();
-    serializeToHash();
+    debouncedSerializeToHash();
 }
 
 // ── Info Overlay ─────────────────────────────────────────────

@@ -5,14 +5,19 @@ function deg2rad(d) {
     return d * Math.PI / 180;
 }
 
-/** Format a decimal-foot value as X' Y" (e.g. 8.5 → 8' 6") */
+/** Format a decimal-foot value as X' Y" (e.g. 8.5 → 8' 6") — cached */
+const _ftInCache = new Map();
 function formatFtIn(v) {
+    let r = _ftInCache.get(v);
+    if (r !== undefined) return r;
     const s = v < 0 ? '-' : '';
     const a = Math.abs(v);
     const f = Math.floor(a);
     const i = Math.round((a - f) * 12);
-    if (i === 12) return `${s}${f + 1}' 0"`;
-    return `${s}${f}' ${i}"`;
+    r = (i === 12) ? `${s}${f + 1}' 0"` : `${s}${f}' ${i}"`;
+    if (_ftInCache.size > 200) _ftInCache.clear();
+    _ftInCache.set(v, r);
+    return r;
 }
 
 /** Centralized value formatter — returns the correct string for any unit */

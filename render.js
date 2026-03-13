@@ -14,7 +14,7 @@ function updateHeaderDOM(eq) {
     updateInfoOverlay(eq, state.includeCenter ? EQUIPMENT[getCenterEqKey()] : null);
     checkMicRange();
     updateLegendState();
-    serializeToHash();
+    debouncedSerializeToHash();
     checkRoomWarnings();
 }
 

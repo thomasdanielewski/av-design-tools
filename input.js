@@ -2,6 +2,20 @@
 // All slider inputs use scheduleRender() (rAF-debounced) instead
 // of calling render() directly.
 
+/** Mirror circle table sync: keep length === width when shape is circle */
+function syncCircleValue(changedKey, v) {
+    if (state.tableShape !== 'circle') return;
+    if (changedKey === 'tableLength') {
+        state.tableWidth = v;
+        DOM['table-width'].value = v;
+        DOM['val-table-width'].textContent = formatFtIn(v);
+    } else if (changedKey === 'tableWidth') {
+        state.tableLength = v;
+        DOM['table-length'].value = v;
+        DOM['val-table-length'].textContent = formatFtIn(v);
+    }
+}
+
 function bindSlider(id, sk, vl, triggersBg = false) {
     const unit = (sk === 'displaySize' || sk === 'displayElev' || sk === 'tableHeight') ? 'in'
         : sk === 'tableRotation' ? 'deg'
@@ -9,15 +23,7 @@ function bindSlider(id, sk, vl, triggersBg = false) {
     (DOM[id] || document.getElementById(id)).addEventListener('input', function () {
         let v = parseFloat(this.value);
 
-        // Mirror circle table sync — ranges are kept equal by syncCircleSliderRanges()
-        if (state.tableShape === 'circle' && (sk === 'tableLength' || sk === 'tableWidth')) {
-            const other = sk === 'tableLength' ? 'tableWidth' : 'tableLength';
-            const otherSlider = sk === 'tableLength' ? 'table-width' : 'table-length';
-            const otherVal = sk === 'tableLength' ? 'val-table-width' : 'val-table-length';
-            state[other] = v;
-            DOM[otherSlider].value = v;
-            DOM[otherVal].textContent = formatFtIn(v);
-        }
+        syncCircleValue(sk, v);
 
         state[sk] = v;
         if (TABLE_SLIDER_PROPS.has(sk)) syncTableFromFlatState();
@@ -145,18 +151,7 @@ function makeEditable(badge) {
         slider.value = v;
         badge.textContent = formatValue(v, unit);
 
-        // Mirror circle table sync: keep length === width
-        if (state.tableShape === 'circle') {
-            if (stateKey === 'tableLength') {
-                state.tableWidth = v;
-                document.getElementById('table-width').value = v;
-                document.getElementById('val-table-width').textContent = formatFtIn(v);
-            } else if (stateKey === 'tableWidth') {
-                state.tableLength = v;
-                document.getElementById('table-length').value = v;
-                document.getElementById('val-table-length').textContent = formatFtIn(v);
-            }
-        }
+        syncCircleValue(stateKey, v);
 
         // Clear active preset when room dims are changed manually
         if (stateKey === 'roomLength' || stateKey === 'roomWidth') {

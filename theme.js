@@ -16,7 +16,7 @@ const CANVAS_THEME = {
         povGradMid: '#141518',
         povGradBot: '#0C0D10',
         exportBg: '#0C0D10',
-        label: '#8B8D95',             // dimension labels, device labels
+        label: '#A0A2AA',             // dimension labels, device labels (WCAG AA ≥4.5:1)
         labelBright: '#EAEBED',       // prominent values (lens height)
         gridDot: 'rgba(255,255,255,0.03)',
         gridAxis: 'rgba(92,94,102,0.5)',
