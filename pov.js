@@ -172,19 +172,20 @@ function renderPOV(cw, ch, dpr) {
     const dyc = state.displayElev;                    // display center height (inches)
     const dyt = dyc + dhi / 2;                        // display top
     const dyb = dyc - dhi / 2;                        // display bottom
+    const dox = state.displayOffsetX;                 // lateral offset in feet
 
     // ── Draw displays ────────────────────────────────────
     if (state.displayCount === 1) {
-        const a = proj(-dwf / 2, dyt, dz);
-        const b = proj(dwf / 2, dyb, dz);
+        const a = proj(-dwf / 2 + dox, dyt, dz);
+        const b = proj(dwf / 2 + dox, dyb, dz);
         drawDisplayPOV(a.x, a.y, b.x - a.x, b.y - a.y);
     } else {
         const gap = 0.5;
-        const a = proj(-dwf - gap / 2, dyt, dz);
-        const b = proj(-gap / 2, dyb, dz);
+        const a = proj(-dwf - gap / 2 + dox, dyt, dz);
+        const b = proj(-gap / 2 + dox, dyb, dz);
         drawDisplayPOV(a.x, a.y, b.x - a.x, b.y - a.y);
-        const c = proj(gap / 2, dyt, dz);
-        const d = proj(dwf + gap / 2, dyb, dz);
+        const c = proj(gap / 2 + dox, dyt, dz);
+        const d = proj(dwf + gap / 2 + dox, dyb, dz);
         drawDisplayPOV(c.x, c.y, d.x - c.x, d.y - c.y);
     }
 
@@ -201,8 +202,8 @@ function renderPOV(cw, ch, dpr) {
     }
 
     if (eq.type !== 'board') {
-        const a = proj(-ewf / 2, dvc + ehi / 2, dz);
-        const b = proj(ewf / 2, dvc - ehi / 2, dz);
+        const a = proj(-ewf / 2 + dox, dvc + ehi / 2, dz);
+        const b = proj(ewf / 2 + dox, dvc - ehi / 2, dz);
         ctx.fillStyle = cc().surface;
         ctx.strokeStyle = 'rgba(91, 156, 245, 0.30)';
         ctx.lineWidth = 2;
@@ -210,19 +211,18 @@ function renderPOV(cw, ch, dpr) {
         ctx.fill();
         ctx.stroke();
 
-        // Lens dot
+        // Lens dot (centred on the offset bar)
         ctx.fillStyle = 'rgba(91, 156, 245, 0.60)';
         ctx.beginPath();
         const ls = Math.max(0.5, 1000 / Math.max(0.5, vd));
-        ctx.arc(cx - vo * ls, (a.y + b.y) / 2, Math.max(2, (b.y - a.y) * 0.3), 0, Math.PI * 2);
+        ctx.arc(cx + (dox - vo) * ls, (a.y + b.y) / 2, Math.max(2, (b.y - a.y) * 0.3), 0, Math.PI * 2);
         ctx.fill();
     } else {
         // Lens dot within board bezel
         ctx.fillStyle = 'rgba(91, 156, 245, 0.60)';
         ctx.beginPath();
         const ls = Math.max(0.5, 1000 / Math.max(0.5, vd));
-        const boardLensP = proj(0, dvc, dz);
-        ctx.arc(cx - vo * ls, boardLensP.y, 2.5, 0, Math.PI * 2);
+        ctx.arc(cx + (dox - vo) * ls, proj(dox, dvc, dz).y, 2.5, 0, Math.PI * 2);
         ctx.fill();
     }
 
@@ -316,16 +316,16 @@ function renderPOV(cw, ch, dpr) {
             // Clip to display rect(s)
             ctx.beginPath();
             if (state.displayCount === 1) {
-                const pTL = proj(-dwf / 2, dyt, dz);
-                const pBR = proj(dwf / 2, dyb, dz);
+                const pTL = proj(-dwf / 2 + dox, dyt, dz);
+                const pBR = proj(dwf / 2 + dox, dyb, dz);
                 ctx.rect(pTL.x, pTL.y, pBR.x - pTL.x, pBR.y - pTL.y);
             } else {
                 const gf = 0.5;
-                const pTL1 = proj(-dwf - gf / 2, dyt, dz);
-                const pBR1 = proj(-gf / 2, dyb, dz);
+                const pTL1 = proj(-dwf - gf / 2 + dox, dyt, dz);
+                const pBR1 = proj(-gf / 2 + dox, dyb, dz);
                 ctx.rect(pTL1.x, pTL1.y, pBR1.x - pTL1.x, pBR1.y - pTL1.y);
-                const pTL2 = proj(gf / 2, dyt, dz);
-                const pBR2 = proj(dwf + gf / 2, dyb, dz);
+                const pTL2 = proj(gf / 2 + dox, dyt, dz);
+                const pBR2 = proj(dwf + gf / 2 + dox, dyb, dz);
                 ctx.rect(pTL2.x, pTL2.y, pBR2.x - pTL2.x, pBR2.y - pTL2.y);
             }
             ctx.clip();
@@ -359,8 +359,8 @@ function renderPOV(cw, ch, dpr) {
         const pF = proj(0, 0, dz);
         const pL = proj(0, dvc, dz);
         const re = (state.displayCount === 1)
-            ? proj(dwf / 2, 0, dz).x
-            : proj(dwf + 0.25, 0, dz).x;
+            ? proj(dwf / 2 + dox, 0, dz).x
+            : proj(dwf + 0.25 + dox, 0, dz).x;
         const lx = Math.min(re + 60, cw - 45);
         const tw2 = 6;
 

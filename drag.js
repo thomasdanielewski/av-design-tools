@@ -105,6 +105,18 @@ canvas.addEventListener('mousemove', e => {
     mousePos.x = e.clientX - _rect.left;
     mousePos.y = e.clientY - _rect.top;
 
+    // POV mode: only the display is draggable
+    if (state.viewMode === 'pov') {
+        if (!isDraggingDisplayPOV) {
+            const b = getPOVDisplayScreenBounds();
+            canvas.style.cursor =
+                (mousePos.x >= b.left && mousePos.x <= b.right &&
+                 mousePos.y >= b.top  && mousePos.y <= b.bot)
+                ? 'grab' : '';
+        }
+        return;
+    }
+
     if (state.viewMode !== 'top' || isDraggingTableId !== null || isDraggingCenter || isDraggingDisplay || isDraggingRotate) return;
     const { mx, my, ppf, ox, ry, wt, cX, cY, dispOx, dispY, dispWidthPx, dispDepthPx, eqWidthPx, eqDepthPx, mainDeviceY } = getDragMetrics(e);
 
@@ -133,17 +145,94 @@ canvas.addEventListener('mousemove', e => {
     if (state.showViewAngle) scheduleRender();
 });
 
+/**
+ * Compute the POV-mode screen bounding box of the display + video bar,
+ * plus the pixel-per-foot scale at the front wall (z=0).
+ * Used for both hit-testing and drag conversion.
+ */
+function getPOVDisplayScreenBounds() {
+    const rect = canvas.getBoundingClientRect();
+    const cw = rect.width;
+    const ch = rect.height;
+    const cx = cw / 2;
+    const cy = ch / 2;
+    const vd = Math.max(1, state.viewerDist);
+    const vo = state.viewerOffset;
+    const eye = state.posture === 'seated' ? 48 : 65;
+    const s = 1000 / vd; // px per foot at the display wall
+
+    const dox = state.displayOffsetX;
+    const dwf = state.displaySize * 0.8715 / 12;
+    const dhi = state.displaySize * 0.49;
+    const dyc = state.displayElev;
+    const dyt = dyc + dhi / 2;
+    const dyb = dyc - dhi / 2;
+
+    const eq = EQUIPMENT[state.videoBar];
+    const ewf = eq.width;
+    const ehi = eq.height * 12;
+    let dvc;
+    if (eq.type === 'board') {
+        dvc = dyt - 1.5;
+    } else if (state.mountPos === 'above') {
+        dvc = dyt + ehi / 2 + 2;
+    } else {
+        dvc = dyb - ehi / 2 - 2;
+    }
+
+    // Screen x for a given world-x (feet)
+    const px = x => cx + (x - vo) * s;
+    // Screen y for a given world-y (inches)
+    const py = y => cy - (y - eye) * (s / 12);
+
+    // Widest horizontal extent (display or videobar)
+    const halfW = Math.max(
+        state.displayCount === 1 ? dwf / 2 : dwf + 0.25,
+        ewf / 2
+    );
+    // Tallest vertical extent
+    const topIn  = state.mountPos === 'above' ? dvc + ehi / 2 : dyt;
+    const botIn  = state.mountPos === 'above' ? dyb            : dvc - ehi / 2;
+
+    return {
+        left:  px(dox - halfW) - DRAG_TOLERANCE,
+        right: px(dox + halfW) + DRAG_TOLERANCE,
+        top:   py(topIn)       - DRAG_TOLERANCE,
+        bot:   py(botIn)       + DRAG_TOLERANCE,
+        s, cx
+    };
+}
+
 // ── Drag state ───────────────────────────────────────────────
 let isDraggingTableId = null;
 let dragTableOffset = null;
 let isDraggingCenter = false;
 let isDraggingDisplay = false;
 let dragDisplayOffsetX = 0;
+let isDraggingDisplayPOV = false;
+let dragDisplayPOVStartX = 0;
+let dragDisplayPOVStartOffset = 0;
 let isDraggingRotate = false;
 let isDraggingRotateTableId = null;
 
 // ── Mouse down: start drag ───────────────────────────────────
 canvas.addEventListener('mousedown', e => {
+    // POV mode: only allow display lateral drag
+    if (state.viewMode === 'pov') {
+        const rect = canvas.getBoundingClientRect();
+        const mx = e.clientX - rect.left;
+        const my = e.clientY - rect.top;
+        const b = getPOVDisplayScreenBounds();
+        if (mx >= b.left && mx <= b.right && my >= b.top && my <= b.bot) {
+            isDraggingDisplayPOV = true;
+            dragDisplayPOVStartX = mx;
+            dragDisplayPOVStartOffset = state.displayOffsetX;
+            canvas.style.cursor = 'grabbing';
+            pushHistory();
+        }
+        return;
+    }
+
     if (state.viewMode !== 'top') return;
     const { mx, my, ppf, ox, ry, wt, cX, cY, dispOx, dispY, dispWidthPx, dispDepthPx, eqWidthPx, eqDepthPx, mainDeviceY } = getDragMetrics(e);
 
@@ -196,6 +285,23 @@ canvas.addEventListener('mousedown', e => {
 
 // ── Mouse move: update position while dragging ───────────────
 canvas.addEventListener('mousemove', e => {
+    // POV display drag is handled independently
+    if (isDraggingDisplayPOV) {
+        const rect = canvas.getBoundingClientRect();
+        const mx = e.clientX - rect.left;
+        const { s } = getPOVDisplayScreenBounds();
+        let nx = dragDisplayPOVStartOffset + (mx - dragDisplayPOVStartX) / s;
+        const displayWidthFt = state.displaySize * 0.8715 / 12;
+        const maxOff = Math.min(15, state.roomWidth / 2 - displayWidthFt / 2);
+        nx = Math.round(Math.max(-maxOff, Math.min(maxOff, nx)) * 2) / 2;
+        state.displayOffsetX = nx;
+        DOM['display-offset-x'].value = nx;
+        DOM['val-display-offset-x'].textContent = formatFtIn(nx);
+        updateSliderTrack(DOM['display-offset-x']);
+        scheduleRender();
+        return;
+    }
+
     if (isDraggingTableId === null && !isDraggingCenter && !isDraggingDisplay && !isDraggingRotate) return;
     const { mx, my, ppf, ox, ry, wt, tableX_px, ty2 } = getDragMetrics(e);
 
@@ -266,6 +372,7 @@ canvas.addEventListener('mouseup', () => {
     isDraggingTableId = null; dragTableOffset = null;
     isDraggingCenter = false;
     isDraggingDisplay = false; dragDisplayOffsetX = 0;
+    isDraggingDisplayPOV = false; dragDisplayPOVStartX = 0; dragDisplayPOVStartOffset = 0;
     isDraggingRotate = false; isDraggingRotateTableId = null;
     canvas.style.cursor = '';
     serializeToHash();
@@ -275,6 +382,7 @@ canvas.addEventListener('mouseleave', () => {
     isDraggingTableId = null; dragTableOffset = null;
     isDraggingCenter = false;
     isDraggingDisplay = false; dragDisplayOffsetX = 0;
+    isDraggingDisplayPOV = false; dragDisplayPOVStartX = 0; dragDisplayPOVStartOffset = 0;
     isDraggingRotate = false; isDraggingRotateTableId = null;
     canvas.style.cursor = '';
     mousePos = { x: -9999, y: -9999 };
