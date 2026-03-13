@@ -50,7 +50,11 @@ function cacheDOMRefs() {
         'val-room-length', 'val-room-width', 'val-room-ceiling-height', 'val-table-length', 'val-table-width',
         'val-table-height', 'val-table-dist', 'val-table-rotation', 'val-table-x',
         'val-display-size', 'val-display-elev', 'val-display-offset-x',
-        'val-viewer-dist', 'val-viewer-offset'
+        'val-viewer-dist', 'val-viewer-offset',
+        'add-door-btn', 'add-window-btn', 'remove-element-btn',
+        'element-list', 'structural-controls',
+        'element-wall', 'element-position', 'element-width',
+        'val-element-position', 'val-element-width'
     ];
     ids.forEach(id => { DOM[id] = document.getElementById(id); });
 }

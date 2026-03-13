@@ -73,6 +73,14 @@ document.querySelectorAll('.arr-pill[data-arrangement]').forEach(btn => {
     btn.addEventListener('click', () => applyArrangement(btn.dataset.arrangement));
 });
 
+// ── Structural element controls ──────────────────────────────
+document.getElementById('add-door-btn').addEventListener('click', addDoor);
+document.getElementById('add-window-btn').addEventListener('click', addWindow);
+document.getElementById('remove-element-btn').addEventListener('click', removeElement);
+document.getElementById('element-wall').addEventListener('change', onElementWallChange);
+document.getElementById('element-position').addEventListener('input', onElementPositionInput);
+document.getElementById('element-width').addEventListener('input', onElementWidthInput);
+
 // ── Room preset pills ────────────────────────────────────────
 document.querySelectorAll('.preset-pill[data-preset-len]').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -185,6 +193,7 @@ setBrand('neat');
 initGroups();
 initSliderTracks();
 renderTableList();
+renderElementList();
 
 // Auto-minimize info overlay on small screens
 if (window.innerWidth <= 900) {

@@ -24,6 +24,11 @@ const TABLE_SLIDER_PROPS = new Set([
     'tableHeight', 'tableRotation', 'tableX'
 ]);
 
+/** Default structural element dimensions (feet) */
+const DOOR_WIDTH_DEFAULT = 3;
+const WINDOW_WIDTH_DEFAULT = 4;
+const DOOR_SWING_ANGLE = Math.PI / 2; // 90° swing arc
+
 /** Compact URL hash keys → state property names */
 const HASH_KEYS = {
     rl: 'roomLength', rw: 'roomWidth', rch: 'ceilingHeight',

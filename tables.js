@@ -301,6 +301,38 @@ function checkRoomWarnings() {
         }
     }
 
+    // Door swing conflict checks
+    if (state.structuralElements && state.structuralElements.length > 0) {
+        const doors = state.structuralElements.filter(e => e.type === 'door');
+        for (const door of doors) {
+            const swing = getDoorSwingCircle(door);
+            const wallLabel = { north: 'North', south: 'South', east: 'East', west: 'West' }[door.wall];
+
+            // Check each table against door swing
+            state.tables.forEach(tbl => {
+                const prefix = multi ? `T${tbl.id}` : 'Table';
+                if (doorSwingOverlapsRect(swing, tbl)) {
+                    issues.push(`${prefix} overlaps ${wallLabel} door swing area.`);
+                }
+            });
+
+            // Check display against door swing (only north wall doors can reach displays)
+            if (door.wall === 'north') {
+                const dispWidthFt = state.displaySize * 0.8715 / 12;
+                const dispCenterX = state.roomWidth / 2 + state.displayOffsetX;
+                const dispRect = {
+                    left: dispCenterX - dispWidthFt / 2,
+                    right: dispCenterX + dispWidthFt / 2,
+                    top: 0,
+                    bottom: 0.5 // small depth for display
+                };
+                if (circleOverlapsAABB(swing, dispRect)) {
+                    issues.push(`Display overlaps ${wallLabel} door swing area.`);
+                }
+            }
+        }
+    }
+
     if (issues.length) {
         t.textContent = '';
         issues.forEach((msg, i) => {
@@ -311,4 +343,29 @@ function checkRoomWarnings() {
     } else {
         w.classList.remove('visible');
     }
+}
+
+/** Check if a door swing circle overlaps with a table's bounding rect */
+function doorSwingOverlapsRect(swing, tbl) {
+    // Table AABB in room coords (relative to room top-left, 0,0 = top-left corner)
+    const tblLeft = state.roomWidth / 2 + tbl.x - tbl.width / 2;
+    const tblRight = state.roomWidth / 2 + tbl.x + tbl.width / 2;
+    const tblTop = tbl.dist;
+    const tblBottom = tbl.dist + tbl.length;
+
+    return circleOverlapsAABB(swing, {
+        left: tblLeft, right: tblRight, top: tblTop, bottom: tblBottom
+    });
+}
+
+/** Check if a circle (cx, cy, radius) overlaps an axis-aligned bounding box */
+function circleOverlapsAABB(circle, rect) {
+    // Find the closest point on the AABB to the circle center
+    const closestX = Math.max(rect.left, Math.min(circle.cx, rect.right));
+    const closestY = Math.max(rect.top, Math.min(circle.cy, rect.bottom));
+
+    const dx = circle.cx - closestX;
+    const dy = circle.cy - closestY;
+
+    return (dx * dx + dy * dy) < (circle.radius * circle.radius);
 }

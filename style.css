@@ -996,6 +996,67 @@ select:focus {
 
 
 /* ══════════════════════════════════════════════════════════════
+   STRUCTURAL ELEMENTS
+   ══════════════════════════════════════════════════════════════ */
+.structural-manager {
+    margin-bottom: var(--space-md);
+}
+
+.structural-manager-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--space-sm);
+}
+
+.structural-manager-header > span {
+    font-size: var(--text-base);
+    font-weight: 500;
+    color: var(--text-secondary);
+}
+
+.structural-manager-actions {
+    display: flex;
+    gap: 6px;
+}
+
+.element-pill {
+    padding: 4px 12px;
+    background: transparent;
+    border: 1px solid var(--border-default);
+    border-radius: 100px;
+    color: var(--text-tertiary);
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s var(--ease-out);
+    white-space: nowrap;
+}
+
+.element-pill:hover {
+    border-color: var(--border-focus);
+    color: var(--text-secondary);
+    background: var(--bg-hover);
+}
+
+.element-pill.active {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: rgba(99, 102, 241, 0.08);
+}
+
+.element-pill.door::before {
+    content: "🚪 ";
+    font-size: 10px;
+}
+
+.element-pill.window::before {
+    content: "▫ ";
+    font-size: 10px;
+}
+
+/* ══════════════════════════════════════════════════════════════
    PRIMARY ACTIONS — Download & Export/Import
    ══════════════════════════════════════════════════════════════ */
 .download-btn {

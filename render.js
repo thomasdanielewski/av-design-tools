@@ -77,6 +77,10 @@ function renderBackground() {
     // Room outline and front wall accent
     drawRoom(rx, ry, rw, rl, ppf);
 
+    // Structural elements (windows, doors) on walls
+    const wallThickBg = Math.max(3, ppf * 0.2);
+    drawStructuralElements(rx, ry, rw, rl, ppf, wallThickBg);
+
     // Dimension labels
     drawDimensionLabels(ox, oy, rx, ry, rl, ppf);
 
