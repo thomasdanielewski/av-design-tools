@@ -163,6 +163,11 @@ function makeEditable(badge) {
             document.querySelectorAll('.preset-pill').forEach(p => p.classList.remove('active'));
         }
 
+        // Keep viewer-dist max in sync with room length
+        if (stateKey === 'roomLength') {
+            DOM['viewer-dist'].max = v;
+        }
+
         pushHistory();
         render();
     }
