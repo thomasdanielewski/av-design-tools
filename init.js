@@ -145,10 +145,31 @@ document.addEventListener('keydown', e => {
     }
 });
 
+// ── Canvas keyboard navigation (arrow keys move selected table) ──
+canvas.addEventListener('keydown', e => {
+    if (state.viewMode !== 'top') return;
+    const step = e.shiftKey ? 1.0 : 0.5;
+    const t = getSelectedTable();
+    if (!t) return;
+    let handled = false;
+    if (e.key === 'ArrowLeft')  { t.x = Math.max(-(state.roomWidth / 2 - t.width / 2), t.x - step); handled = true; }
+    if (e.key === 'ArrowRight') { t.x = Math.min(state.roomWidth / 2 - t.width / 2, t.x + step); handled = true; }
+    if (e.key === 'ArrowUp')    { t.dist = Math.max(0, t.dist - step); handled = true; }
+    if (e.key === 'ArrowDown')  { t.dist = Math.min(state.roomLength - t.length, t.dist + step); handled = true; }
+    if (handled) {
+        e.preventDefault();
+        syncFlatStateFromTable(t);
+        updateTableSliders();
+        debouncedPushHistory();
+        scheduleRender();
+    }
+});
+
 // ── Window resize (debounced) ────────────────────────────────
 let _resizeTimer;
 window.addEventListener('resize', () => {
     clearTimeout(_resizeTimer);
+    invalidateLayoutCache();
     _resizeTimer = setTimeout(render, DEBOUNCE_RESIZE);
 });
 

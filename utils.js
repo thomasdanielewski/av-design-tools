@@ -52,6 +52,42 @@ function roundRect(c, x, y, w, h, r) {
     c.closePath();
 }
 
+// ── Cached Top-Down Layout ───────────────────────────────────
+// Shared by render.js and drag.js. Invalidated on resize or room dim change.
+let _layoutCache = null;
+let _layoutKey = '';
+
+function getTopDownLayout() {
+    const dpr = window.devicePixelRatio || 1;
+    const container = document.querySelector('.canvas-container');
+    const cw = container.clientWidth - 64;
+    const ch = container.clientHeight - 64;
+    const key = `${cw},${ch},${state.roomWidth},${state.roomLength},${dpr}`;
+    if (_layoutCache && _layoutKey === key) return _layoutCache;
+    _layoutKey = key;
+
+    const padF = 2;
+    const totalW = state.roomWidth + padF * 2;
+    const totalH = state.roomLength + padF * 2;
+    const scale = Math.min(cw / totalW, ch / totalH);
+    const ppf = scale;
+
+    const canvasW = Math.floor(totalW * scale);
+    const canvasH = Math.floor(totalH * scale);
+    const ox = (totalW * scale) / 2;
+    const oy = padF * ppf + (state.roomLength * ppf) / 2;
+    const rw = state.roomWidth * ppf;
+    const rl = state.roomLength * ppf;
+    const rx = ox - rw / 2;
+    const ry = oy - rl / 2;
+    const wallThick = Math.max(3, ppf * 0.2);
+
+    _layoutCache = { dpr, ppf, canvasW, canvasH, ox, oy, rw, rl, rx, ry, wallThick };
+    return _layoutCache;
+}
+
+function invalidateLayoutCache() { _layoutCache = null; }
+
 // ── requestAnimationFrame Debouncing ─────────────────────────
 // scheduleRender()          → repaints only the foreground canvas (tables,
 //                             equipment, coverage overlays).  Called by drag

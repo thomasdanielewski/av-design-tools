@@ -31,7 +31,7 @@ function drawDisplayPOV(x, y, w, h) {
 
     // Screen gradient fill
     const g = ctx.createLinearGradient(x, y, x + w, y + h);
-    g.addColorStop(0, 'rgba(91, 156, 245, 0.08)');
+    g.addColorStop(0, cc().equipmentFill);
     g.addColorStop(1, cc().displayGradEnd);
     ctx.fillStyle = g;
     ctx.fillRect(x + 2, y + 2, w - 4, h - 4);
@@ -217,8 +217,7 @@ function drawViewAngle(ox, dispY, rl, ppf, isHovered) {
 
         // Background pill
         ctx.fillStyle = cc().viewPill;
-        ctx.beginPath();
-        ctx.roundRect(
+        roundRect(ctx,
             labelX - textWidth / 2 - px,
             labelY - 10 - py,
             textWidth + px * 2,
@@ -260,21 +259,21 @@ function drawEquipmentTopDown(ox, ry, wallThick, dispY, dispDepthPx, dispWidthPx
         const bx = ox - eqWidthPx / 2;
         const by = ry + wallThick + 2;
         ctx.save();
-        ctx.shadowColor = 'rgba(91, 156, 245, 0.20)';
+        ctx.shadowColor = cc().equipmentGlow;
         ctx.shadowBlur = 12;
         ctx.fillStyle = cc().surface;
-        ctx.strokeStyle = 'rgba(91, 156, 245, 0.25)';
+        ctx.strokeStyle = cc().equipmentStroke;
         ctx.lineWidth = 1.5;
         roundRect(ctx, bx, by, eqWidthPx, eqDepthPx, 3);
         ctx.fill();
         ctx.restore();
-        ctx.strokeStyle = 'rgba(91, 156, 245, 0.25)';
+        ctx.strokeStyle = cc().equipmentStroke;
         ctx.lineWidth = 1.5;
         roundRect(ctx, bx, by, eqWidthPx, eqDepthPx, 3);
         ctx.stroke();
 
         // Translucent fill + label
-        ctx.fillStyle = 'rgba(91, 156, 245, 0.05)';
+        ctx.fillStyle = cc().equipmentFill;
         ctx.fillRect(bx + 2, by + 2, eqWidthPx - 4, eqDepthPx - 4);
         ctx.font = `600 ${Math.max(8, ppf * 0.3)}px 'Satoshi', sans-serif`;
         ctx.fillStyle = '#EE3224';
@@ -291,21 +290,21 @@ function drawEquipmentTopDown(ox, ry, wallThick, dispY, dispDepthPx, dispWidthPx
         const bx = ox - eqWidthPx / 2;
         const by = mainDeviceY - eqDepthPx / 2;
         ctx.save();
-        ctx.shadowColor = 'rgba(91, 156, 245, 0.20)';
+        ctx.shadowColor = cc().equipmentGlow;
         ctx.shadowBlur = 8;
         ctx.fillStyle = cc().surface;
-        ctx.strokeStyle = 'rgba(91, 156, 245, 0.30)';
+        ctx.strokeStyle = cc().equipmentStrokeBright;
         ctx.lineWidth = 1.5;
         roundRect(ctx, bx, by, eqWidthPx, eqDepthPx, 2);
         ctx.fill();
         ctx.restore();
-        ctx.strokeStyle = 'rgba(91, 156, 245, 0.30)';
+        ctx.strokeStyle = cc().equipmentStrokeBright;
         ctx.lineWidth = 1.5;
         roundRect(ctx, bx, by, eqWidthPx, eqDepthPx, 2);
         ctx.stroke();
 
         // Lens indicator dot (no glow)
-        ctx.fillStyle = 'rgba(91, 156, 245, 0.60)';
+        ctx.fillStyle = cc().lensDot;
         ctx.beginPath();
         ctx.arc(ox, mainDeviceY, Math.max(2, ppf * 0.08), 0, Math.PI * 2);
         ctx.fill();
@@ -417,7 +416,7 @@ function drawTable(ox, ry, wallThick, ppf) {
             ctx.save();
             ctx.translate(tcx, tcy);
             ctx.rotate(angle);
-            ctx.strokeStyle = 'rgba(238,50,36,0.45)';
+            ctx.strokeStyle = cc().selectionRing;
             ctx.lineWidth = 1.5;
             ctx.setLineDash([3, 3]);
             roundRect(ctx, x0 - 4, y0 - 4, tw + 8, tl + 8, 8);
@@ -435,7 +434,7 @@ function drawTable(ox, ry, wallThick, ppf) {
             ctx.rotate(angle);
             const handleY = -tl / 2 - stemLen;
             // Stem line
-            ctx.strokeStyle = 'rgba(238, 50, 36, 0.70)';
+            ctx.strokeStyle = cc().rotateHandle;
             ctx.lineWidth = 1.5;
             ctx.setLineDash([]);
             ctx.beginPath();
@@ -443,7 +442,7 @@ function drawTable(ox, ry, wallThick, ppf) {
             ctx.lineTo(0, handleY);
             ctx.stroke();
             // Handle dot
-            ctx.fillStyle = 'rgba(238, 50, 36, 0.85)';
+            ctx.fillStyle = cc().rotateHandleFill;
             ctx.strokeStyle = cc().bg;
             ctx.lineWidth = 1.5;
             ctx.beginPath();
@@ -463,7 +462,7 @@ function drawCenterDevice(centerX, centerY, centerEq, ppf) {
 
     // Device body (circle)
     ctx.fillStyle = cc().surface;
-    ctx.strokeStyle = 'rgba(91, 156, 245, 0.30)';
+    ctx.strokeStyle = cc().centerStroke;
     ctx.lineWidth = 1.5;
     ctx.beginPath();
     ctx.arc(centerX, centerY, cSize / 2, 0, Math.PI * 2);
@@ -471,7 +470,7 @@ function drawCenterDevice(centerX, centerY, centerEq, ppf) {
     ctx.stroke();
 
     // Inner ring
-    ctx.strokeStyle = 'rgba(91, 156, 245, 0.12)';
+    ctx.strokeStyle = cc().centerInner;
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.arc(centerX, centerY, cSize / 3, 0, Math.PI * 2);
@@ -493,7 +492,7 @@ function drawMicPod(micPodX, micPodY, micPodEq, ppf) {
 
     // Outer ring
     ctx.fillStyle = cc().surface;
-    ctx.strokeStyle = 'rgba(74, 222, 128, 0.30)';
+    ctx.strokeStyle = cc().micPodStroke;
     ctx.lineWidth = 1.5;
     ctx.beginPath();
     ctx.arc(micPodX, micPodY, ms / 2, 0, Math.PI * 2);
@@ -501,7 +500,7 @@ function drawMicPod(micPodX, micPodY, micPodEq, ppf) {
     ctx.stroke();
 
     // Center dot
-    ctx.fillStyle = 'rgba(74, 222, 128, 0.50)';
+    ctx.fillStyle = cc().micPodDot;
     ctx.beginPath();
     ctx.arc(micPodX, micPodY, ms / 4, 0, Math.PI * 2);
     ctx.fill();

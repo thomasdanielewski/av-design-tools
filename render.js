@@ -32,31 +32,19 @@ function isMouseInViewCone(ox, dispY, rl, ppf) {
     return Math.abs(angle - Math.PI / 2) <= hv;
 }
 
-// ── Shared layout helper ─────────────────────────────────────
-// Computes the pixel-coordinate system used by both render layers.
-function _topDownLayout() {
-    const dpr = window.devicePixelRatio || 1;
-    const container = document.querySelector('.canvas-container');
-    const cw = container.clientWidth - 64;
-    const ch = container.clientHeight - 64;
-
-    const padF = 2;
-    const totalW = state.roomWidth + padF * 2;
-    const totalH = state.roomLength + padF * 2;
-    const scale = Math.min(cw / totalW, ch / totalH);
-    const ppf = scale;
-
-    const canvasW = Math.floor(totalW * scale);
-    const canvasH = Math.floor(totalH * scale);
-    const ox = (totalW * scale) / 2;
-    const oy = padF * ppf + (state.roomLength * ppf) / 2;
-    const rw = state.roomWidth * ppf;
-    const rl = state.roomLength * ppf;
-    const rx = ox - rw / 2;
-    const ry = oy - rl / 2;
-    const wallThick = Math.max(3, ppf * 0.2);
-
-    return { dpr, ppf, canvasW, canvasH, ox, oy, rw, rl, rx, ry, wallThick };
+/**
+ * Size a canvas only when dimensions actually change, avoiding unnecessary
+ * context state resets. Always re-applies the DPR transform.
+ */
+function _sizeCanvas(cvs, ctxObj, w, h, dpr) {
+    const pw = w * dpr, ph = h * dpr;
+    if (cvs.width !== pw || cvs.height !== ph) {
+        cvs.width = pw; cvs.height = ph;
+        cvs.style.width = w + 'px'; cvs.style.height = h + 'px';
+    }
+    ctxObj.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctxObj.imageSmoothingEnabled = true;
+    ctxObj.imageSmoothingQuality = 'high';
 }
 
 /**
@@ -66,16 +54,11 @@ function _topDownLayout() {
 function renderBackground() {
     if (state.viewMode === 'pov') return;
 
-    const { dpr, ppf, canvasW, canvasH, ox, oy, rw, rl, rx, ry } = _topDownLayout();
+    invalidateThemeCache();
+    const { dpr, ppf, canvasW, canvasH, ox, oy, rw, rl, rx, ry } = getTopDownLayout();
 
     // Size the background canvas
-    bgCanvas.width = canvasW * dpr;
-    bgCanvas.height = canvasH * dpr;
-    bgCanvas.style.width = canvasW + 'px';
-    bgCanvas.style.height = canvasH + 'px';
-    bgCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    bgCtx.imageSmoothingEnabled = true;
-    bgCtx.imageSmoothingQuality = 'high';
+    _sizeCanvas(bgCanvas, bgCtx, canvasW, canvasH, dpr);
 
     // Temporarily redirect the global ctx so all drawXxx helpers use bgCtx
     const _savedCtx = ctx;
@@ -109,16 +92,11 @@ function renderBackground() {
 function renderForeground() {
     if (state.viewMode === 'pov') return;
 
-    const { dpr, ppf, canvasW, canvasH, ox, ry, rw, rl, wallThick } = _topDownLayout();
+    invalidateThemeCache();
+    const { dpr, ppf, canvasW, canvasH, ox, ry, rw, rl, wallThick } = getTopDownLayout();
 
     // Size the foreground canvas to match the background canvas
-    fgCanvas.width = canvasW * dpr;
-    fgCanvas.height = canvasH * dpr;
-    fgCanvas.style.width = canvasW + 'px';
-    fgCanvas.style.height = canvasH + 'px';
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = 'high';
+    _sizeCanvas(fgCanvas, ctx, canvasW, canvasH, dpr);
 
     // Clear to transparent (background shows through)
     ctx.clearRect(0, 0, canvasW, canvasH);
@@ -188,8 +166,8 @@ function renderForeground() {
         drawMicPod(micPodX, micPodY, micPodEq, ppf);
     }
 
-    // Update DOM header and info
-    updateHeaderDOM(eq);
+    // Defer DOM updates to after canvas paint to avoid layout thrashing
+    queueMicrotask(() => updateHeaderDOM(eq));
 
     // Re-apply the CSS pan/zoom transform after every foreground paint so that
     // any render path (scheduleRender, scheduleBackgroundRender, render) keeps
@@ -201,15 +179,17 @@ function renderForeground() {
  * Full render: repaints both background and foreground (or the POV view).
  */
 function render() {
-    const dpr = window.devicePixelRatio || 1;
-    const container = document.querySelector('.canvas-container');
-    const cw = container.clientWidth - 64;
-    const ch = container.clientHeight - 64;
+    invalidateThemeCache();
+    invalidateLayoutCache();
 
     if (state.viewMode === 'pov') {
         // Clear the CSS viewport transform — POV renders directly to the canvas.
         const stack = document.querySelector('.canvas-stack');
         if (stack) stack.style.transform = '';
+        const dpr = window.devicePixelRatio || 1;
+        const container = document.querySelector('.canvas-container');
+        const cw = container.clientWidth - 64;
+        const ch = container.clientHeight - 64;
         renderPOV(cw, ch, dpr);
         return;
     }

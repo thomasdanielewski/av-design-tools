@@ -173,6 +173,13 @@ function applyArrangement(name) {
     renderTableList();
     pushHistory();
     scheduleRender();
+
+    // Click feedback animation
+    const clickedBtn = document.querySelector(`.arr-pill[data-arrangement="${name}"]`);
+    if (clickedBtn) {
+        clickedBtn.style.animation = 'arrangementFlash 0.4s var(--ease-out)';
+        clickedBtn.addEventListener('animationend', () => clickedBtn.style.animation = '', { once: true });
+    }
 }
 
 // ── Validation ───────────────────────────────────────────────
