@@ -71,6 +71,7 @@ function scheduleBackgroundRender() {
     _bgRenderPending = true;
     requestAnimationFrame(() => {
         _bgRenderPending = false;
+        if (state.viewMode === 'pov') { render(); return; }
         renderBackground();
         renderForeground();
     });
