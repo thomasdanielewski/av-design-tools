@@ -453,6 +453,12 @@
                 <canvas id="bg-canvas" aria-hidden="true"></canvas>
                 <canvas id="fg-canvas" tabindex="0" role="img" aria-label="Conference room layout diagram showing tables, displays, and AV equipment coverage areas"></canvas>
             </div>
+            <div class="zoom-controls" role="toolbar" aria-label="Zoom controls">
+                <button class="zoom-btn" id="zoom-in-btn" title="Zoom in" aria-label="Zoom in">+</button>
+                <button class="zoom-btn" id="zoom-out-btn" title="Zoom out" aria-label="Zoom out">−</button>
+                <button class="zoom-btn" id="zoom-reset-btn" title="Reset zoom" aria-label="Reset zoom">⌂</button>
+                <div class="zoom-level" id="zoom-level" aria-live="polite">100%</div>
+            </div>
         </div>
         <div class="info-overlay" id="info-overlay">
             <button class="info-specs-tab" data-action="toggle-overlay">Specs ▸</button>
