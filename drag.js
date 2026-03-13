@@ -105,14 +105,14 @@ canvas.addEventListener('mousemove', e => {
     mousePos.x = e.clientX - _rect.left;
     mousePos.y = e.clientY - _rect.top;
 
-    // POV mode: only the display is draggable
+    // POV mode: display is grabbable, background shows pan cursor
     if (state.viewMode === 'pov') {
-        if (!isDraggingDisplayPOV) {
+        if (!isDraggingDisplayPOV && !isDraggingViewerOffset) {
             const b = getPOVDisplayScreenBounds();
             canvas.style.cursor =
                 (mousePos.x >= b.left && mousePos.x <= b.right &&
                  mousePos.y >= b.top  && mousePos.y <= b.bot)
-                ? 'grab' : '';
+                ? 'grab' : 'ew-resize';
         }
         return;
     }
@@ -214,12 +214,15 @@ let dragDisplayPOVStartX = 0;
 let dragDisplayPOVStartY = 0;
 let dragDisplayPOVStartOffset = 0;
 let dragDisplayPOVStartElev = 0;
+let isDraggingViewerOffset = false;
+let dragViewerOffsetStartX = 0;
+let dragViewerOffsetStartVal = 0;
 let isDraggingRotate = false;
 let isDraggingRotateTableId = null;
 
 // ── Mouse down: start drag ───────────────────────────────────
 canvas.addEventListener('mousedown', e => {
-    // POV mode: only allow display lateral drag
+    // POV mode: display drag or viewer pan
     if (state.viewMode === 'pov') {
         const rect = canvas.getBoundingClientRect();
         const mx = e.clientX - rect.left;
@@ -232,6 +235,12 @@ canvas.addEventListener('mousedown', e => {
             dragDisplayPOVStartOffset = state.displayOffsetX;
             dragDisplayPOVStartElev = state.displayElev;
             canvas.style.cursor = 'grabbing';
+            pushHistory();
+        } else {
+            isDraggingViewerOffset = true;
+            dragViewerOffsetStartX = mx;
+            dragViewerOffsetStartVal = state.viewerOffset;
+            canvas.style.cursor = 'ew-resize';
             pushHistory();
         }
         return;
@@ -318,6 +327,23 @@ canvas.addEventListener('mousemove', e => {
         return;
     }
 
+    if (isDraggingViewerOffset) {
+        const rect = canvas.getBoundingClientRect();
+        const mx = e.clientX - rect.left;
+        const s = 1000 / Math.max(1, state.viewerDist);
+        // Drag right → content moves right → viewer offset decreases (camera pans left)
+        let nv = dragViewerOffsetStartVal - (mx - dragViewerOffsetStartX) / s;
+        const minOff = parseFloat(DOM['viewer-offset'].min);
+        const maxOff = parseFloat(DOM['viewer-offset'].max);
+        nv = Math.round(Math.max(minOff, Math.min(maxOff, nv)) * 2) / 2;
+        state.viewerOffset = nv;
+        DOM['viewer-offset'].value = nv;
+        DOM['val-viewer-offset'].textContent = formatFtIn(nv);
+        updateSliderTrack(DOM['viewer-offset']);
+        scheduleRender();
+        return;
+    }
+
     if (isDraggingTableId === null && !isDraggingCenter && !isDraggingDisplay && !isDraggingRotate) return;
     const { mx, my, ppf, ox, ry, wt, tableX_px, ty2 } = getDragMetrics(e);
 
@@ -389,6 +415,7 @@ canvas.addEventListener('mouseup', () => {
     isDraggingCenter = false;
     isDraggingDisplay = false; dragDisplayOffsetX = 0;
     isDraggingDisplayPOV = false; dragDisplayPOVStartX = 0; dragDisplayPOVStartY = 0; dragDisplayPOVStartOffset = 0; dragDisplayPOVStartElev = 0;
+    isDraggingViewerOffset = false; dragViewerOffsetStartX = 0; dragViewerOffsetStartVal = 0;
     isDraggingRotate = false; isDraggingRotateTableId = null;
     canvas.style.cursor = '';
     serializeToHash();
@@ -399,8 +426,26 @@ canvas.addEventListener('mouseleave', () => {
     isDraggingCenter = false;
     isDraggingDisplay = false; dragDisplayOffsetX = 0;
     isDraggingDisplayPOV = false; dragDisplayPOVStartX = 0; dragDisplayPOVStartY = 0; dragDisplayPOVStartOffset = 0; dragDisplayPOVStartElev = 0;
+    isDraggingViewerOffset = false; dragViewerOffsetStartX = 0; dragViewerOffsetStartVal = 0;
     isDraggingRotate = false; isDraggingRotateTableId = null;
     canvas.style.cursor = '';
     mousePos = { x: -9999, y: -9999 };
     if (state.showViewAngle) scheduleRender();
 });
+
+// ── Scroll wheel: adjust viewer distance in POV mode ─────────
+canvas.addEventListener('wheel', e => {
+    if (state.viewMode !== 'pov') return;
+    e.preventDefault();
+    const step = 0.5;
+    const delta = e.deltaY > 0 ? step : -step;
+    const minDist = parseFloat(DOM['viewer-dist'].min);
+    const maxDist = parseFloat(DOM['viewer-dist'].max);
+    const nv = Math.round(Math.max(minDist, Math.min(maxDist, state.viewerDist + delta)) * 2) / 2;
+    state.viewerDist = nv;
+    DOM['viewer-dist'].value = nv;
+    DOM['val-viewer-dist'].textContent = formatFtIn(nv);
+    updateSliderTrack(DOM['viewer-dist']);
+    debouncedPushHistory();
+    scheduleRender();
+}, { passive: false });

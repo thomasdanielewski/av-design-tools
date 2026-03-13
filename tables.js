@@ -215,6 +215,50 @@ function checkMicRange() {
     }
 }
 
+function getTableCorners(tbl) {
+    const cx = tbl.x;
+    const cy = tbl.dist + tbl.length / 2;
+    const hw = tbl.width / 2;
+    const hl = tbl.length / 2;
+    const angle = tbl.rotation * Math.PI / 180;
+    const cos = Math.cos(angle);
+    const sin = Math.sin(angle);
+    return [[-hw, -hl], [hw, -hl], [hw, hl], [-hw, hl]].map(([lx, ly]) => [
+        cx + lx * cos - ly * sin,
+        cy + lx * sin + ly * cos
+    ]);
+}
+
+function tablesOverlap(a, b) {
+    if (a.rotation === 0 && b.rotation === 0) {
+        return !(
+            a.x + a.width / 2 <= b.x - b.width / 2 ||
+            a.x - a.width / 2 >= b.x + b.width / 2 ||
+            a.dist + a.length <= b.dist ||
+            a.dist >= b.dist + b.length
+        );
+    }
+    // SAT for rotated tables
+    const polyA = getTableCorners(a);
+    const polyB = getTableCorners(b);
+    for (const poly of [polyA, polyB]) {
+        for (let i = 0; i < poly.length; i++) {
+            const [x1, y1] = poly[i];
+            const [x2, y2] = poly[(i + 1) % poly.length];
+            const nx = -(y2 - y1), ny = x2 - x1;
+            const len = Math.sqrt(nx * nx + ny * ny);
+            if (!len) continue;
+            const ax = nx / len, ay = ny / len;
+            let minA = Infinity, maxA = -Infinity;
+            let minB = Infinity, maxB = -Infinity;
+            for (const [x, y] of polyA) { const p = x * ax + y * ay; if (p < minA) minA = p; if (p > maxA) maxA = p; }
+            for (const [x, y] of polyB) { const p = x * ax + y * ay; if (p < minB) minB = p; if (p > maxB) maxB = p; }
+            if (maxA <= minB || maxB <= minA) return false;
+        }
+    }
+    return true;
+}
+
 function checkRoomWarnings() {
     const w = DOM['room-warning'];
     const t = DOM['room-warning-text'];
@@ -231,6 +275,18 @@ function checkRoomWarnings() {
             issues.push(`${prefix}extends ${formatFtIn(tableEnd)} but room is only ${formatFtIn(state.roomLength)} deep.`);
         }
     });
+
+    if (multi) {
+        for (let i = 0; i < state.tables.length; i++) {
+            for (let j = i + 1; j < state.tables.length; j++) {
+                const a = state.tables[i];
+                const b = state.tables[j];
+                if (tablesOverlap(a, b)) {
+                    issues.push(`T${a.id} and T${b.id} overlap.`);
+                }
+            }
+        }
+    }
 
     if (issues.length) {
         t.innerHTML = issues.join('<br>');
