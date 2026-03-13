@@ -66,6 +66,12 @@ function updateElementControls(el) {
     DOM['element-width'].value = el.width;
     DOM['val-element-position'].textContent = formatValue(el.position, 'ft');
     DOM['val-element-width'].textContent = formatValue(el.width, 'ft');
+    // Show Flip Swing button only for doors
+    const isDoor = el.type === 'door';
+    DOM['swing-flip-row'].style.display = isDoor ? '' : 'none';
+    if (isDoor) {
+        DOM['flip-swing-btn'].textContent = el.swingInverted ? '⇄ Flip Swing (inverted)' : '⇄ Flip Swing';
+    }
     updateElementSliderRanges();
 }
 
@@ -80,7 +86,8 @@ function addDoor() {
         type: 'door',
         wall: 'south',
         position: Math.max(0, (wallLen - DOOR_WIDTH_DEFAULT) / 2),
-        width: DOOR_WIDTH_DEFAULT
+        width: DOOR_WIDTH_DEFAULT,
+        swingInverted: false
     };
     state.structuralElements.push(el);
     state.selectedElementId = newId;
@@ -182,26 +189,38 @@ function onElementWidthInput() {
     scheduleBackgroundRender();
 }
 
+/** Toggle the swing direction of the selected door */
+function flipSwing() {
+    const el = getSelectedElement();
+    if (!el || el.type !== 'door') return;
+    el.swingInverted = !el.swingInverted;
+    DOM['flip-swing-btn'].textContent = el.swingInverted ? '⇄ Flip Swing (inverted)' : '⇄ Flip Swing';
+    pushHistory();
+    scheduleBackgroundRender();
+}
+
 /**
  * Get door swing circle info in room coordinate space (feet).
  * Returns { cx, cy, radius } where cx/cy are relative to room top-left.
+ * The hinge is at the start (normal) or far end (inverted) of the opening.
  */
 function getDoorSwingCircle(el) {
     const radius = el.width;
+    const inv = el.swingInverted;
     let cx, cy;
 
     if (el.wall === 'north') {
-        cx = el.position; // hinge at left edge of opening
-        cy = 0;           // along north wall
+        cx = inv ? el.position + el.width : el.position;
+        cy = 0;
     } else if (el.wall === 'south') {
-        cx = el.position;
+        cx = inv ? el.position + el.width : el.position;
         cy = state.roomLength;
     } else if (el.wall === 'west') {
         cx = 0;
-        cy = el.position;
+        cy = inv ? el.position + el.width : el.position;
     } else { // east
         cx = state.roomWidth;
-        cy = el.position;
+        cy = inv ? el.position + el.width : el.position;
     }
 
     return { cx, cy, radius };
