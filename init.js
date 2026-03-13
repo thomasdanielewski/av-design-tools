@@ -123,6 +123,11 @@ document.querySelectorAll('[data-action="set-posture"]').forEach(btn => {
     btn.addEventListener('click', () => setPosture(btn.dataset.val));
 });
 
+// ── Unit toggle ─────────────────────────────────────────────
+document.querySelectorAll('[data-action="set-units"]').forEach(btn => {
+    btn.addEventListener('click', () => setUnits(btn.dataset.val));
+});
+
 // ── Download, Export, Import ─────────────────────────────────
 document.getElementById('download-btn').addEventListener('click', downloadLayout);
 document.getElementById('export-btn').addEventListener('click', exportConfig);
@@ -194,6 +199,17 @@ document.getElementById('theme-toggle')?.addEventListener('click', toggleTheme);
 // ── Initialization ───────────────────────────────────────────
 
 initTheme();
+
+// Load saved unit preference from localStorage
+const savedUnits = localStorage.getItem('av-planner-units');
+if (savedUnits === 'metric' || savedUnits === 'imperial') {
+    state.units = savedUnits;
+    DOM['unit-toggle'].querySelectorAll('.toggle-btn').forEach(b => {
+        const isActive = b.dataset.val === savedUnits;
+        b.classList.toggle('active', isActive);
+        b.setAttribute('aria-pressed', isActive);
+    });
+}
 
 setBrand('neat');
 initGroups();

@@ -214,7 +214,10 @@ function checkMicRange() {
         // Warn user: mic can't reach the table's far edge
         w.classList.add('visible');
         b.classList.remove('resolved');
-        t.textContent = `Table far edge is ${(fe - eq.micRange).toFixed(1)} ft beyond the ${eq.name}'s ${eq.micRange} ft mic range.`;
+        const excess = fe - eq.micRange;
+        const exStr = state.units === 'metric' ? formatMetric(convertToMetric(excess)) : `${excess.toFixed(1)} ft`;
+        const rangeStr = state.units === 'metric' ? formatMetric(convertToMetric(eq.micRange)) : `${eq.micRange} ft`;
+        t.textContent = `Table far edge is ${exStr} beyond the ${eq.name}'s ${rangeStr} mic range.`;
         b.innerHTML = `<span>+</span> Add ${cn} for extended coverage`;
         b.addEventListener('click', enableCompanion, { once: true });
     } else if (ex && state.includeCenter) {

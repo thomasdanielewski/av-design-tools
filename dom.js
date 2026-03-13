@@ -55,7 +55,8 @@ function cacheDOMRefs() {
         'element-list', 'structural-controls',
         'element-wall', 'element-position', 'element-width',
         'val-element-position', 'val-element-width',
-        'swing-flip-row', 'flip-swing-btn'
+        'swing-flip-row', 'flip-swing-btn',
+        'unit-toggle'
     ];
     ids.forEach(id => { DOM[id] = document.getElementById(id); });
 }

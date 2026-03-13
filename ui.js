@@ -171,6 +171,22 @@ function setPosture(p) {
     render();
 }
 
+/** Set the unit system (imperial / metric) */
+function setUnits(u) {
+    state.units = u;
+    localStorage.setItem('av-planner-units', u);
+    DOM['unit-toggle']
+        .querySelectorAll('.toggle-btn')
+        .forEach(b => {
+            const isActive = b.dataset.val === u;
+            b.classList.toggle('active', isActive);
+            b.setAttribute('aria-pressed', isActive);
+        });
+    // Re-sync all slider value badges
+    syncUIFromState();
+    render();
+}
+
 // ── Collapsible Control Groups ───────────────────────────────
 
 function collapseGroup(el) {

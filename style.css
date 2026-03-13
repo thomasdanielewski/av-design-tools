@@ -334,6 +334,19 @@ body {
     font-weight: 400;
 }
 
+.sidebar-header .unit-toggle {
+    margin-top: var(--space-sm);
+    margin-left: 42px;
+    max-width: 160px;
+}
+
+.sidebar-header .unit-toggle .toggle-btn {
+    padding: 5px 10px;
+    font-size: var(--text-sm);
+    font-family: var(--font-mono);
+    letter-spacing: 0.02em;
+}
+
 .sidebar-scroll {
     flex: 1;
     overflow-y: auto;
@@ -2113,6 +2126,10 @@ select:focus-visible {
 
     .sidebar-header p {
         padding-left: 32px;
+    }
+
+    .sidebar-header .unit-toggle {
+        margin-left: 32px;
     }
 }
 

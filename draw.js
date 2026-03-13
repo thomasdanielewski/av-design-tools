@@ -720,7 +720,9 @@ function drawScaleBar(rx, ry, rl, ppf) {
     const bx = rx + margin;
     const by = ry + rl - margin - 1;
     const tickH = 5;
-    const barLabel = `${barFt} ft`;
+    const barLabel = state.units === 'metric'
+        ? formatMetric(convertToMetric(barFt))
+        : `${barFt} ft`;
 
     // Background pill for legibility
     const pillW = barPx + 2;

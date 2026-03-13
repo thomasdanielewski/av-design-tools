@@ -5,9 +5,38 @@ function deg2rad(d) {
     return d * Math.PI / 180;
 }
 
+/** Convert feet to metres */
+function convertToMetric(ft) {
+    return ft * 0.3048;
+}
+
+/** Convert inches to centimetres */
+function convertInToMetric(inches) {
+    return inches * 2.54;
+}
+
+/** Format a metric value (in metres) as a human-readable string.
+ *  Values < 1 m → "XX cm", values >= 1 m → "X.XX m" */
+function formatMetric(m) {
+    if (Math.abs(m) < 1) {
+        const cm = Math.round(m * 100);
+        return `${cm} cm`;
+    }
+    return `${m.toFixed(2)} m`;
+}
+
+/** Format a metric value (in cm) as a human-readable string */
+function formatMetricCm(cm) {
+    if (Math.abs(cm) >= 100) {
+        return `${(cm / 100).toFixed(2)} m`;
+    }
+    return `${Math.round(cm)} cm`;
+}
+
 /** Format a decimal-foot value as X' Y" (e.g. 8.5 → 8' 6") — cached */
 const _ftInCache = new Map();
 function formatFtIn(v) {
+    if (state.units === 'metric') return formatMetric(convertToMetric(v));
     let r = _ftInCache.get(v);
     if (r !== undefined) return r;
     const s = v < 0 ? '-' : '';
@@ -22,8 +51,12 @@ function formatFtIn(v) {
 
 /** Centralized value formatter — returns the correct string for any unit */
 function formatValue(v, unit) {
-    if (unit === 'in') return `${v}"`;
     if (unit === 'deg') return `${v}°`;
+    if (state.units === 'metric') {
+        if (unit === 'in') return formatMetricCm(convertInToMetric(v));
+        return formatMetric(convertToMetric(v));
+    }
+    if (unit === 'in') return `${v}"`;
     return formatFtIn(v);
 }
 

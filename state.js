@@ -17,7 +17,8 @@ const state = {
     viewerDist: 12, viewerOffset: 0,
     posture: 'seated',
     structuralElements: [],
-    selectedElementId: null
+    selectedElementId: null,
+    units: 'imperial'
 };
 
 // ── Undo / Redo ──────────────────────────────────────────────
@@ -224,4 +225,13 @@ function syncUIFromState() {
 
     // Structural elements
     syncStructuralUI();
+
+    // Unit toggle
+    DOM['unit-toggle']
+        .querySelectorAll('.toggle-btn')
+        .forEach(b => {
+            const isActive = b.dataset.val === state.units;
+            b.classList.toggle('active', isActive);
+            b.setAttribute('aria-pressed', isActive);
+        });
 }
