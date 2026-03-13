@@ -46,8 +46,15 @@ function drawDisplayPOV(x, y, w, h) {
  * @param {number} facingAngle - Angle the device faces (radians)
  */
 /** Shared helper: draw a single coverage arc (full-circle or sector). */
-function _drawCoverageArc(devX, devY, radius, facingAngle, arcDeg, fillColor, strokeColor, lineWidth, dashPattern) {
-    ctx.fillStyle = fillColor;
+function _drawCoverageArc(devX, devY, radius, facingAngle, arcDeg, fillColor, strokeColor, lineWidth, dashPattern, gradientStops) {
+    // Set fill: radial gradient heatmap or flat color
+    if (gradientStops) {
+        const grad = ctx.createRadialGradient(devX, devY, 0, devX, devY, radius);
+        for (const [offset, color] of gradientStops) grad.addColorStop(offset, color);
+        ctx.fillStyle = grad;
+    } else {
+        ctx.fillStyle = fillColor;
+    }
     ctx.strokeStyle = strokeColor;
     ctx.lineWidth = lineWidth;
 
@@ -55,9 +62,11 @@ function _drawCoverageArc(devX, devY, radius, facingAngle, arcDeg, fillColor, st
         ctx.beginPath();
         ctx.arc(devX, devY, radius, 0, Math.PI * 2);
         ctx.fill();
-        ctx.setLineDash(dashPattern);
-        ctx.stroke();
-        ctx.setLineDash([]);
+        if (!gradientStops) {
+            ctx.setLineDash(dashPattern);
+            ctx.stroke();
+            ctx.setLineDash([]);
+        }
     } else {
         const ha = deg2rad(arcDeg / 2);
         ctx.beginPath();
@@ -66,28 +75,35 @@ function _drawCoverageArc(devX, devY, radius, facingAngle, arcDeg, fillColor, st
         ctx.closePath();
         ctx.fill();
 
-        ctx.setLineDash(dashPattern);
-        ctx.beginPath();
-        ctx.arc(devX, devY, radius, facingAngle - ha, facingAngle + ha);
-        ctx.stroke();
+        if (!gradientStops) {
+            ctx.setLineDash(dashPattern);
+            ctx.beginPath();
+            ctx.arc(devX, devY, radius, facingAngle - ha, facingAngle + ha);
+            ctx.stroke();
 
-        // Radial edge lines
-        ctx.beginPath();
-        ctx.moveTo(devX, devY);
-        ctx.lineTo(devX + Math.cos(facingAngle - ha) * radius, devY + Math.sin(facingAngle - ha) * radius);
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.moveTo(devX, devY);
-        ctx.lineTo(devX + Math.cos(facingAngle + ha) * radius, devY + Math.sin(facingAngle + ha) * radius);
-        ctx.stroke();
-        ctx.setLineDash([]);
+            // Radial edge lines
+            ctx.beginPath();
+            ctx.moveTo(devX, devY);
+            ctx.lineTo(devX + Math.cos(facingAngle - ha) * radius, devY + Math.sin(facingAngle - ha) * radius);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(devX, devY);
+            ctx.lineTo(devX + Math.cos(facingAngle + ha) * radius, devY + Math.sin(facingAngle + ha) * radius);
+            ctx.stroke();
+            ctx.setLineDash([]);
+        }
     }
 }
 
 function drawCoverage(devX, devY, device, facingAngle) {
     if (state.showMic) {
         _drawCoverageArc(devX, devY, device.micRange * ppf_g, facingAngle,
-            device.micArc, 'rgba(74, 222, 128, 0.08)', 'rgba(74, 222, 128, 0.20)', 1, [4, 4]);
+            device.micArc, null, null, 0, [], [
+                [0,   'rgba(74, 222, 128, 0.18)'],
+                [0.35, 'rgba(74, 222, 128, 0.10)'],
+                [0.7, 'rgba(74, 222, 128, 0.04)'],
+                [1,   'rgba(74, 222, 128, 0)']
+            ]);
     }
 
     if (state.showCamera && device.cameraFOV > 0) {
