@@ -244,6 +244,25 @@ function setPosture(p) {
     }
 }
 
+/** Update pov-yaw slider range based on current camera and perspective, clamping value if needed. */
+function applyPovYawConstraint() {
+    const slider = DOM['pov-yaw'];
+    if (!slider) return;
+    const eq = EQUIPMENT[state.videoBar];
+    const limit = (state.povPerspective === 'camera' && eq && eq.cameraFOV)
+        ? eq.cameraFOV / 2
+        : 180;
+    slider.min = -limit;
+    slider.max = limit;
+    const clamped = Math.max(-limit, Math.min(limit, state.povYaw));
+    if (clamped !== state.povYaw) {
+        state.povYaw = clamped;
+        slider.value = clamped;
+        DOM['val-pov-yaw'].textContent = formatValue(clamped, 'deg');
+        updateSliderTrack(slider);
+    }
+}
+
 /** Set POV perspective (audience / camera) */
 function setPovPerspective(p) {
     state.povPerspective = p;
@@ -260,13 +279,14 @@ function setPovPerspective(p) {
         el.style.display = p === 'camera' ? 'none' : '';
     });
 
-    // Reset yaw to 0 when switching to camera mode
+    // Reset yaw to 0 when switching to camera mode, then apply range constraint
     if (p === 'camera') {
         state.povYaw = 0;
         DOM['pov-yaw'].value = 0;
         DOM['val-pov-yaw'].textContent = '0°';
         updateSliderTrack(DOM['pov-yaw']);
     }
+    applyPovYawConstraint();
 
     if (!_suppressHistory) pushHistory('changed POV perspective');
     render();

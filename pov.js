@@ -713,6 +713,82 @@ function renderPOV(cw, ch, dpr) {
         }
     });
 
+    // ── Draw seated human silhouettes around tables ──────
+    if (state.seatingDensity !== 'none') {
+        const seatFill = 'rgba(128,128,128,0.15)';
+        const seatStroke = 'none';
+        // Silhouette dimensions (inches)
+        const SEATED_EYE = 48;        // seated eye height
+        const HEAD_R_IN = 4.5;        // head radius
+        const SHOULDER_W_IN = 18;     // shoulder width
+        const SHOULDER_H_IN = 10;     // shoulder drop from neck
+        const NECK_H_IN = 3;          // neck height above shoulders
+        const TORSO_TOP_IN = SEATED_EYE - HEAD_R_IN - NECK_H_IN;
+        const TORSO_BOT_IN = TORSO_TOP_IN - SHOULDER_H_IN;
+
+        state.tables.forEach(t => {
+            const chairs = getChairPositions(t);
+            if (!chairs.length) return;
+            const { px: tPX, pz: tPZ, rotOffset } = tableToPOV(t);
+            const tAngle = (t.rotation + rotOffset) * Math.PI / 180;
+            const cosT = Math.cos(tAngle), sinT = Math.sin(tAngle);
+
+            chairs.forEach(ch => {
+                // Transform chair local coords (ch.x, ch.y) into POV-space
+                const wx = tPX + ch.x * cosT - ch.y * sinT;
+                const wz = tPZ + ch.x * sinT + ch.y * cosT;
+
+                // Facing angle in POV space
+                const faceAngle = ch.angle + tAngle;
+                const cosF = Math.cos(faceAngle), sinF = Math.sin(faceAngle);
+
+                // Shoulder half-width in feet
+                const shHW = (SHOULDER_W_IN / 2) / 12;
+
+                // Helper: point at given height and lateral offset (positive = right)
+                function pt(heightIn, lateralFt) {
+                    return {
+                        x: wx + lateralFt * sinF,
+                        yIn: heightIn,
+                        z: wz - lateralFt * cosF
+                    };
+                }
+
+                // Smooth body profile: [heightIn, halfWidthFt] from bottom to top
+                const bodyProfile = [
+                    [TORSO_BOT_IN,           shHW * 0.65],
+                    [TORSO_BOT_IN + 2.5,     shHW * 0.72],
+                    [TORSO_BOT_IN + 5,       shHW * 0.82],
+                    [TORSO_TOP_IN - 3,       shHW * 0.94],
+                    [TORSO_TOP_IN - 1,       shHW * 0.99],
+                    [TORSO_TOP_IN,           shHW],           // shoulder peak
+                    [TORSO_TOP_IN + 0.5,     shHW * 0.88],
+                    [TORSO_TOP_IN + 1,       shHW * 0.68],
+                    [TORSO_TOP_IN + 1.5,     shHW * 0.48],
+                    [TORSO_TOP_IN + 2,       shHW * 0.35],
+                    [TORSO_TOP_IN + NECK_H_IN, shHW * 0.25],  // top of neck
+                ];
+
+                // Build body outline: right side bottom→top, left side top→bottom
+                const bodyVerts = [];
+                for (const [y, hw] of bodyProfile) bodyVerts.push(pt(y, hw));
+                for (let i = bodyProfile.length - 1; i >= 0; i--) bodyVerts.push(pt(bodyProfile[i][0], -bodyProfile[i][1]));
+                drawPoly(bodyVerts, seatFill, seatStroke, 0);
+
+                // Smooth circular head (16 segments)
+                const headVerts = [];
+                for (let i = 0; i < 16; i++) {
+                    const a = (2 * Math.PI * i) / 16;
+                    headVerts.push(pt(
+                        SEATED_EYE + HEAD_R_IN * Math.sin(a),
+                        (HEAD_R_IN * Math.cos(a)) / 12
+                    ));
+                }
+                drawPoly(headVerts, seatFill, seatStroke, 0);
+            });
+        });
+    }
+
     // ── Draw center companion in POV ─────────────────────
     const thi = state.tableHeight;
 
@@ -1139,6 +1215,38 @@ function renderPOV(cw, ch, dpr) {
         ctx.beginPath();
         ctx.arc(compassCX, compassCY, 2, 0, Math.PI * 2);
         ctx.fill();
+
+        ctx.restore();
+    }
+
+    // ── Camera height badge (camera perspective only) ────
+    if (isCamera) {
+        const lensHtLabel = state.units === 'metric'
+            ? formatMetricCm(convertInToMetric(Math.round(eye)))
+            : `${Math.round(eye)}"`;
+
+        ctx.save();
+        ctx.font = "600 13px 'JetBrains Mono', monospace";
+        const badgeW = ctx.measureText(lensHtLabel).width + 16;
+        const badgeH = 36;
+        const bx = cw - 50; // center-aligned with compass
+        const by = 50 + 28 + 14; // just below compass (compassCY + compassR + gap)
+
+        ctx.fillStyle = cc().surface;
+        ctx.strokeStyle = cc().povBadgeStroke;
+        ctx.lineWidth = 1.5;
+        roundRect(ctx, bx - badgeW / 2, by - badgeH / 2, badgeW, badgeH, 4);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.fillStyle = cc().labelBright;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(lensHtLabel, bx, by - 5);
+
+        ctx.font = "500 9px 'JetBrains Mono', monospace";
+        ctx.fillStyle = cc().label;
+        ctx.fillText('CAM HT', bx, by + 8);
 
         ctx.restore();
     }

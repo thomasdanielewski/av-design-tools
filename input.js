@@ -74,6 +74,8 @@ function bindSelect(id, sk) {
                 DOM['display-size'].value = 65;
                 DOM['val-display-size'].textContent = '65"';
             }
+            // Update yaw range constraint for the new camera
+            applyPovYawConstraint();
         }
 
         const descMap = {

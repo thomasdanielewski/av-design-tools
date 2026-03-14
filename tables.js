@@ -225,6 +225,54 @@ function enableCompanion() {
     render();
 }
 
+function checkMicPodPlacement() {
+    const w = DOM['micpod-placement-warning'];
+    const t = DOM['micpod-placement-warning-text'];
+
+    if (!state.includeMicPod || state.brand !== 'logitech') {
+        w.classList.remove('visible');
+        return;
+    }
+
+    const selT = getSelectedTable();
+    const halfLen = selT.length / 2;
+    const dw = state.displayWall;
+
+    // Distance in feet from the video bar (display wall) to a pod on the table.
+    // micPodPos.y is positive toward the back of the room for north/south walls;
+    // micPodPos.x is used for east/west walls (auto-placement always uses y, so
+    // east/west warnings will reflect actual position).
+    function distFromBar(pos) {
+        if (dw === 'north') return selT.dist + halfLen + pos.y;
+        if (dw === 'south') return state.roomLength - selT.dist - halfLen - pos.y;
+        if (dw === 'west')  return state.roomWidth / 2 + selT.x + pos.x;
+        return state.roomWidth / 2 - selT.x - pos.x; // east
+    }
+
+    const TOL = 1; // ±1 ft tolerance before warning
+    const issues = [];
+    const dist1 = distFromBar(state.micPodPos);
+
+    if (Math.abs(dist1 - 12) > TOL) {
+        issues.push(`Pod 1 is ${dist1.toFixed(1)} ft from the video bar — recommended 12 ft.`);
+    }
+
+    if (state.includeDualMicPod) {
+        const dist2 = distFromBar(state.micPod2Pos);
+        const sep = Math.abs(dist2 - dist1);
+        if (Math.abs(sep - 8) > TOL) {
+            issues.push(`Pods are ${sep.toFixed(1)} ft apart — recommended 8 ft.`);
+        }
+    }
+
+    if (issues.length > 0) {
+        w.classList.add('visible');
+        t.textContent = issues.join(' ');
+    } else {
+        w.classList.remove('visible');
+    }
+}
+
 function checkMicRange() {
     const eq = EQUIPMENT[state.videoBar];
     const fe = state.tableDist + state.tableLength;

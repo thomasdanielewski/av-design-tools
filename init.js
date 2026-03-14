@@ -56,13 +56,18 @@ DOM['micpod-mode'].addEventListener('change', () => {
     state.includeMicPod = val === 'single' || val === 'dual';
     state.includeDualMicPod = val === 'dual';
 
-    // Auto-place mic pods on the table
+    // Auto-place per Logitech spec: first pod 12 ft from video bar, second 8 ft further back.
+    // micPodPos.y is offset in feet from table center (+ = toward back of room).
+    // Distance from bar to pod = selT.dist + selT.length/2 + y  →  y = 12 - selT.dist - halfLen
     const selT = getSelectedTable();
+    const halfLen = selT.length / 2;
+    const clamp = (v) => Math.max(-halfLen, Math.min(halfLen, v));
+    const y1 = clamp(12 - selT.dist - halfLen);
     if (val === 'dual') {
-        state.micPodPos = { x: -selT.width / 4, y: selT.length / 4 };
-        state.micPod2Pos = { x: selT.width / 4, y: -selT.length / 4 };
+        state.micPodPos  = { x: 0, y: y1 };
+        state.micPod2Pos = { x: 0, y: clamp(y1 + 8) };
     } else if (val === 'single') {
-        state.micPodPos = { x: 0, y: selT.length / 4 };
+        state.micPodPos = { x: 0, y: y1 };
     }
 
     pushHistory();

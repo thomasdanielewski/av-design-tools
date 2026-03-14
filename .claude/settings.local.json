@@ -24,7 +24,8 @@
       "Bash(ls -la /c/Users/Thomas/Documents/GitHub/av-design-tools/*.js)",
       "Bash(where node:*)",
       "Bash(where npx:*)",
-      "Bash(where python:*)"
+      "Bash(where python:*)",
+      "Bash(grep -n \"const EQUIPMENT\\\\|^const EQUIPMENT\" /c/Users/Thomas/Documents/GitHub/av-design-tools/*.js)"
     ]
   }
 }

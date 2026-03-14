@@ -577,7 +577,10 @@ function getChairPositions(table) {
         distributeAlongEdge(-hw - gap, semiY, -hw - gap, -hl, Math.PI);
     }
 
-    return chairs;
+    // Filter out chairs on the display-wall side of the table
+    // (between camera/display and table — backs would face the camera)
+    const rot = (table.rotation || 0) * Math.PI / 180;
+    return chairs.filter(ch => Math.sin(ch.angle + rot) >= 0);
 }
 
 /**

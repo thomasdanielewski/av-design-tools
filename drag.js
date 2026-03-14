@@ -1125,16 +1125,23 @@ canvas.addEventListener('mousemove', e => {
         const mx = e.clientX - rect.left;
         // Drag sensitivity: ~0.3 deg per pixel
         let nv = dragPOVYawStartVal + (mx - dragPOVYawStartX) * 0.3;
-        // Wrap to -180..180
-        while (nv > 180) nv -= 360;
-        while (nv < -180) nv += 360;
+        // Clamp to slider range (camera mode restricts to camera FOV, audience allows full ±180)
+        const slider = DOM['pov-yaw'];
+        const limit = slider ? parseFloat(slider.max) : 180;
+        if (state.povPerspective === 'camera') {
+            nv = Math.max(-limit, Math.min(limit, nv));
+        } else {
+            // Wrap to -180..180 for audience mode
+            while (nv > 180) nv -= 360;
+            while (nv < -180) nv += 360;
+        }
         // Snap to nearest 5 degrees
         nv = Math.round(nv / 5) * 5;
         state.povYaw = nv;
-        if (DOM['pov-yaw']) {
-            DOM['pov-yaw'].value = nv;
+        if (slider) {
+            slider.value = nv;
             DOM['val-pov-yaw'].textContent = nv + '°';
-            updateSliderTrack(DOM['pov-yaw']);
+            updateSliderTrack(slider);
         }
         scheduleRender();
         return;

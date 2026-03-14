@@ -44,6 +44,7 @@ function cacheDOMRefs() {
         'display-wall-toggle', 'mount-pos-toggle', 'view-mode-toggle', 'posture-toggle',
         'pov-controls', 'cg-overlays', 'center-label', 'micpod-row', 'micpod-label',
         'mic-warning', 'mic-warning-btn', 'mic-warning-text',
+        'micpod-placement-warning', 'micpod-placement-warning-text',
         'room-warning', 'room-warning-text',
         'seating-density', 'header-capacity',
         'header-room', 'header-device', 'mount-row', 'info-overlay',
