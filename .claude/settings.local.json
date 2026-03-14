@@ -36,7 +36,8 @@
       "Bash(sed -i 's/    --text-secondary: rgba\\(0, 0, 0, 0.55\\);/    --text-secondary: rgba\\(0, 0, 0, 0.50\\);/' \"C:/Users/Thomas/Documents/GitHub/av-design-tools/style.css\")",
       "Bash(sed -i 's/    --text-tertiary: rgba\\(0, 0, 0, 0.30\\);/    --text-tertiary: rgba\\(0, 0, 0, 0.25\\);/' \"C:/Users/Thomas/Documents/GitHub/av-design-tools/style.css\")",
       "Bash(python3 -:*)",
-      "Bash(node -e \":*)"
+      "Bash(node -e \":*)",
+      "Bash(grep -rn \"brand\" *.js)"
     ]
   }
 }
