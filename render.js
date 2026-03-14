@@ -180,8 +180,10 @@ function renderForeground() {
     const centerY = tableY + state.centerPos.y * ppf;
     const center2X = tableX_px + state.center2Pos.x * ppf;
     const center2Y = tableY + state.center2Pos.y * ppf;
-    const micPodX = tableX_px;
-    const micPodY = ry + wallThick + selT.dist * ppf + selT.length * ppf - 0.5 * ppf;
+    const micPodX = tableX_px + state.micPodPos.x * ppf;
+    const micPodY = tableY + state.micPodPos.y * ppf;
+    const micPod2X = tableX_px + state.micPod2Pos.x * ppf;
+    const micPod2Y = tableY + state.micPod2Pos.y * ppf;
 
     // Viewing angle overlay
     if (state.showViewAngle) {
@@ -199,6 +201,9 @@ function renderForeground() {
     }
     if (state.includeMicPod && state.brand === 'logitech') {
         drawCoverage(micPodX, micPodY, micPodEq, 0);
+        if (state.includeDualMicPod) {
+            drawCoverage(micPod2X, micPod2Y, micPodEq, 0);
+        }
     }
 
     // Displays and equipment — use rotated drawing for E/W walls
@@ -207,6 +212,11 @@ function renderForeground() {
 
     drawEquipmentTopDown(dispX, dispY, dispDepthPx, dispWidthPx,
         mainDeviceX, mainDeviceY, eq, eqWidthPx, eqDepthPx, ppf, dispRotation);
+
+    // Mount bracket between video bar and display
+    if (eq.type === 'bar') {
+        drawMountBracket(dispX, dispY, mainDeviceX, mainDeviceY, eqWidthPx, isHoriz, dispRotation);
+    }
 
     // Conference tables
     drawTable(ox, ry, wallThick, ppf);
@@ -226,9 +236,12 @@ function renderForeground() {
         }
     }
 
-    // Mic pod
+    // Mic pod(s)
     if (state.includeMicPod && state.brand === 'logitech') {
-        drawMicPod(micPodX, micPodY, micPodEq, ppf);
+        drawMicPod(micPodX, micPodY, micPodEq, ppf, state.includeDualMicPod ? '1' : null);
+        if (state.includeDualMicPod) {
+            drawMicPod(micPod2X, micPod2Y, micPodEq, ppf, '2');
+        }
     }
 
     // Wall boundary glow (drawn on top while table is pressed against a wall)
@@ -240,6 +253,12 @@ function renderForeground() {
     if (isDraggingTableId !== null && state.showSnap && snapGuides.length > 0) {
         drawSnapGuides(snapGuides, rx, ry, rw, rl, wallThick);
     }
+
+    // Measurement dimension lines (drawn on top of room content)
+    drawMeasurements(ppf);
+
+    // Equipment hover tooltip (drawn last, on top of everything)
+    drawEquipmentTooltip();
 
     // Defer DOM updates to after canvas paint to avoid layout thrashing
     queueMicrotask(() => updateHeaderDOM(eq));

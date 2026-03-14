@@ -11,6 +11,7 @@ const TOAST_DURATION = 4000;
 const DEBOUNCE_HISTORY = 300;
 const DEBOUNCE_RESIZE = 100;
 const DRAG_HINT_DELAY = 800;
+const MAX_MEASUREMENTS = 10;
 const SCALE_BAR_CANDIDATES = [1, 2, 5, 10, 20];
 
 /** Chair spacing in feet per seat (center-to-center) by density */
@@ -41,11 +42,14 @@ const HASH_KEYS = {
     th: 'tableHeight', ts: 'tableShape', tx: 'tableX', tr: 'tableRotation',
     dc: 'displayCount', ds: 'displaySize', de: 'displayElev', dox: 'displayOffsetX', dw: 'displayWall',
     br: 'brand', vb: 'videoBar', mp: 'mountPos',
-    ic: 'includeCenter', idc: 'includeDualCenter', im: 'includeMicPod',
+    ic: 'includeCenter', idc: 'includeDualCenter', im: 'includeMicPod', idm: 'includeDualMicPod',
     sc: 'showCamera', sm: 'showMic', sg: 'showGrid', sv: 'showViewAngle', sn: 'showSnap',
-    vm: 'viewMode', vd: 'viewerDist', vo: 'viewerOffset', py: 'povYaw', po: 'posture',
+    vm: 'viewMode', vd: 'viewerDist', vo: 'viewerOffset', py: 'povYaw', po: 'posture', pp: 'povPerspective',
     cx: 'centerPosX', cy: 'centerPosY',
     c2x: 'center2PosX', c2y: 'center2PosY',
+    mpx: 'micPodPosX', mpy: 'micPodPosY',
+    mp2x: 'micPod2PosX', mp2y: 'micPod2PosY',
     sd: 'seatingDensity',
-    un: 'units'
+    un: 'units',
+    mt: 'measureToolActive'
 };

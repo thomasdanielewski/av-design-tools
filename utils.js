@@ -150,3 +150,38 @@ function scheduleBackgroundRender() {
         renderForeground();
     });
 }
+
+// ── Animation System ─────────────────────────────────────────
+// Global flag: true while any view transition is in progress.
+// Checked by toggle handlers to block interaction during animations.
+let animating = false;
+
+/** Quadratic ease-in-out: smooth acceleration and deceleration */
+function easeInOut(t) {
+    return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+}
+
+/**
+ * Run a requestAnimationFrame-driven animation.
+ * Adds body.animating class to block pointer events during the transition.
+ * @param {number}   duration   Total duration in ms
+ * @param {function} onFrame    Called each frame with raw t (0→1)
+ * @param {function} onComplete Called once after the last frame
+ */
+function runAnimation(duration, onFrame, onComplete) {
+    const start = performance.now();
+    animating = true;
+    document.body.classList.add('animating');
+    function tick(now) {
+        const t = Math.min(1, (now - start) / duration);
+        onFrame(t);
+        if (t < 1) {
+            requestAnimationFrame(tick);
+        } else {
+            animating = false;
+            document.body.classList.remove('animating');
+            if (onComplete) onComplete();
+        }
+    }
+    requestAnimationFrame(tick);
+}

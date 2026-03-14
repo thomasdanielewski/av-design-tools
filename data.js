@@ -102,10 +102,15 @@ const EQUIPMENT = {
     },
     'rally-mic-pod': {
         name: 'Rally Mic Pod', brand: 'logitech',
-        width: 0.33, depth: 0.33, height: 0.07,
+        width: 0.479, depth: 0.479, height: 0.295, // 5.75 × 5.75 × 3.54 in (146 × 146 × 90 mm)
         cameraFOV: 0, cameraRange: 0,
-        micCount: 4, micDesc: '4 omni / 8 beams',
+        micCount: 4, micDesc: '4 omni / 8 acoustic beams',
         micRange: 15, micArc: 360,
+        micFreqResponse: '90Hz–16kHz',
+        micSensitivity: '>-27 dB ±1dB @ 1Pa',
+        micDataRate: '48 kHz',
+        audioProcessing: 'AEC, VAD',
+        noiseSuppression: 'AI filter',
         zoom: 'N/A', resolution: 'N/A',
         sensor: 'N/A', speakers: 'None',
         power: 'Bus', type: 'micpod'

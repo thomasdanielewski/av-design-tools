@@ -1,7 +1,10 @@
 // ── Drawing Helpers (shared by top-down and POV renderers) ───
 
-/** Draw a display rectangle (top-down view) */
-function drawDisplay(x, y, w, h) {
+/** Draw a display rectangle (top-down view) with bezel frame and size label */
+function drawDisplay(x, y, w, h, displaySizeIn) {
+    const bezel = Math.max(1.5, w * 0.015);
+
+    // Outer body with shadow
     ctx.save();
     ctx.shadowColor = cc().displayShadow;
     ctx.shadowBlur = 8;
@@ -11,12 +14,35 @@ function drawDisplay(x, y, w, h) {
     roundRect(ctx, x, y, w, h, 2);
     ctx.fill();
     ctx.restore();
+
+    // Outer stroke
     ctx.strokeStyle = cc().displayStroke;
     ctx.lineWidth = 1;
     roundRect(ctx, x, y, w, h, 2);
     ctx.stroke();
+
+    // Inner screen area
     ctx.fillStyle = cc().displayInner;
-    ctx.fillRect(x + 1.5, y + 1.5, w - 3, h - 3);
+    ctx.fillRect(x + bezel, y + bezel, w - bezel * 2, h - bezel * 2);
+
+    // Bezel edge highlight (subtle depth cue on top/left)
+    ctx.strokeStyle = cc().displayBezel;
+    ctx.lineWidth = 0.5;
+    ctx.beginPath();
+    ctx.moveTo(x + bezel, y + h - bezel);
+    ctx.lineTo(x + bezel, y + bezel);
+    ctx.lineTo(x + w - bezel, y + bezel);
+    ctx.stroke();
+
+    // Display size label centered on screen (e.g., "65"")
+    if (displaySizeIn && w > 30) {
+        const fontSize = Math.max(6, Math.min(10, w * 0.06));
+        ctx.font = `500 ${fontSize}px 'JetBrains Mono', monospace`;
+        ctx.fillStyle = cc().displaySizeLabel;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(displaySizeIn + '\u2033', x + w / 2, y + h / 2);
+    }
 }
 
 /** Draw a display rectangle (POV perspective view) */
@@ -264,20 +290,58 @@ function drawViewAngle(dispX, dispY, rl, ppf, isHovered) {
 }
 
 /**
+ * Draw a small mount bracket indicator between video bar and display.
+ * Drawn in the space between the two devices to show the physical connection.
+ */
+function drawMountBracket(dispX, dispY, mainDeviceX, mainDeviceY, eqWidthPx, isHoriz, rotation) {
+    ctx.save();
+    const midX = (dispX + mainDeviceX) / 2;
+    const midY = (dispY + mainDeviceY) / 2;
+    ctx.translate(midX, midY);
+    if (rotation) ctx.rotate(rotation);
+
+    // Bracket dimensions
+    const bw = Math.min(eqWidthPx * 0.12, 14);
+    const bh = Math.max(2, Math.abs(isHoriz
+        ? (mainDeviceY - dispY) : (mainDeviceX - dispX)) * 0.4);
+
+    // Bracket body
+    ctx.fillStyle = cc().mountBracketFill;
+    ctx.strokeStyle = cc().mountBracket;
+    ctx.lineWidth = 0.8;
+    roundRect(ctx, -bw / 2, -bh / 2, bw, bh, 1);
+    ctx.fill();
+    ctx.stroke();
+
+    // Small screw dots at top and bottom
+    ctx.fillStyle = cc().mountBracket;
+    const dotR = Math.max(0.8, bw * 0.08);
+    ctx.beginPath();
+    ctx.arc(0, -bh / 2 + dotR + 0.5, dotR, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(0, bh / 2 - dotR - 0.5, dotR, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.restore();
+}
+
+/**
  * Draw the displays (top-down view, 1 or 2 screens).
  * @param {number} rotation - Rotation angle in radians (0 for N/S, π/2 for E/W)
  */
 function drawDisplaysTopDown(ox, oy, dispWidthPx, dispDepthPx, eq, eqWidthPx, eqDepthPx, rotation) {
     if (eq.type !== 'board') {
+        const sizeLabel = state.displaySize;
         ctx.save();
         ctx.translate(ox, oy);
         if (rotation) ctx.rotate(rotation);
         if (state.displayCount === 1) {
-            drawDisplay(-dispWidthPx / 2, -dispDepthPx / 2, dispWidthPx, dispDepthPx);
+            drawDisplay(-dispWidthPx / 2, -dispDepthPx / 2, dispWidthPx, dispDepthPx, sizeLabel);
         } else {
             const gap = 8;
-            drawDisplay(-dispWidthPx - gap / 2, -dispDepthPx / 2, dispWidthPx, dispDepthPx);
-            drawDisplay(gap / 2, -dispDepthPx / 2, dispWidthPx, dispDepthPx);
+            drawDisplay(-dispWidthPx - gap / 2, -dispDepthPx / 2, dispWidthPx, dispDepthPx, sizeLabel);
+            drawDisplay(gap / 2, -dispDepthPx / 2, dispWidthPx, dispDepthPx, sizeLabel);
         }
         ctx.restore();
     }
@@ -327,17 +391,19 @@ function drawEquipmentTopDown(dispX, dispY, dispDepthPx, dispWidthPx,
 
         // If dual display, draw secondary screen offset from board
         if (state.displayCount === 2) {
-            drawDisplay(-dispWidthPx / 2, by + eqDepthPx + 4, dispWidthPx, dispDepthPx);
+            drawDisplay(-dispWidthPx / 2, by + eqDepthPx + 4, dispWidthPx, dispDepthPx, state.displaySize);
         }
         ctx.restore();
     } else {
-        // Standard video bar: small rectangle with center lens dot
+        // Standard video bar: detailed rectangle with lens, speaker grilles, brand logo
         ctx.save();
         ctx.translate(mainDeviceX, mainDeviceY);
         if (rotation) ctx.rotate(rotation);
 
         const bx = -eqWidthPx / 2;
         const by = -eqDepthPx / 2;
+
+        // Body with glow
         ctx.save();
         ctx.shadowColor = cc().equipmentGlow;
         ctx.shadowBlur = 8;
@@ -352,11 +418,76 @@ function drawEquipmentTopDown(dispX, dispY, dispDepthPx, dispWidthPx,
         roundRect(ctx, bx, by, eqWidthPx, eqDepthPx, 2);
         ctx.stroke();
 
-        // Lens indicator dot (no glow)
-        ctx.fillStyle = cc().lensDot;
+        // Speaker grilles — thin lines near each end of the bar
+        if (eqWidthPx > 20) {
+            const grilleInset = eqWidthPx * 0.08;
+            const grilleWidth = eqWidthPx * 0.18;
+            const grilleY1 = by + eqDepthPx * 0.25;
+            const grilleY2 = by + eqDepthPx * 0.75;
+            const lineCount = Math.max(2, Math.min(5, Math.floor(grilleWidth / 3)));
+            ctx.strokeStyle = cc().speakerGrille;
+            ctx.lineWidth = 0.7;
+
+            // Left speaker grille
+            for (let i = 0; i < lineCount; i++) {
+                const lx = bx + grilleInset + (grilleWidth / (lineCount - 1 || 1)) * i;
+                ctx.beginPath();
+                ctx.moveTo(lx, grilleY1);
+                ctx.lineTo(lx, grilleY2);
+                ctx.stroke();
+            }
+            // Right speaker grille
+            for (let i = 0; i < lineCount; i++) {
+                const lx = bx + eqWidthPx - grilleInset - grilleWidth + (grilleWidth / (lineCount - 1 || 1)) * i;
+                ctx.beginPath();
+                ctx.moveTo(lx, grilleY1);
+                ctx.lineTo(lx, grilleY2);
+                ctx.stroke();
+            }
+        }
+
+        // Camera lens — detailed multi-ring indicator
+        const lensR = Math.max(2.5, ppf * 0.09);
+        // Outer lens ring
+        ctx.strokeStyle = cc().lensDot;
+        ctx.lineWidth = 0.8;
         ctx.beginPath();
-        ctx.arc(0, 0, Math.max(2, ppf * 0.08), 0, Math.PI * 2);
+        ctx.arc(0, 0, lensR + 1, 0, Math.PI * 2);
+        ctx.stroke();
+        // Lens body
+        const lensGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, lensR);
+        lensGrad.addColorStop(0, cc().lensDot);
+        lensGrad.addColorStop(0.6, cc().lensDot);
+        lensGrad.addColorStop(1, 'rgba(91, 156, 245, 0.25)');
+        ctx.fillStyle = lensGrad;
+        ctx.beginPath();
+        ctx.arc(0, 0, lensR, 0, Math.PI * 2);
         ctx.fill();
+        // Inner lens highlight
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+        ctx.beginPath();
+        ctx.arc(-lensR * 0.25, -lensR * 0.25, lensR * 0.3, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Brand logo area — subtle rounded rect to the right of lens
+        if (eqWidthPx > 30) {
+            const logoW = Math.min(eqWidthPx * 0.12, 18);
+            const logoH = eqDepthPx * 0.35;
+            const logoX = lensR + 4;
+            const logoY = -logoH / 2;
+            ctx.fillStyle = cc().brandLogo;
+            roundRect(ctx, logoX, logoY, logoW, logoH, 1.5);
+            ctx.fill();
+            // Brand initial letter
+            const brandInitial = eq.brand === 'neat' ? 'N' : 'L';
+            const logoFontSize = Math.max(5, Math.min(8, logoH * 0.7));
+            ctx.font = `600 ${logoFontSize}px 'Satoshi', sans-serif`;
+            ctx.fillStyle = cc().brandLogoText;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(brandInitial, logoX + logoW / 2, 0);
+        }
+
         ctx.restore();
     }
 }
@@ -684,25 +815,106 @@ function drawTable(ox, ry, wallThick, ppf) {
 
 /**
  * Draw the center companion device (Neat Center / Logitech Sight).
+ * Neat Center: rectangular screen+camera form factor
+ * Logitech Sight: circular puck with camera lens
  */
 function drawCenterDevice(centerX, centerY, centerEq, ppf, dualLabel) {
     const cSize = Math.max(12, centerEq.width * ppf * 3);
 
-    // Device body (circle)
-    ctx.fillStyle = cc().surface;
-    ctx.strokeStyle = cc().centerStroke;
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.arc(centerX, centerY, cSize / 2, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
+    if (centerEq.brand === 'logitech') {
+        // ── Logitech Sight: circular puck shape ──
+        // Outer puck body
+        ctx.fillStyle = cc().surface;
+        ctx.strokeStyle = cc().centerStroke;
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, cSize / 2, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
 
-    // Inner ring
-    ctx.strokeStyle = cc().centerInner;
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.arc(centerX, centerY, cSize / 3, 0, Math.PI * 2);
-    ctx.stroke();
+        // Inner ring (device edge detail)
+        ctx.strokeStyle = cc().centerInner;
+        ctx.lineWidth = 0.8;
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, cSize * 0.38, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // Camera lens — two concentric lenses with gradient
+        const lensR = cSize * 0.2;
+        const lensGrad = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, lensR);
+        lensGrad.addColorStop(0, cc().sightLens);
+        lensGrad.addColorStop(0.7, cc().sightLens);
+        lensGrad.addColorStop(1, 'rgba(91, 156, 245, 0.15)');
+        ctx.fillStyle = lensGrad;
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, lensR, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Lens highlight
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.12)';
+        ctx.beginPath();
+        ctx.arc(centerX - lensR * 0.25, centerY - lensR * 0.25, lensR * 0.3, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Second lens dot (Sight has dual 4K lens) offset to the side
+        const lens2X = centerX + cSize * 0.15;
+        const lens2Y = centerY - cSize * 0.15;
+        const lens2R = lensR * 0.45;
+        ctx.fillStyle = cc().sightLens;
+        ctx.beginPath();
+        ctx.arc(lens2X, lens2Y, lens2R, 0, Math.PI * 2);
+        ctx.fill();
+    } else {
+        // ── Neat Center: cylindrical form factor (top-down view) ──
+        // Based on actual dimensions: 3.3" (84mm) diameter, 11.7" (297mm) tall
+        // In top-down view, it appears as a circle with a camera slot
+
+        const bodyR = cSize / 2;
+
+        // Outer cylindrical body
+        ctx.fillStyle = cc().surface;
+        ctx.strokeStyle = cc().centerStroke;
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, bodyR, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+
+        // Subtle inner ring (body edge detail)
+        ctx.strokeStyle = cc().centerInner;
+        ctx.lineWidth = 0.6;
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, bodyR * 0.88, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // Camera slot (elongated pill shape on one side)
+        const slotW = bodyR * 0.35;
+        const slotH = bodyR * 1.1;
+        const slotX = centerX - slotW / 2;
+        const slotY = centerY - slotH / 2 - bodyR * 0.1;
+        ctx.fillStyle = cc().centerScreen;
+        roundRect(ctx, slotX, slotY, slotW, slotH, slotW / 2);
+        ctx.fill();
+
+        // Camera lens dot at top of slot
+        const camLensR = slotW * 0.3;
+        const lensGrad = ctx.createRadialGradient(
+            centerX, slotY + slotW / 2 + camLensR * 0.5, 0,
+            centerX, slotY + slotW / 2 + camLensR * 0.5, camLensR
+        );
+        lensGrad.addColorStop(0, cc().sightLens);
+        lensGrad.addColorStop(1, 'rgba(91, 156, 245, 0.15)');
+        ctx.fillStyle = lensGrad;
+        ctx.beginPath();
+        ctx.arc(centerX, slotY + slotW / 2 + camLensR * 0.5, camLensR, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Lens highlight
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+        ctx.beginPath();
+        ctx.arc(centerX - camLensR * 0.2, slotY + slotW / 2 + camLensR * 0.2, camLensR * 0.25, 0, Math.PI * 2);
+        ctx.fill();
+    }
 
     // Label beneath
     ctx.font = `400 ${Math.max(7, ppf * 0.22)}px 'JetBrains Mono', monospace`;
@@ -712,7 +924,8 @@ function drawCenterDevice(centerX, centerY, centerEq, ppf, dualLabel) {
     const label = dualLabel
         ? centerEq.name.split(' ').pop() + ' ' + dualLabel
         : centerEq.name.split(' ').pop();
-    ctx.fillText(label, centerX, centerY + cSize / 2 + 3);
+    const labelY = centerY + cSize / 2 + 3;
+    ctx.fillText(label, centerX, labelY);
 }
 
 /**
@@ -774,11 +987,14 @@ function drawDualCenterDistance(c1x, c1y, c2x, c2y, ppf) {
 
 /**
  * Draw the Rally Mic Pod device.
+ * Based on actual dimensions: 5.75" (146mm) diameter, 3.54" (90mm) height
+ * Circular puck with fabric texture and center mute button.
  */
-function drawMicPod(micPodX, micPodY, micPodEq, ppf) {
-    const ms = Math.max(10, micPodEq.width * ppf * 4);
+function drawMicPod(micPodX, micPodY, micPodEq, ppf, dualLabel) {
+    // Use multiplier 2 — actual width is 0.479 ft (5.75"), keeping visual size proportional
+    const ms = Math.max(10, micPodEq.width * ppf * 2);
 
-    // Outer ring
+    // Outer body (fabric-covered puck)
     ctx.fillStyle = cc().surface;
     ctx.strokeStyle = cc().micPodStroke;
     ctx.lineWidth = 1.5;
@@ -787,18 +1003,51 @@ function drawMicPod(micPodX, micPodY, micPodEq, ppf) {
     ctx.fill();
     ctx.stroke();
 
-    // Center dot
-    ctx.fillStyle = cc().micPodDot;
+    // Fabric texture ring (subtle pattern)
+    ctx.strokeStyle = cc().micPodFabric || cc().micPodStroke;
+    ctx.lineWidth = 0.5;
     ctx.beginPath();
-    ctx.arc(micPodX, micPodY, ms / 4, 0, Math.PI * 2);
+    ctx.arc(micPodX, micPodY, ms * 0.44, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(micPodX, micPodY, ms * 0.38, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Center mute button (circular with ring)
+    const btnR = ms * 0.18;
+    // Button ring
+    ctx.strokeStyle = cc().micPodDot;
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.arc(micPodX, micPodY, btnR, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Mute icon (small mic symbol)
+    ctx.fillStyle = cc().micPodDot;
+    const iconS = btnR * 0.5;
+    ctx.beginPath();
+    ctx.arc(micPodX, micPodY - iconS * 0.3, iconS * 0.4, Math.PI, 0);
+    ctx.lineTo(micPodX + iconS * 0.4, micPodY + iconS * 0.1);
+    ctx.lineTo(micPodX - iconS * 0.4, micPodY + iconS * 0.1);
+    ctx.closePath();
     ctx.fill();
+    // Mic stand
+    ctx.strokeStyle = cc().micPodDot;
+    ctx.lineWidth = 0.8;
+    ctx.beginPath();
+    ctx.moveTo(micPodX, micPodY + iconS * 0.1);
+    ctx.lineTo(micPodX, micPodY + iconS * 0.5);
+    ctx.moveTo(micPodX - iconS * 0.3, micPodY + iconS * 0.5);
+    ctx.lineTo(micPodX + iconS * 0.3, micPodY + iconS * 0.5);
+    ctx.stroke();
 
     // Label beneath
     ctx.font = `400 ${Math.max(7, ppf * 0.22)}px 'JetBrains Mono', monospace`;
     ctx.fillStyle = cc().label;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
-    ctx.fillText('Mic Pod', micPodX, micPodY + ms / 2 + 3);
+    const label = dualLabel ? 'Mic Pod ' + dualLabel : 'Mic Pod';
+    ctx.fillText(label, micPodX, micPodY + ms / 2 + 3);
 }
 
 /**
@@ -1176,4 +1425,185 @@ function drawSnapGuides(guides, rx, ry, rw, rl, wt) {
     }
     ctx.setLineDash([]);
     ctx.restore();
+}
+
+/**
+ * Draw all measurement dimension lines (architectural style).
+ * Each measurement has perpendicular end ticks, a connecting line, and a label.
+ */
+function drawMeasurements(ppf) {
+    if (!state.measurements || state.measurements.length === 0) return;
+    const isMetric = state.units === 'metric';
+
+    for (const m of state.measurements) {
+        const p1 = roomFtToCanvasPx(m.x1, m.y1);
+        const p2 = roomFtToCanvasPx(m.x2, m.y2);
+        const dx = p2.cx - p1.cx;
+        const dy = p2.cy - p1.cy;
+        const len = Math.sqrt(dx * dx + dy * dy);
+        if (len < 2) continue;
+
+        // Unit vector along line and perpendicular
+        const ux = dx / len, uy = dy / len;
+        const nx = -uy, ny = ux;
+
+        const tickH = Math.max(5, ppf * 0.15);
+        const labelOffset = Math.max(12, ppf * 0.35);
+
+        ctx.save();
+
+        // ── Dimension line ──
+        ctx.strokeStyle = cc().label;
+        ctx.lineWidth = Math.max(1, ppf * 0.04);
+        ctx.setLineDash([]);
+
+        // Main line between endpoints
+        ctx.beginPath();
+        ctx.moveTo(p1.cx, p1.cy);
+        ctx.lineTo(p2.cx, p2.cy);
+        ctx.stroke();
+
+        // Perpendicular ticks at endpoints
+        ctx.lineWidth = Math.max(1, ppf * 0.05);
+        ctx.beginPath();
+        ctx.moveTo(p1.cx + nx * tickH, p1.cy + ny * tickH);
+        ctx.lineTo(p1.cx - nx * tickH, p1.cy - ny * tickH);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(p2.cx + nx * tickH, p2.cy + ny * tickH);
+        ctx.lineTo(p2.cx - nx * tickH, p2.cy - ny * tickH);
+        ctx.stroke();
+
+        // ── Label ──
+        const distFt = measureDistanceFt(m);
+        const label = isMetric ? formatMetric(convertToMetric(distFt)) : formatFtIn(distFt);
+        const fontSize = Math.max(9, ppf * 0.28);
+        ctx.font = `600 ${fontSize}px 'JetBrains Mono', monospace`;
+        const textW = ctx.measureText(label).width;
+        const pad = 4;
+        const pillW = textW + pad * 2;
+        const pillH = fontSize + pad * 2;
+
+        // Position label at midpoint, offset perpendicular to line
+        const midX = (p1.cx + p2.cx) / 2;
+        const midY = (p1.cy + p2.cy) / 2;
+        const lblX = midX + nx * labelOffset;
+        const lblY = midY + ny * labelOffset;
+
+        // Background pill
+        ctx.fillStyle = cc().scaleBarPill;
+        roundRect(ctx, lblX - pillW / 2, lblY - pillH / 2, pillW, pillH, 3);
+        ctx.fill();
+
+        // Label text
+        ctx.fillStyle = cc().label;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(label, lblX, lblY);
+
+        // ── Delete button (small X circle) ──
+        const btnR = 6;
+        const btnX = lblX + pillW / 2 + btnR + 2;
+        const btnY = lblY;
+        ctx.fillStyle = 'rgba(239, 68, 68, 0.75)';
+        ctx.beginPath();
+        ctx.arc(btnX, btnY, btnR, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+        ctx.lineWidth = 1.5;
+        const xOff = 3;
+        ctx.beginPath();
+        ctx.moveTo(btnX - xOff, btnY - xOff);
+        ctx.lineTo(btnX + xOff, btnY + xOff);
+        ctx.moveTo(btnX + xOff, btnY - xOff);
+        ctx.lineTo(btnX - xOff, btnY + xOff);
+        ctx.stroke();
+
+        ctx.setLineDash([]);
+        ctx.restore();
+    }
+
+    // Draw pending measurement preview (rubber-band)
+    if (state.measureToolActive && _measurePending && _measureHoverPx) {
+        const p1 = roomFtToCanvasPx(_measurePending.x1, _measurePending.y1);
+        ctx.save();
+        ctx.strokeStyle = cc().snapGuide;
+        ctx.lineWidth = Math.max(1, ppf * 0.04);
+        ctx.setLineDash([4, 3]);
+        ctx.beginPath();
+        ctx.moveTo(p1.cx, p1.cy);
+        ctx.lineTo(_measureHoverPx.x, _measureHoverPx.y);
+        ctx.stroke();
+
+        // Show live distance
+        const hover = canvasPxToRoomFt(_measureHoverPx.x, _measureHoverPx.y);
+        const dx2 = hover.x - _measurePending.x1;
+        const dy2 = hover.y - _measurePending.y1;
+        const distFt2 = Math.sqrt(dx2 * dx2 + dy2 * dy2);
+        const label2 = isMetric ? formatMetric(convertToMetric(distFt2)) : formatFtIn(distFt2);
+        const midX2 = (p1.cx + _measureHoverPx.x) / 2;
+        const midY2 = (p1.cy + _measureHoverPx.y) / 2;
+        const fontSize2 = Math.max(9, ppf * 0.28);
+        ctx.font = `600 ${fontSize2}px 'JetBrains Mono', monospace`;
+        ctx.fillStyle = cc().label;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'bottom';
+        ctx.fillText(label2, midX2, midY2 - 6);
+
+        ctx.setLineDash([]);
+        ctx.restore();
+    }
+}
+
+/**
+ * Draw a hover tooltip showing device name + key spec.
+ * Positioned near the mouse cursor, offset to avoid covering the device.
+ */
+function drawEquipmentTooltip() {
+    if (!hoveredEquipment) return;
+    const { name, spec, x, y } = hoveredEquipment;
+
+    const nameFontSize = 11;
+    const specFontSize = 9;
+    const pad = 8;
+    const gap = 3;
+
+    ctx.font = `600 ${nameFontSize}px 'Satoshi', sans-serif`;
+    const nameW = ctx.measureText(name).width;
+    ctx.font = `400 ${specFontSize}px 'JetBrains Mono', monospace`;
+    const specW = ctx.measureText(spec).width;
+
+    const pillW = Math.max(nameW, specW) + pad * 2;
+    const pillH = nameFontSize + specFontSize + gap + pad * 2;
+
+    // Position tooltip above and to the right of the cursor
+    let tx = x + 14;
+    let ty = y - pillH - 8;
+
+    // Background pill
+    ctx.save();
+    ctx.shadowColor = 'rgba(0,0,0,0.25)';
+    ctx.shadowBlur = 6;
+    ctx.fillStyle = cc().tooltipBg;
+    roundRect(ctx, tx, ty, pillW, pillH, 5);
+    ctx.fill();
+    ctx.restore();
+
+    // Border
+    ctx.strokeStyle = cc().equipmentStrokeBright;
+    ctx.lineWidth = 0.5;
+    roundRect(ctx, tx, ty, pillW, pillH, 5);
+    ctx.stroke();
+
+    // Device name
+    ctx.font = `600 ${nameFontSize}px 'Satoshi', sans-serif`;
+    ctx.fillStyle = cc().tooltipText;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    ctx.fillText(name, tx + pad, ty + pad);
+
+    // Spec line
+    ctx.font = `400 ${specFontSize}px 'JetBrains Mono', monospace`;
+    ctx.fillStyle = cc().tooltipSpec;
+    ctx.fillText(spec, tx + pad, ty + pad + nameFontSize + gap);
 }

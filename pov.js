@@ -1,5 +1,9 @@
 // ── First-Person POV Renderer (360° Yaw) ─────────────────────
 
+// Animated eye height override — set by setPosture() during smooth transitions.
+// When non-null, renderPOV uses this instead of the state.posture-derived value.
+let _animEyeHeight = null;
+
 function renderPOV(cw, ch, dpr) {
     // ── Canvas sizing ────────────────────────────────────
     canvas.width = cw * dpr;
@@ -27,16 +31,44 @@ function renderPOV(cw, ch, dpr) {
     // ── Viewer parameters ────────────────────────────────
     const screenCX = cw / 2;
     const screenCY = ch / 2;
-    const vd = Math.max(1, state.viewerDist);
-    const vo = state.viewerOffset;
-    const eye = state.posture === 'seated' ? 48 : 65;
     const hY = screenCY;
     const FOCAL = 1000;
     const NEAR = 0.3;
 
-    // Yaw angle: 0 = facing display wall, positive = turn right (degrees → radians)
+    const isCamera = state.povPerspective === 'camera';
+    let vd, vo, eye;
+
+    if (isCamera) {
+        // Camera perspective: viewpoint at the equipment lens
+        const eq_cam = EQUIPMENT[state.videoBar];
+        const dhi_cam = state.displaySize * 0.49;
+        const dyc_cam = state.displayElev;
+        const dyt_cam = dyc_cam + dhi_cam / 2;
+        const dyb_cam = dyc_cam - dhi_cam / 2;
+        const ehi_cam = eq_cam.height * 12;
+
+        // Calculate lens height (same logic as dvc below)
+        if (eq_cam.type === 'board') {
+            eye = dyt_cam - 1.5;
+        } else if (state.mountPos === 'above') {
+            eye = dyt_cam + ehi_cam / 2 + 2;
+        } else {
+            eye = dyb_cam - ehi_cam / 2 - 2;
+        }
+
+        vd = eq_cam.depth || 0.15; // camera sits at depth of equipment from wall
+        vo = state.displayOffsetX;
+    } else {
+        vd = Math.max(1, state.viewerDist);
+        vo = state.viewerOffset;
+        eye = _animEyeHeight !== null ? _animEyeHeight : (state.posture === 'seated' ? 48 : 65);
+    }
+
+    // Yaw angle: 0 = facing display wall (audience) or facing room (camera)
     const yawDeg = state.povYaw || 0;
-    const yaw = yawDeg * Math.PI / 180;
+    // Camera faces into the room (180° offset from audience)
+    const effectiveYawDeg = isCamera ? yawDeg + 180 : yawDeg;
+    const yaw = effectiveYawDeg * Math.PI / 180;
     const cosY = Math.cos(yaw);
     const sinY = Math.sin(yaw);
 
@@ -526,38 +558,6 @@ function renderPOV(cw, ch, dpr) {
     const dyb = dyc - dhi / 2;
     const dox = state.displayOffsetX;
 
-    // ── Display screen glow (behind display rectangles) ──
-    {
-        const isDark = (document.documentElement.getAttribute('data-theme') || 'dark') === 'dark';
-        const drawDisplayGlow = (x, y, w, h) => {
-            if (w <= 0 || h <= 0) return;
-            const cx = x + w / 2, cy = y + h / 2;
-            const gr = Math.max(w, h) * 0.9;
-            const gg = ctx.createRadialGradient(cx, cy, 0, cx, cy, gr);
-            gg.addColorStop(0, isDark ? 'rgba(91,156,245,0.20)' : 'rgba(91,156,245,0.10)');
-            gg.addColorStop(0.45, isDark ? 'rgba(160,200,255,0.07)' : 'rgba(120,170,255,0.04)');
-            gg.addColorStop(1, 'rgba(91,156,245,0)');
-            ctx.save();
-            ctx.fillStyle = gg;
-            ctx.beginPath();
-            ctx.ellipse(cx, cy, gr, gr * 0.65, 0, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.restore();
-        };
-        if (state.displayCount === 1) {
-            const ga = proj(-dwf / 2 + dox, dyt, dz);
-            const gb = proj(dwf / 2 + dox, dyb, dz);
-            if (ga && gb) drawDisplayGlow(ga.x, ga.y, gb.x - ga.x, gb.y - ga.y);
-        } else {
-            const gap = 0.5;
-            const ga = proj(-dwf - gap / 2 + dox, dyt, dz);
-            const gb = proj(-gap / 2 + dox, dyb, dz);
-            if (ga && gb) drawDisplayGlow(ga.x, ga.y, gb.x - ga.x, gb.y - ga.y);
-            const gc = proj(gap / 2 + dox, dyt, dz);
-            const gd = proj(dwf + gap / 2 + dox, dyb, dz);
-            if (gc && gd) drawDisplayGlow(gc.x, gc.y, gd.x - gc.x, gd.y - gc.y);
-        }
-    }
 
     // ── Draw displays ────────────────────────────────────
     // Only draw if display wall is in front of viewer
@@ -649,8 +649,10 @@ function renderPOV(cw, ch, dpr) {
     }
 
     // ── Draw all tables in perspective ───────────────────
+    const TABLE_APRON = 1.5; // inches — visible edge thickness
     state.tables.forEach(t => {
         const thi_t = t.height;
+        const tBot = thi_t - TABLE_APRON;
         const { px: tPovX, pz: tPovZ, rotOffset } = tableToPOV(t);
         const angle_t = (t.rotation + rotOffset) * Math.PI / 180;
         const cos_t = Math.cos(angle_t), sin_t = Math.sin(angle_t);
@@ -660,42 +662,52 @@ function renderPOV(cw, ch, dpr) {
             return { x: tPovX + lx * cos_t - lz * sin_t, z: tPovZ + lx * sin_t + lz * cos_t };
         }
 
+        // Helper: draw apron edge between two perimeter points
+        const isDark = (document.documentElement.getAttribute('data-theme') || 'dark') === 'dark';
+        const apronFill = isDark ? 'rgba(45,47,55,0.85)' : 'rgba(170,172,180,0.55)';
+        function drawEdge(p1, p2) {
+            drawPoly([
+                { x: p1.x, yIn: thi_t, z: p1.z },
+                { x: p2.x, yIn: thi_t, z: p2.z },
+                { x: p2.x, yIn: tBot, z: p2.z },
+                { x: p1.x, yIn: tBot, z: p1.z }
+            ], apronFill, cc().tableStroke, 1);
+        }
+
         if (t.shape === 'oval' || t.shape === 'circle') {
-            // Approximate ellipse/circle with a polygon in POV-space
             const SEGS = 32;
-            const ovalVerts = [];
+            const ovalPts = [];
             for (let i = 0; i < SEGS; i++) {
                 const theta = (2 * Math.PI * i) / SEGS;
-                const lx = hw * Math.cos(theta);
-                const lz = hl * Math.sin(theta);
-                const p = rcPOV(lx, lz);
-                ovalVerts.push({ x: p.x, yIn: thi_t, z: p.z });
+                ovalPts.push(rcPOV(hw * Math.cos(theta), hl * Math.sin(theta)));
             }
+            // Apron edges
+            for (let i = 0; i < SEGS; i++) drawEdge(ovalPts[i], ovalPts[(i + 1) % SEGS]);
+            // Top surface
+            const ovalVerts = ovalPts.map(p => ({ x: p.x, yIn: thi_t, z: p.z }));
             drawPoly(ovalVerts, cc().surface, cc().tableStroke, 2);
         } else if (t.shape === 'd-shape') {
-            // Flat top edge + semicircular bottom
             const SEGS = 16;
-            const dVerts = [];
-            // Top-left to top-right (straight edge)
-            dVerts.push(rcPOV(-hw, -hl));
-            dVerts.push(rcPOV(+hw, -hl));
-            // Right side down to semicircle start
+            const dPts = [];
+            dPts.push(rcPOV(-hw, -hl));
+            dPts.push(rcPOV(+hw, -hl));
             const semiCenterZ = hl - hw;
-            dVerts.push(rcPOV(+hw, semiCenterZ));
-            // Semicircle from right (0) to left (PI)
+            dPts.push(rcPOV(+hw, semiCenterZ));
             for (let i = 0; i <= SEGS; i++) {
                 const theta = (Math.PI * i) / SEGS;
-                const lx = hw * Math.cos(theta);
-                const lz = semiCenterZ + hw * Math.sin(theta);
-                dVerts.push(rcPOV(lx, lz));
+                dPts.push(rcPOV(hw * Math.cos(theta), semiCenterZ + hw * Math.sin(theta)));
             }
-            // Left side back up
-            dVerts.push(rcPOV(-hw, -hl));
-            const dVertsPOV = dVerts.map(c => ({ x: c.x, yIn: thi_t, z: c.z }));
+            dPts.push(rcPOV(-hw, -hl));
+            // Apron edges
+            for (let i = 0; i < dPts.length - 1; i++) drawEdge(dPts[i], dPts[i + 1]);
+            // Top surface
+            const dVertsPOV = dPts.map(c => ({ x: c.x, yIn: thi_t, z: c.z }));
             drawPoly(dVertsPOV, cc().surface, cc().tableStroke, 2);
         } else {
-            // Rectangular: 4-corner quad
             const wc = [rcPOV(-hw, -hl), rcPOV(+hw, -hl), rcPOV(+hw, +hl), rcPOV(-hw, +hl)];
+            // Apron edges (4 sides)
+            for (let i = 0; i < 4; i++) drawEdge(wc[i], wc[(i + 1) % 4]);
+            // Top surface
             const verts = wc.map(c => ({ x: c.x, yIn: thi_t, z: c.z }));
             drawPoly(verts, cc().surface, cc().tableStroke, 2);
         }
@@ -814,6 +826,59 @@ function renderPOV(cw, ch, dpr) {
                 0, Math.PI * 2
             );
             ctx.fill();
+        }
+    }
+
+    // ── Draw Rally Mic Pod(s) in POV ─────────────────────
+    if (state.includeMicPod && state.brand === 'logitech') {
+        const mpEq = getMicPodEq();
+        const mpHI = mpEq.height * 12; // 3.54 inches
+        const mpR = mpEq.width / 2;    // 0.24 ft radius
+        const selTPovMP = tableToPOV(getSelectedTable());
+
+        function drawPOVMicPod(mpXOff, mpZ) {
+            // Project the top-center and side-edge to get perspective radius
+            const pC = proj(mpXOff, thi + mpHI, mpZ);
+            const pE = proj(mpXOff + mpR, thi + mpHI, mpZ);
+            if (!pC || !pE) return;
+            const screenR = Math.max(3, Math.abs(pE.x - pC.x));
+
+            // Outer body
+            ctx.fillStyle = cc().surface;
+            ctx.strokeStyle = cc().micPodStroke;
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.arc(pC.x, pC.y, screenR, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+
+            // Fabric rings
+            ctx.strokeStyle = cc().micPodFabric || cc().micPodStroke;
+            ctx.lineWidth = 0.5;
+            ctx.beginPath();
+            ctx.arc(pC.x, pC.y, screenR * 0.75, 0, Math.PI * 2);
+            ctx.stroke();
+
+            // Center mute button
+            ctx.strokeStyle = cc().micPodDot;
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.arc(pC.x, pC.y, screenR * 0.3, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.fillStyle = cc().micPodDot;
+            ctx.beginPath();
+            ctx.arc(pC.x, pC.y, screenR * 0.12, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        const mpX1 = selTPovMP.px + state.micPodPos.x;
+        const mpZ1 = selTPovMP.pz + state.micPodPos.y;
+        drawPOVMicPod(mpX1, mpZ1);
+
+        if (state.includeDualMicPod) {
+            const mpX2 = selTPovMP.px + state.micPod2Pos.x;
+            const mpZ2 = selTPovMP.pz + state.micPod2Pos.y;
+            drawPOVMicPod(mpX2, mpZ2);
         }
     }
 
@@ -1022,12 +1087,19 @@ function renderPOV(cw, ch, dpr) {
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillStyle = cc().label || 'rgba(180,180,180,0.6)';
-        const cardinals = [
-            { label: 'F', angle: 0 },
-            { label: 'R', angle: Math.PI / 2 },
-            { label: 'B', angle: Math.PI },
-            { label: 'L', angle: -Math.PI / 2 }
-        ];
+        const cardinals = isCamera
+            ? [
+                { label: 'B', angle: 0 },
+                { label: 'L', angle: Math.PI / 2 },
+                { label: 'F', angle: Math.PI },
+                { label: 'R', angle: -Math.PI / 2 }
+            ]
+            : [
+                { label: 'F', angle: 0 },
+                { label: 'R', angle: Math.PI / 2 },
+                { label: 'B', angle: Math.PI },
+                { label: 'L', angle: -Math.PI / 2 }
+            ];
         for (const c of cardinals) {
             const cx2 = compassCX + Math.sin(c.angle) * (compassR - 8);
             const cy2 = compassCY - Math.cos(c.angle) * (compassR - 8);
@@ -1037,7 +1109,8 @@ function renderPOV(cw, ch, dpr) {
         // Direction indicator (arrow showing where viewer is looking)
         ctx.strokeStyle = cc().accent || 'rgba(91, 156, 245, 0.8)';
         ctx.lineWidth = 2;
-        const arrowAngle = yaw; // 0 = up (toward display/front)
+        // Use user-facing yaw for compass (not the 180° offset)
+        const arrowAngle = isCamera ? (yawDeg + 180) * Math.PI / 180 : yaw;
         const ax = compassCX + Math.sin(arrowAngle) * (compassR - 14);
         const ay = compassCY - Math.cos(arrowAngle) * (compassR - 14);
         ctx.beginPath();
@@ -1073,8 +1146,14 @@ function renderPOV(cw, ch, dpr) {
     // ── Update DOM ───────────────────────────────────────
     const wallLabel = { north: 'N', south: 'S', east: 'E', west: 'W' }[dw];
     const yawLabel = yawDeg !== 0 ? ` yaw ${yawDeg}°` : '';
-    DOM['header-room'].textContent =
-        `POV: ${formatFtIn(vd)} from display (${wallLabel})${yawLabel}`;
+    if (isCamera) {
+        const lensHt = state.units === 'metric' ? formatMetricCm(convertInToMetric(Math.round(eye))) : `${Math.round(eye)}"`;
+        DOM['header-room'].textContent =
+            `Camera View: lens at ${lensHt} (${wallLabel})${yawLabel}`;
+    } else {
+        DOM['header-room'].textContent =
+            `POV: ${formatFtIn(vd)} from display (${wallLabel})${yawLabel}`;
+    }
     const povCenterSuffix = state.includeDualCenter
         ? ' + 2× ' + EQUIPMENT[getCenterEqKey()].name
         : (state.includeCenter ? ' + ' + EQUIPMENT[getCenterEqKey()].name : '');

@@ -50,8 +50,26 @@ DOM['center-mode'].addEventListener('change', () => {
     render();
 });
 
+// ── Wire up mic pod mode select ──────────────────────────────
+DOM['micpod-mode'].addEventListener('change', () => {
+    const val = DOM['micpod-mode'].value;
+    state.includeMicPod = val === 'single' || val === 'dual';
+    state.includeDualMicPod = val === 'dual';
+
+    // Auto-place mic pods on the table
+    const selT = getSelectedTable();
+    if (val === 'dual') {
+        state.micPodPos = { x: -selT.width / 4, y: selT.length / 4 };
+        state.micPod2Pos = { x: selT.width / 4, y: -selT.length / 4 };
+    } else if (val === 'single') {
+        state.micPodPos = { x: 0, y: selT.length / 4 };
+    }
+
+    pushHistory();
+    render();
+});
+
 // ── Wire up checkboxes ───────────────────────────────────────
-bindCheckbox('include-micpod', 'includeMicPod');
 bindCheckbox('show-view-angle', 'showViewAngle');
 bindCheckbox('show-camera', 'showCamera');
 bindCheckbox('show-mic', 'showMic');
@@ -147,6 +165,11 @@ document.querySelectorAll('[data-action="set-posture"]').forEach(btn => {
     btn.addEventListener('click', () => setPosture(btn.dataset.val));
 });
 
+// ── POV perspective toggle ──────────────────────────────────
+document.querySelectorAll('[data-action="set-pov-perspective"]').forEach(btn => {
+    btn.addEventListener('click', () => setPovPerspective(btn.dataset.val));
+});
+
 // ── Unit toggle ─────────────────────────────────────────────
 document.querySelectorAll('[data-action="set-units"]').forEach(btn => {
     btn.addEventListener('click', () => setUnits(btn.dataset.val));
@@ -177,6 +200,9 @@ document.querySelector('[data-action="redo"]').addEventListener('click', redo);
 // ── Share button ─────────────────────────────────────────────
 document.querySelector('[data-action="share"]').addEventListener('click', copyShareLink);
 
+// ── Measure tool button ─────────────────────────────────────
+document.querySelector('[data-action="toggle-measure"]').addEventListener('click', toggleMeasureTool);
+
 // ── Keyboard shortcuts for undo/redo ─────────────────────────
 document.addEventListener('keydown', e => {
     if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
@@ -186,6 +212,21 @@ document.addEventListener('keydown', e => {
     if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) {
         e.preventDefault();
         redo();
+    }
+    // Delete selected measurement
+    if (e.key === 'Delete' && _selectedMeasureId !== null) {
+        removeMeasurement(_selectedMeasureId);
+        _selectedMeasureId = null;
+    }
+    // Escape cancels measure tool or pending measurement
+    if (e.key === 'Escape' && state.measureToolActive) {
+        if (_measurePending) {
+            _measurePending = null;
+            _measureHoverPx = null;
+            scheduleRender();
+        } else {
+            toggleMeasureTool();
+        }
     }
 });
 
@@ -250,6 +291,7 @@ if (window.innerWidth <= 900) {
 const hadHash = loadFromHash();
 if (hadHash) {
     syncUIFromState();
+    syncMeasureNextId();
 }
 
 render();

@@ -176,7 +176,14 @@ function getDragMetrics(e) {
         mainDeviceY = dispY;
     }
 
+    // Mic pod positions
+    const mpX = tableX_px + state.micPodPos.x * ppf;
+    const mpY = ty2 + state.micPodPos.y * ppf;
+    const mp2X = tableX_px + state.micPod2Pos.x * ppf;
+    const mp2Y = ty2 + state.micPod2Pos.y * ppf;
+
     return { mx, my, ppf, ox, oy, rw, rl, rx, ry, wt, ty2, tableX_px, cX, cY, c2X, c2Y,
+             mpX, mpY, mp2X, mp2Y,
              dispOx: dispX, dispY, dispWidthPx, dispDepthPx, eqWidthPx, eqDepthPx,
              mainDeviceX, mainDeviceY, isHoriz };
 }
@@ -269,7 +276,7 @@ canvas.addEventListener('mousemove', e => {
         return;
     }
 
-    if (state.viewMode !== 'top' || isPanning || isDraggingTableId !== null || isDraggingCenter || isDraggingCenter2 || isDraggingDisplay || isDraggingRotate) return;
+    if (state.viewMode !== 'top' || isPanning || isDraggingTableId !== null || isDraggingCenter || isDraggingCenter2 || isDraggingMicPod || isDraggingMicPod2 || isDraggingDisplay || isDraggingRotate) return;
 
     // Space-pan mode: show grab hand, skip normal hit-testing.
     if (isSpaceDown) {
@@ -281,7 +288,7 @@ canvas.addEventListener('mousemove', e => {
         return;
     }
 
-    const { mx, my, ppf, ox, oy, rw, rl, rx, ry, wt, cX, cY, c2X, c2Y, dispOx, dispY, dispWidthPx, dispDepthPx, eqWidthPx, eqDepthPx, mainDeviceX, mainDeviceY, isHoriz } = getDragMetrics(e);
+    const { mx, my, ppf, ox, oy, rw, rl, rx, ry, wt, cX, cY, c2X, c2Y, mpX, mpY, mp2X, mp2Y, dispOx, dispY, dispWidthPx, dispDepthPx, eqWidthPx, eqDepthPx, mainDeviceX, mainDeviceY, isHoriz } = getDragMetrics(e);
 
     // Rotation handle takes cursor priority over table body
     const selT = getSelectedTable();
@@ -294,6 +301,12 @@ canvas.addEventListener('mousemove', e => {
             const cs = Math.max(12, ceq.width * ppf * 3);
             if (Math.sqrt((mx - cX) ** 2 + (my - cY) ** 2) <= cs) onTarget = true;
             if (!onTarget && state.includeDualCenter && Math.sqrt((mx - c2X) ** 2 + (my - c2Y) ** 2) <= cs) onTarget = true;
+        }
+        if (!onTarget && state.includeMicPod && state.brand === 'logitech') {
+            const mpEq = getMicPodEq();
+            const mps = Math.max(10, mpEq.width * ppf * 2);
+            if (Math.sqrt((mx - mpX) ** 2 + (my - mpY) ** 2) <= mps / 2) onTarget = true;
+            if (!onTarget && state.includeDualMicPod && Math.sqrt((mx - mp2X) ** 2 + (my - mp2Y) ** 2) <= mps / 2) onTarget = true;
         }
         if (!onTarget && isPointOnDisplay(mx, my, dispOx, dispY, dispWidthPx, dispDepthPx, eqWidthPx, eqDepthPx, mainDeviceX, mainDeviceY, isHoriz)) {
             onTarget = true;
@@ -308,10 +321,78 @@ canvas.addEventListener('mousemove', e => {
                 if (hitTestStructuralElement(mx, my, el, rx, ry, rw, rl, ppf, wt)) { onTarget = true; break; }
             }
         }
+        if (!onTarget && state.measurements.length > 0) {
+            if (hitTestMeasureDelete(mx, my) !== null) onTarget = 'delete';
+            else if (hitTestMeasureLine(mx, my)) onTarget = 'measure';
+        }
     }
 
-    canvas.style.cursor = onRotateHandle ? 'crosshair' : (onTarget ? 'grab' : '');
-    if (state.showViewAngle && (Math.abs(mousePos.x - _lastViewAngleX) > 2 || Math.abs(mousePos.y - _lastViewAngleY) > 2)) {
+    canvas.style.cursor = state.measureToolActive ? 'crosshair'
+        : onRotateHandle ? 'crosshair'
+        : onTarget === 'delete' ? 'pointer'
+        : onTarget === 'measure' ? 'grab'
+        : onTarget ? 'grab' : '';
+
+    // Equipment hover detection for tooltips (generous padding since devices are thin in top-down)
+    let newHover = null;
+    const eq = EQUIPMENT[state.videoBar];
+    const hoverPad = 6; // extra px tolerance for thin devices
+    // Hit test video bar / board
+    if (eq.type === 'bar') {
+        const halfW = (isHoriz ? eqWidthPx / 2 : eqDepthPx / 2) + hoverPad;
+        const halfH = (isHoriz ? eqDepthPx / 2 : eqWidthPx / 2) + hoverPad;
+        if (mx >= mainDeviceX - halfW && mx <= mainDeviceX + halfW &&
+            my >= mainDeviceY - halfH && my <= mainDeviceY + halfH) {
+            newHover = { name: eq.name, spec: eq.cameraFOV + '° FOV', x: mx, y: my };
+        }
+    } else if (eq.type === 'board') {
+        const halfW = (isHoriz ? eqWidthPx / 2 : eqDepthPx / 2) + hoverPad;
+        const halfH = (isHoriz ? eqDepthPx / 2 : eqWidthPx / 2) + hoverPad;
+        if (mx >= dispOx - halfW && mx <= dispOx + halfW &&
+            my >= dispY - halfH && my <= dispY + halfH) {
+            newHover = { name: eq.name, spec: eq.cameraFOV + '° FOV', x: mx, y: my };
+        }
+    }
+    // Hit test display
+    if (!newHover) {
+        const dHalfW = (isHoriz ? dispWidthPx / 2 : dispDepthPx / 2) + hoverPad;
+        const dHalfH = (isHoriz ? dispDepthPx / 2 : dispWidthPx / 2) + hoverPad;
+        if (mx >= dispOx - dHalfW && mx <= dispOx + dHalfW &&
+            my >= dispY - dHalfH && my <= dispY + dHalfH) {
+            newHover = { name: state.displaySize + '\u2033 Display', spec: state.displayCount === 2 ? 'Dual' : 'Single', x: mx, y: my };
+        }
+    }
+    // Hit test center devices
+    if (!newHover && state.includeCenter) {
+        const ceq = EQUIPMENT[getCenterEqKey()];
+        const cs = Math.max(12, ceq.width * ppf * 3);
+        if (Math.sqrt((mx - cX) ** 2 + (my - cY) ** 2) <= cs) {
+            newHover = { name: ceq.name, spec: ceq.cameraFOV + '° FOV', x: mx, y: my };
+        }
+        if (!newHover && state.includeDualCenter && Math.sqrt((mx - c2X) ** 2 + (my - c2Y) ** 2) <= cs) {
+            newHover = { name: ceq.name + ' #2', spec: ceq.cameraFOV + '° FOV', x: mx, y: my };
+        }
+    }
+    // Hit test mic pods
+    if (!newHover && state.includeMicPod && state.brand === 'logitech') {
+        const mpEq = getMicPodEq();
+        const mps = Math.max(10, mpEq.width * ppf * 2);
+        if (Math.sqrt((mx - mpX) ** 2 + (my - mpY) ** 2) <= mps / 2) {
+            newHover = { name: mpEq.name, spec: mpEq.micCount + ' omni mics · ' + mpEq.micRange + ' ft range', x: mx, y: my };
+        }
+        if (!newHover && state.includeDualMicPod && Math.sqrt((mx - mp2X) ** 2 + (my - mp2Y) ** 2) <= mps / 2) {
+            newHover = { name: mpEq.name + ' #2', spec: mpEq.micCount + ' omni mics · ' + mpEq.micRange + ' ft range', x: mx, y: my };
+        }
+    }
+
+    const hoverChanged = (hoveredEquipment === null) !== (newHover === null) ||
+        (hoveredEquipment && newHover && (hoveredEquipment.name !== newHover.name ||
+            Math.abs(hoveredEquipment.x - newHover.x) > 2 || Math.abs(hoveredEquipment.y - newHover.y) > 2));
+    hoveredEquipment = newHover;
+
+    if (hoverChanged) {
+        scheduleRender();
+    } else if (state.showViewAngle && (Math.abs(mousePos.x - _lastViewAngleX) > 2 || Math.abs(mousePos.y - _lastViewAngleY) > 2)) {
         _lastViewAngleX = mousePos.x; _lastViewAngleY = mousePos.y;
         scheduleRender();
     }
@@ -666,6 +747,8 @@ let dragTableOverlap = false;
 let dragDistances = null;
 let isDraggingCenter = false;
 let isDraggingCenter2 = false;
+let isDraggingMicPod = false;
+let isDraggingMicPod2 = false;
 let isDraggingDisplay = false;
 let dragDisplayOffsetX = 0;
 let isDraggingDisplayPOV = false;
@@ -697,6 +780,13 @@ let resizeElementPOVStartHeight = 0;
 let resizeElementPOVStartSill = 0;
 let resizeElementPOVStartPos = 0;
 
+// ── Measurement drag state ───────────────────────────────────
+let isDraggingMeasurement = false;
+let draggingMeasureId = null;
+let dragMeasureOffsetX = 0;
+let dragMeasureOffsetY = 0;
+let _selectedMeasureId = null;
+
 // ── Viewport pan state (middle-click or Space+left-drag) ─────
 let isPanning = false;
 let isSpaceDown = false;
@@ -715,6 +805,8 @@ function resetDrag() {
     dragDistances = null;
     isDraggingCenter = false;
     isDraggingCenter2 = false;
+    isDraggingMicPod = false;
+    isDraggingMicPod2 = false;
     isDraggingDisplay = false; dragDisplayOffsetX = 0;
     isDraggingDisplayPOV = false; dragDisplayPOVStartX = 0; dragDisplayPOVStartY = 0;
     dragDisplayPOVStartOffset = 0; dragDisplayPOVStartElev = 0;
@@ -727,6 +819,8 @@ function resetDrag() {
     isResizingElementPOV = false; resizeElementPOVId = null; resizeElementPOVEdge = null;
     resizeElementPOVStartMouse = 0; resizeElementPOVStartWidth = 0;
     resizeElementPOVStartHeight = 0; resizeElementPOVStartSill = 0; resizeElementPOVStartPos = 0;
+    isDraggingMeasurement = false; draggingMeasureId = null;
+    dragMeasureOffsetX = 0; dragMeasureOffsetY = 0;
 }
 
 // ── Mouse down: start drag ───────────────────────────────────
@@ -741,6 +835,52 @@ canvas.addEventListener('mousedown', e => {
         panStartOffsetY = viewportPanY;
         canvas.style.cursor = 'grabbing';
         return;
+    }
+
+    // Measurement tool interactions (top-down only)
+    if (state.viewMode === 'top' && e.button === 0) {
+        const { mx, my, ppf } = getDragMetrics(e);
+
+        // Check delete button click on any measurement (even when tool not active)
+        const delId = hitTestMeasureDelete(mx, my);
+        if (delId !== null) {
+            removeMeasurement(delId);
+            if (_selectedMeasureId === delId) _selectedMeasureId = null;
+            return;
+        }
+
+        if (state.measureToolActive) {
+            if (!_measurePending) {
+                // First click: set start point
+                const ft = canvasPxToRoomFt(mx, my);
+                _measurePending = { x1: ft.x, y1: ft.y };
+                _measureHoverPx = { x: mx, y: my };
+                scheduleRender();
+            } else {
+                // Second click: complete measurement
+                const ft = canvasPxToRoomFt(mx, my);
+                addMeasurement(_measurePending.x1, _measurePending.y1, ft.x, ft.y);
+                _measurePending = null;
+                _measureHoverPx = null;
+            }
+            return;
+        }
+
+        // Check if clicking on a measurement line to drag it
+        const hitM = hitTestMeasureLine(mx, my);
+        if (hitM) {
+            isDraggingMeasurement = true;
+            draggingMeasureId = hitM.id;
+            _selectedMeasureId = hitM.id;
+            const midFtX = (hitM.x1 + hitM.x2) / 2;
+            const midFtY = (hitM.y1 + hitM.y2) / 2;
+            const midPx = roomFtToCanvasPx(midFtX, midFtY);
+            dragMeasureOffsetX = mx - midPx.cx;
+            dragMeasureOffsetY = my - midPx.cy;
+            canvas.style.cursor = 'grabbing';
+            pushHistory('moved measurement');
+            return;
+        }
     }
 
     // POV mode: display drag, structural element drag, or viewer pan
@@ -822,6 +962,25 @@ canvas.addEventListener('mousedown', e => {
         }
     }
 
+    // Mic pod(s) take priority after center devices
+    if (state.includeMicPod && state.brand === 'logitech') {
+        const mpEq = getMicPodEq();
+        const mps = Math.max(10, mpEq.width * ppf * 2);
+        const { mpX, mpY, mp2X, mp2Y } = getDragMetrics(e);
+        if (state.includeDualMicPod && Math.sqrt((mx - mp2X) ** 2 + (my - mp2Y) ** 2) <= mps / 2) {
+            isDraggingMicPod2 = true;
+            canvas.style.cursor = 'grabbing';
+            pushHistory('moved mic pod');
+            return;
+        }
+        if (Math.sqrt((mx - mpX) ** 2 + (my - mpY) ** 2) <= mps / 2) {
+            isDraggingMicPod = true;
+            canvas.style.cursor = 'grabbing';
+            pushHistory('moved mic pod');
+            return;
+        }
+    }
+
     // Display / video-bar lateral drag
     if (isPointOnDisplay(mx, my, dispOx, dispY, dispWidthPx, dispDepthPx, eqWidthPx, eqDepthPx, mainDeviceX, mainDeviceY, isHoriz)) {
         isDraggingDisplay = true;
@@ -884,6 +1043,32 @@ canvas.addEventListener('mousemove', e => {
         viewportPanY = panStartOffsetY + (e.clientY - panStartY);
         markViewportDirty();
         applyViewportTransform();
+        return;
+    }
+
+    // Measurement tool: update rubber-band preview
+    if (state.measureToolActive && _measurePending && state.viewMode === 'top') {
+        const { mx, my } = getDragMetrics(e);
+        _measureHoverPx = { x: mx, y: my };
+        scheduleRender();
+        return;
+    }
+
+    // Measurement drag
+    if (isDraggingMeasurement && draggingMeasureId !== null) {
+        const { mx, my, ppf } = getDragMetrics(e);
+        const m = state.measurements.find(ms => ms.id === draggingMeasureId);
+        if (m) {
+            const midFtX = (m.x1 + m.x2) / 2;
+            const midFtY = (m.y1 + m.y2) / 2;
+            const newMidPx = { cx: mx - dragMeasureOffsetX, cy: my - dragMeasureOffsetY };
+            const newMidFt = canvasPxToRoomFt(newMidPx.cx, newMidPx.cy);
+            const deltaX = newMidFt.x - midFtX;
+            const deltaY = newMidFt.y - midFtY;
+            m.x1 += deltaX; m.y1 += deltaY;
+            m.x2 += deltaX; m.y2 += deltaY;
+            scheduleRender();
+        }
         return;
     }
 
@@ -1117,7 +1302,7 @@ canvas.addEventListener('mousemove', e => {
         return;
     }
 
-    if (isDraggingTableId === null && !isDraggingCenter && !isDraggingCenter2 && !isDraggingDisplay && !isDraggingRotate && !isDraggingElement) return;
+    if (isDraggingTableId === null && !isDraggingCenter && !isDraggingCenter2 && !isDraggingMicPod && !isDraggingMicPod2 && !isDraggingDisplay && !isDraggingRotate && !isDraggingElement) return;
     const { mx, my, ppf, ox, oy, rw, rl, rx, ry, wt, tableX_px, ty2 } = getDragMetrics(e);
 
     if (isDraggingTableId !== null) {
@@ -1202,6 +1387,22 @@ canvas.addEventListener('mousemove', e => {
         ny = Math.max(-selT.length / 2, Math.min(ny, selT.length / 2));
         state.center2Pos = { x: nx, y: ny };
         scheduleRender();
+    } else if (isDraggingMicPod) {
+        const selT = getSelectedTable();
+        let nx = (mx - tableX_px) / ppf;
+        let ny = (my - ty2) / ppf;
+        nx = Math.max(-selT.width / 2, Math.min(nx, selT.width / 2));
+        ny = Math.max(-selT.length / 2, Math.min(ny, selT.length / 2));
+        state.micPodPos = { x: nx, y: ny };
+        scheduleRender();
+    } else if (isDraggingMicPod2) {
+        const selT = getSelectedTable();
+        let nx = (mx - tableX_px) / ppf;
+        let ny = (my - ty2) / ppf;
+        nx = Math.max(-selT.width / 2, Math.min(nx, selT.width / 2));
+        ny = Math.max(-selT.length / 2, Math.min(ny, selT.length / 2));
+        state.micPod2Pos = { x: nx, y: ny };
+        scheduleRender();
     } else if (isDraggingDisplay) {
         const dw = state.displayWall;
         const isH = (dw === 'north' || dw === 'south');
@@ -1270,6 +1471,7 @@ canvas.addEventListener('mouseleave', () => {
     resetDrag();
     canvas.style.cursor = '';
     mousePos = { x: -9999, y: -9999 };
+    if (hoveredEquipment) { hoveredEquipment = null; scheduleRender(); }
     if (state.showViewAngle) scheduleRender();
 });
 

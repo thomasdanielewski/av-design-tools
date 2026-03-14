@@ -18,7 +18,13 @@
       "Bash(grep -n \"updateCenterModeOptions\\\\|dual.*room\\\\|room.*length\" /c/Users/Thomas/Documents/GitHub/av-design-tools/*.js)",
       "Bash(wc -l C:UsersThomasDocumentsGitHubav-design-tools/*.js C:UsersThomasDocumentsGitHubav-design-toolsstyle.css)",
       "Bash(grep -r \"canvas\\\\|context\\\\|2D\\\\|perspective\\\\|projection\" /c/Users/Thomas/Documents/GitHub/av-design-tools/*.js)",
-      "Bash(xargs wc:*)"
+      "Bash(xargs wc:*)",
+      "Bash(grep -r \"center-mode\" /c/Users/Thomas/Documents/GitHub/av-design-tools/*.js --include=\"*.js\")",
+      "Bash(powershell -Command \"\\(Get-Content drag.js\\) -replace ''Math\\\\.max\\\\\\(14, mpEq\\\\.width \\\\* ppf \\\\* 4\\\\\\)'', ''Math.max\\(10, mpEq.width * ppf * 2\\)'' | Set-Content drag.js\")",
+      "Bash(ls -la /c/Users/Thomas/Documents/GitHub/av-design-tools/*.js)",
+      "Bash(where node:*)",
+      "Bash(where npx:*)",
+      "Bash(where python:*)"
     ]
   }
 }

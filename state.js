@@ -9,18 +9,23 @@ const state = {
     displayCount: 1, displaySize: 65, displayElev: 54, displayOffsetX: 0, displayWall: 'north',
     brand: 'neat', videoBar: 'neat-bar-gen2',
     mountPos: 'below',
-    includeCenter: false, includeDualCenter: false, includeMicPod: false,
+    includeCenter: false, includeDualCenter: false, includeMicPod: false, includeDualMicPod: false,
     showCamera: true, showMic: true,
     showGrid: true, showViewAngle: false, showSnap: true,
     viewMode: 'top',
     centerPos: { x: 0, y: 0 },
     center2Pos: { x: 0, y: 0 },
+    micPodPos: { x: 0, y: 0 },
+    micPod2Pos: { x: 0, y: 0 },
     viewerDist: 12, viewerOffset: 0,
     povYaw: 0,
     posture: 'seated',
+    povPerspective: 'audience',
     structuralElements: [],
     selectedElementId: null,
-    units: 'imperial'
+    units: 'imperial',
+    measurements: [],
+    measureToolActive: false
 };
 
 // ── Undo / Redo ──────────────────────────────────────────────
@@ -104,6 +109,10 @@ function serializeToHash() {
         if (sk === 'centerPosY') { params.set(k, state.centerPos.y.toFixed(2)); continue; }
         if (sk === 'center2PosX') { params.set(k, state.center2Pos.x.toFixed(2)); continue; }
         if (sk === 'center2PosY') { params.set(k, state.center2Pos.y.toFixed(2)); continue; }
+        if (sk === 'micPodPosX') { params.set(k, state.micPodPos.x.toFixed(2)); continue; }
+        if (sk === 'micPodPosY') { params.set(k, state.micPodPos.y.toFixed(2)); continue; }
+        if (sk === 'micPod2PosX') { params.set(k, state.micPod2Pos.x.toFixed(2)); continue; }
+        if (sk === 'micPod2PosY') { params.set(k, state.micPod2Pos.y.toFixed(2)); continue; }
         const v = state[sk];
         if (typeof v === 'boolean') params.set(k, v ? '1' : '0');
         else params.set(k, v);
@@ -114,6 +123,10 @@ function serializeToHash() {
     // Serialize structural elements
     if (state.structuralElements && state.structuralElements.length > 0) {
         params.set('se', JSON.stringify(state.structuralElements));
+    }
+    // Serialize measurements
+    if (state.measurements && state.measurements.length > 0) {
+        params.set('ms', JSON.stringify(state.measurements));
     }
     history.replaceState
         ? window.history.replaceState(null, '', '#' + params.toString())
@@ -132,6 +145,10 @@ function loadFromHash() {
             if (sk === 'centerPosY') { state.centerPos.y = parseFloat(raw); continue; }
             if (sk === 'center2PosX') { state.center2Pos.x = parseFloat(raw); continue; }
             if (sk === 'center2PosY') { state.center2Pos.y = parseFloat(raw); continue; }
+            if (sk === 'micPodPosX') { state.micPodPos.x = parseFloat(raw); continue; }
+            if (sk === 'micPodPosY') { state.micPodPos.y = parseFloat(raw); continue; }
+            if (sk === 'micPod2PosX') { state.micPod2Pos.x = parseFloat(raw); continue; }
+            if (sk === 'micPod2PosY') { state.micPod2Pos.y = parseFloat(raw); continue; }
             if (typeof state[sk] === 'boolean') { state[sk] = raw === '1'; continue; }
             if (typeof state[sk] === 'number') { state[sk] = parseFloat(raw); continue; }
             state[sk] = raw;
@@ -148,6 +165,10 @@ function loadFromHash() {
         // Load structural elements
         if (params.has('se')) {
             try { state.structuralElements = JSON.parse(params.get('se')); } catch (_) {}
+        }
+        // Load measurements
+        if (params.has('ms')) {
+            try { state.measurements = JSON.parse(params.get('ms')); } catch (_) {}
         }
         // Ensure selectedTableId points to an existing table
         if (!state.tables.find(t => t.id === state.selectedTableId)) state.selectedTableId = state.tables[0].id;
@@ -230,18 +251,21 @@ function syncUIFromState() {
     DOM['center-mode'].value = cmVal;
 
     // Checkboxes
-    DOM['include-micpod'].checked = state.includeMicPod;
+    // Mic pod mode select
+    const mpVal = state.includeDualMicPod ? 'dual' : (state.includeMicPod ? 'single' : 'none');
+    if (DOM['micpod-mode']) DOM['micpod-mode'].value = mpVal;
     DOM['show-camera'].checked = state.showCamera;
     DOM['show-mic'].checked = state.showMic;
     DOM['show-grid'].checked = state.showGrid;
     DOM['show-view-angle'].checked = state.showViewAngle;
     if (DOM['show-snap']) DOM['show-snap'].checked = state.showSnap;
 
-    // Display count, wall, posture, view mode
+    // Display count, wall, posture, view mode, perspective
     setDisplayCount(state.displayCount);
     setDisplayWall(state.displayWall);
     setPosture(state.posture);
     setViewMode(state.viewMode);
+    setPovPerspective(state.povPerspective);
 
     // Structural elements
     syncStructuralUI();

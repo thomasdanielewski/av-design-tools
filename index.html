@@ -301,23 +301,13 @@
                             <option value="dual">Dual</option>
                         </select>
                     </div>
-                    <div class="check-row" id="micpod-row" style="display:none">
-                        <span style="display:flex;align-items:center">Rally Mic Pod (Far End)
-                            <div class="tooltip-container" tabindex="0" role="note">
-                                <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
-                                    style="color:var(--text-muted);cursor:help">
-                                    <circle cx="12" cy="12" r="10"></circle>
-                                    <line x1="12" y1="16" x2="12" y2="12"></line>
-                                    <line x1="12" y1="8" x2="12.01" y2="8"></line>
-                                </svg>
-                                <div class="tooltip-text">Places a Rally Mic Pod at the far end of the table for
-                                    enhanced voice pickup. When used with Sight, do not place near the display —
-                                    front-of-room mics already cover that zone.</div>
-                            </div>
-                        </span>
-                        <label class="switch"><input type="checkbox" id="include-micpod"><span
-                                class="slider"></span></label>
+                    <div class="control-row" id="micpod-row" style="display:none">
+                        <div class="control-label"><label for="micpod-mode" id="micpod-label">Rally Mic Pod</label></div>
+                        <select id="micpod-mode">
+                            <option value="none">None</option>
+                            <option value="single">Single</option>
+                            <option value="dual">Dual</option>
+                        </select>
                     </div>
                     <div class="mic-warning" id="mic-warning" aria-live="assertive">
                         <div class="mic-warning-header"><span class="mic-warning-dot"></span> Coverage Warning</div>
@@ -390,13 +380,20 @@
                     </svg></div>
                 <div class="control-group-body">
                     <div class="control-row">
+                        <div class="control-label"><label>Perspective</label></div>
+                        <div class="toggle-group" id="pov-perspective-toggle">
+                            <button class="toggle-btn active" data-val="audience" data-action="set-pov-perspective">Room</button>
+                            <button class="toggle-btn" data-val="camera" data-action="set-pov-perspective">Camera</button>
+                        </div>
+                    </div>
+                    <div class="control-row pov-audience-only">
                         <div class="control-label"><label for="viewer-dist">Viewer Distance</label><span class="value" id="val-viewer-dist"
                                 data-slider="viewer-dist" data-key="viewerDist" data-unit="ft">12'
                                 0"</span>
                         </div>
                         <input type="range" id="viewer-dist" min="1" max="60" step="0.5" value="12">
                     </div>
-                    <div class="control-row">
+                    <div class="control-row pov-audience-only">
                         <div class="control-label"><label for="viewer-offset">Viewer Offset (L/R)</label><span class="value"
                                 id="val-viewer-offset" data-slider="viewer-offset" data-key="viewerOffset"
                                 data-unit="ft">0' 0"</span>
@@ -410,7 +407,7 @@
                         </div>
                         <input type="range" id="pov-yaw" min="-180" max="180" step="5" value="0">
                     </div>
-                    <div class="control-row">
+                    <div class="control-row pov-audience-only">
                         <div class="control-label"><label>Posture</label></div>
                         <div class="toggle-group" id="posture-toggle">
                             <button class="toggle-btn active" data-val="seated"
@@ -454,6 +451,8 @@
                     <button class="redo-btn" id="redo-btn" title="Redo (Ctrl+Shift+Z)" disabled
                         data-action="redo">↪</button>
                 </div>
+                <button class="undo-btn measure-btn" id="measure-btn" title="Measure" data-action="toggle-measure"
+                    style="width:auto;padding:0 10px;font-size:13px;">📏</button>
                 <button class="undo-btn" id="share-btn" title="Copy shareable link" data-action="share"
                     style="width:auto;padding:0 10px;font-size:11px;font-family:var(--font-mono);gap:5px">🔗
                     Share</button>
@@ -530,6 +529,7 @@
     <script src="tables.js?v=3"></script>
     <script src="structural.js?v=3"></script>
     <script src="ui.js?v=3"></script>
+    <script src="measure.js?v=3"></script>
     <script src="draw.js?v=3"></script>
     <script src="render.js?v=3"></script>
     <script src="pov.js?v=3"></script>

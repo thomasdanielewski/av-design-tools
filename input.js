@@ -18,7 +18,7 @@ function syncCircleValue(changedKey, v) {
 
 function bindSlider(id, sk, vl, triggersBg = false) {
     const unit = (sk === 'displaySize' || sk === 'displayElev' || sk === 'tableHeight') ? 'in'
-        : sk === 'tableRotation' ? 'deg'
+        : (sk === 'tableRotation' || sk === 'povYaw') ? 'deg'
         : 'ft';
     (DOM[id] || document.getElementById(id)).addEventListener('input', function () {
         let v = parseFloat(this.value);

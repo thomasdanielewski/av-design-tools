@@ -18,6 +18,9 @@ let ppf_g = 1;
 // Global mouse position in canvas CSS pixels (updated on mousemove)
 let mousePos = { x: 0, y: 0 };
 
+// Hovered equipment info for tooltip display (null or { name, spec, x, y })
+let hoveredEquipment = null;
+
 // Viewport pan and zoom for the top-down view (not persisted to URL/history).
 // Pan is in screen pixels (applied as CSS translate); zoom is a unitless multiplier.
 let viewportZoom = 1.0;
@@ -36,10 +39,10 @@ function cacheDOMRefs() {
         'table-list', 'add-table-btn', 'remove-table-btn',
         'display-size', 'display-elev', 'display-offset-x',
         'viewer-dist', 'viewer-offset', 'table-shape', 'video-bar',
-        'center-mode', 'include-micpod', 'show-camera', 'show-mic',
+        'center-mode', 'micpod-mode', 'show-camera', 'show-mic',
         'show-grid', 'show-view-angle', 'show-snap', 'brand-toggle', 'display-count-toggle',
         'display-wall-toggle', 'mount-pos-toggle', 'view-mode-toggle', 'posture-toggle',
-        'pov-controls', 'cg-overlays', 'center-label', 'micpod-row',
+        'pov-controls', 'cg-overlays', 'center-label', 'micpod-row', 'micpod-label',
         'mic-warning', 'mic-warning-btn', 'mic-warning-text',
         'room-warning', 'room-warning-text',
         'seating-density', 'header-capacity',
@@ -59,7 +62,9 @@ function cacheDOMRefs() {
         'val-element-position', 'val-element-width',
         'val-element-height', 'val-element-sill',
         'swing-flip-row', 'flip-swing-btn',
-        'unit-toggle'
+        'unit-toggle',
+        'measure-btn',
+        'pov-perspective-toggle'
     ];
     ids.forEach(id => { DOM[id] = document.getElementById(id); });
 }

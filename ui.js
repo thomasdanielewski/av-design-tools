@@ -39,7 +39,8 @@ function setBrand(brand) {
     state.includeCenter = false;
     state.includeDualCenter = false;
     state.includeMicPod = false;
-    DOM['include-micpod'].checked = false;
+    state.includeDualMicPod = false;
+    if (DOM['micpod-mode']) DOM['micpod-mode'].value = 'none';
 
     // Update companion label and mic pod visibility
     DOM['center-label'].textContent =
@@ -72,6 +73,9 @@ function setDisplayCount(n) {
 
 /** Set the display wall (north / south / east / west) */
 function setDisplayWall(w) {
+    if (animating) return;
+    const oldWall = state.displayWall;
+
     state.displayWall = w;
     DOM['display-wall-toggle']
         .querySelectorAll('.toggle-btn')
@@ -91,7 +95,29 @@ function setDisplayWall(w) {
         });
     }
     if (!_suppressHistory) pushHistory('changed display wall');
-    render();
+
+    // Animate 90° room rotation in top-down mode (skip during undo/redo)
+    if (state.viewMode === 'top' && oldWall !== w && !_suppressHistory) {
+        const wallAngles = { north: 0, east: 90, south: 180, west: 270 };
+        let delta = wallAngles[w] - wallAngles[oldWall];
+        if (delta > 180) delta -= 360;
+        if (delta < -180) delta += 360;
+
+        // Render the new layout immediately, then animate from old
+        // rotation (−delta) back to 0 so the room visually spins into place
+        render();
+
+        runAnimation(400, (t) => {
+            const angle = -delta * (1 - easeInOut(t));
+            bgCanvas.style.transform = `rotate(${angle}deg)`;
+            canvas.style.transform = `rotate(${angle}deg)`;
+        }, () => {
+            bgCanvas.style.transform = '';
+            canvas.style.transform = '';
+        });
+    } else {
+        render();
+    }
 }
 
 /** Set the bar mount position (above / below display) */
@@ -110,6 +136,9 @@ function setMountPos(p) {
 
 /** Switch between top-down and first-person POV */
 function setViewMode(m) {
+    if (animating) return;
+
+    const changed = state.viewMode !== m;
     state.viewMode = m;
     DOM['view-mode-toggle']
         .querySelectorAll('.toggle-btn')
@@ -146,23 +175,52 @@ function setViewMode(m) {
 
     if (!_suppressHistory) pushHistory('switched view');
 
-    // Animated view transition: zoom-fade out → render → zoom-fade in
-    bgCanvas.style.opacity = '0';
-    bgCanvas.style.transform = 'scale(1.04)';
-    canvas.style.opacity = '0';
-    canvas.style.transform = 'scale(1.04)';
-    setTimeout(() => {
+    // Animated view transition (only on user-initiated changes, not undo/redo)
+    if (changed && !_suppressHistory) {
+        const toPOV = m === 'pov';
+        let rendered = false;
+
+        runAnimation(400, (t) => {
+            if (t < 0.5) {
+                // Phase 1: scale + fade out old view
+                const p = easeInOut(t * 2);
+                const scale = toPOV ? 1 + p * 0.5 : 1 - p * 0.3;
+                bgCanvas.style.transform = `scale(${scale})`;
+                canvas.style.transform = `scale(${scale})`;
+                bgCanvas.style.opacity = 1 - p;
+                canvas.style.opacity = 1 - p;
+            } else {
+                // Render new view once at the midpoint
+                if (!rendered) {
+                    rendered = true;
+                    render();
+                }
+                // Phase 2: fade in new view with a subtle settle scale (0.96→1)
+                const p = easeInOut((t - 0.5) * 2);
+                const settle = 0.96 + p * 0.04;
+                bgCanvas.style.transform = `scale(${settle})`;
+                canvas.style.transform = `scale(${settle})`;
+                bgCanvas.style.opacity = p;
+                canvas.style.opacity = p;
+            }
+        }, () => {
+            bgCanvas.style.transform = '';
+            canvas.style.transform = '';
+            bgCanvas.style.opacity = '1';
+            canvas.style.opacity = '1';
+        });
+    } else {
         render();
-        bgCanvas.style.transform = 'scale(1)';
-        bgCanvas.style.opacity = '1';
-        canvas.style.transform = 'scale(1)';
-        canvas.style.opacity = '1';
-    }, 180);
+    }
 }
 
 /** Set viewer posture (seated / standing) */
 function setPosture(p) {
+    if (animating) return;
+    const oldEye = state.posture === 'seated' ? 48 : 65;
     state.posture = p;
+    const newEye = p === 'seated' ? 48 : 65;
+
     DOM['posture-toggle']
         .querySelectorAll('.toggle-btn')
         .forEach(b => {
@@ -171,6 +229,46 @@ function setPosture(p) {
             b.setAttribute('aria-pressed', isActive);
         });
     if (!_suppressHistory) pushHistory('changed posture');
+
+    // Animate eye height change in POV mode (skip during undo/redo)
+    if (state.viewMode === 'pov' && oldEye !== newEye && !_suppressHistory) {
+        runAnimation(300, (t) => {
+            _animEyeHeight = oldEye + (newEye - oldEye) * easeInOut(t);
+            render();
+        }, () => {
+            _animEyeHeight = null;
+            render();
+        });
+    } else {
+        render();
+    }
+}
+
+/** Set POV perspective (audience / camera) */
+function setPovPerspective(p) {
+    state.povPerspective = p;
+    DOM['pov-perspective-toggle']
+        .querySelectorAll('.toggle-btn')
+        .forEach(b => {
+            const isActive = b.dataset.val === p;
+            b.classList.toggle('active', isActive);
+            b.setAttribute('aria-pressed', isActive);
+        });
+
+    // Hide/show audience-only controls
+    document.querySelectorAll('.pov-audience-only').forEach(el => {
+        el.style.display = p === 'camera' ? 'none' : '';
+    });
+
+    // Reset yaw to 0 when switching to camera mode
+    if (p === 'camera') {
+        state.povYaw = 0;
+        DOM['pov-yaw'].value = 0;
+        DOM['val-pov-yaw'].textContent = '0°';
+        updateSliderTrack(DOM['pov-yaw']);
+    }
+
+    if (!_suppressHistory) pushHistory('changed POV perspective');
     render();
 }
 

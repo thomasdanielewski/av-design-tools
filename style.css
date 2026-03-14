@@ -1245,21 +1245,9 @@ select:focus {
     min-height: 0;
     min-width: 0;
     background:
-        radial-gradient(ellipse at 30% 20%, rgba(91, 156, 245, 0.015) 0%, transparent 60%),
-        radial-gradient(ellipse at 70% 80%, rgba(238, 50, 36, 0.01) 0%, transparent 50%),
         radial-gradient(circle, rgba(255, 255, 255, 0.025) 1px, transparent 1px),
         var(--bg-base);
-    background-size: 100% 100%, 100% 100%, 28px 28px, 100%;
-}
-
-/* Vignette overlay */
-.canvas-container::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-    background: radial-gradient(ellipse at center, transparent 50%, rgba(0, 0, 0, 0.12) 100%);
-    z-index: 1;
+    background-size: 28px 28px, 100%;
 }
 
 /* Stacked canvas layout */
@@ -1285,6 +1273,18 @@ select:focus {
     z-index: 2;
     border-radius: var(--radius);
     transition: opacity 0.2s var(--ease-out), transform 0.2s var(--ease-out);
+}
+
+/* Block all interaction during animated transitions */
+body.animating {
+    pointer-events: none;
+}
+
+/* Disable CSS transitions on canvases during rAF-driven animations
+   so that per-frame style updates apply instantly */
+body.animating #bg-canvas,
+body.animating #fg-canvas {
+    transition: none !important;
 }
 
 
@@ -1400,6 +1400,13 @@ select:focus {
     color: var(--text-tertiary);
     pointer-events: none;
     filter: saturate(0);
+}
+
+.measure-btn.active,
+.measure-btn.active:hover {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
 }
 
 .history-badge {
@@ -1983,15 +1990,9 @@ select:focus {
 
 [data-theme="light"] .canvas-container {
     background:
-        radial-gradient(ellipse at 30% 20%, rgba(91, 156, 245, 0.025) 0%, transparent 60%),
-        radial-gradient(ellipse at 70% 80%, rgba(217, 42, 29, 0.015) 0%, transparent 50%),
         radial-gradient(circle, rgba(0, 0, 0, 0.04) 1px, transparent 1px),
         var(--bg-base);
-    background-size: 100% 100%, 100% 100%, 28px 28px, 100%;
-}
-
-[data-theme="light"] .canvas-container::after {
-    background: radial-gradient(ellipse at center, transparent 50%, rgba(0, 0, 0, 0.04) 100%);
+    background-size: 28px 28px, 100%;
 }
 
 [data-theme="light"] .canvas-header .legend-item:hover {
