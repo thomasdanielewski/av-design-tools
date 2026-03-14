@@ -2232,7 +2232,7 @@ select:focus-visible {
    CONTEXT MENU — Right-click on canvas tables
    ══════════════════════════════════════════════════════════════ */
 .context-menu {
-    position: absolute;
+    position: fixed;
     display: none;
     z-index: 1000;
     min-width: 180px;

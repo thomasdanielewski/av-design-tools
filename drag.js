@@ -715,25 +715,23 @@ canvas.addEventListener('contextmenu', e => {
     const deleteBtn = _ctxMenu.querySelector('[data-action="ctx-delete"]');
     if (deleteBtn) deleteBtn.disabled = state.tables.length <= 1;
 
-    // Position the menu at the mouse location
-    const containerRect = document.querySelector('.canvas-container').getBoundingClientRect();
-    let left = e.clientX - containerRect.left;
-    let top = e.clientY - containerRect.top;
+    // Position the menu at the mouse location (fixed positioning = viewport coords)
+    let left = e.clientX;
+    let top = e.clientY;
 
-    // Ensure the menu stays within the container bounds
     _ctxMenu.style.left = left + 'px';
     _ctxMenu.style.top = top + 'px';
     _ctxMenu.classList.add('visible');
 
-    // Adjust if the menu overflows the container
+    // Adjust if the menu overflows the viewport
     requestAnimationFrame(() => {
         const menuRect = _ctxMenu.getBoundingClientRect();
-        if (menuRect.right > containerRect.right) {
-            left -= (menuRect.right - containerRect.right + 8);
+        if (menuRect.right > window.innerWidth) {
+            left -= (menuRect.right - window.innerWidth + 8);
             _ctxMenu.style.left = left + 'px';
         }
-        if (menuRect.bottom > containerRect.bottom) {
-            top -= (menuRect.bottom - containerRect.bottom + 8);
+        if (menuRect.bottom > window.innerHeight) {
+            top -= (menuRect.bottom - window.innerHeight + 8);
             _ctxMenu.style.top = top + 'px';
         }
     });
