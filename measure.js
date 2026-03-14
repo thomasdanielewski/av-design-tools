@@ -67,6 +67,30 @@ function roomFtToCanvasPx(xFt, yFt) {
     };
 }
 
+/**
+ * Snap a room-feet coordinate to the nearest grid line or room edge,
+ * if within SNAP_THRESHOLD. Only active when state.showSnap is true.
+ */
+function snapMeasurePoint(xFt, yFt) {
+    if (!state.showSnap) return { x: xFt, y: yFt };
+    let x = xFt, y = yFt;
+    // Room edges
+    const edges = [0, state.roomWidth];
+    const edgesY = [0, state.roomLength];
+    for (const ex of edges) {
+        if (Math.abs(x - ex) <= SNAP_THRESHOLD) { x = ex; break; }
+    }
+    for (const ey of edgesY) {
+        if (Math.abs(y - ey) <= SNAP_THRESHOLD) { y = ey; break; }
+    }
+    // Grid lines (only if not already snapped to an edge)
+    const snapX = Math.round(x / GRID_SPACING) * GRID_SPACING;
+    if (Math.abs(xFt - snapX) <= SNAP_THRESHOLD) x = snapX;
+    const snapY = Math.round(y / GRID_SPACING) * GRID_SPACING;
+    if (Math.abs(yFt - snapY) <= SNAP_THRESHOLD) y = snapY;
+    return { x, y };
+}
+
 /** Compute the distance in feet between two points */
 function measureDistanceFt(m) {
     const dx = m.x2 - m.x1;

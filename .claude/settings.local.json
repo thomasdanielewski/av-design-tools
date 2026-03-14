@@ -37,7 +37,9 @@
       "Bash(sed -i 's/    --text-tertiary: rgba\\(0, 0, 0, 0.30\\);/    --text-tertiary: rgba\\(0, 0, 0, 0.25\\);/' \"C:/Users/Thomas/Documents/GitHub/av-design-tools/style.css\")",
       "Bash(python3 -:*)",
       "Bash(node -e \":*)",
-      "Bash(grep -rn \"brand\" *.js)"
+      "Bash(grep -rn \"brand\" *.js)",
+      "Bash(node -e \"const fs=require\\(''fs''\\);const code=fs.readFileSync\\(''draw.js'',''utf8''\\);console.log\\(JSON.stringify\\(code.substring\\(1820,1950\\)\\)\\)\")",
+      "Bash(node -e \"const fs=require\\(''fs''\\);const code=fs.readFileSync\\(''draw.js'',''utf8''\\);const lines=code.split\\(''\\\\n''\\);console.log\\(''L48:'',lines[47].trim\\(\\)\\);console.log\\(''L49:'',lines[48].trim\\(\\)\\);console.log\\(''L80:'',lines[79].trim\\(\\)\\);console.log\\(''L81:'',lines[80].trim\\(\\)\\)\")"
     ]
   }
 }

@@ -1180,6 +1180,13 @@ select option {
     gap: 6px;
 }
 
+.empty-state {
+    color: var(--text-tertiary);
+    font-size: var(--text-sm);
+    text-align: center;
+    padding: var(--space-md) var(--space-sm);
+}
+
 .element-pill {
     padding: 5px 12px;
     background: transparent;
@@ -1834,7 +1841,7 @@ body.animating #fg-canvas {
 .mic-warning,
 .room-warning {
     display: none;
-    margin-top: 16px;
+    margin-top: var(--space-md);
     padding: 12px 14px;
     border: none;
     border-radius: 0 10px 10px 0;
@@ -1856,7 +1863,7 @@ body.animating #fg-canvas {
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.8px;
-    margin-bottom: 6px;
+    margin-bottom: var(--space-xs);
 }
 
 .mic-warning-dot,
@@ -1899,7 +1906,7 @@ body.animating #fg-canvas {
 }
 
 .mic-warning-text {
-    margin-bottom: 10px;
+    margin-bottom: var(--space-sm);
 }
 
 .mic-warning-btn {

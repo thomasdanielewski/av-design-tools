@@ -91,6 +91,7 @@
                             </div>
                         </div>
                         <div id="element-list" class="table-list"></div>
+                        <div class="empty-state" id="structural-empty">Add doors and windows to check for clearance conflicts with tables and equipment.</div>
                     </div>
                     <div id="structural-controls" style="display:none">
                         <div class="control-row">
@@ -425,6 +426,7 @@
             <!-- Actions -->
             <div class="control-group" style="border-bottom:none;padding-bottom:24px">
                 <button class="download-btn" id="download-btn">↓ Download Layout</button>
+                <button class="download-btn" id="download-pdf-btn" style="margin-top:8px">↓ Download PDF</button>
                 <div class="action-btn-row">
                     <button class="secondary-btn" id="export-btn" title="Export JSON configuration">⬇ Export
                         Config</button>
@@ -432,6 +434,7 @@
                         Config</button>
                     <input type="file" id="import-file-input" accept=".json" style="display:none">
                 </div>
+                <button class="secondary-btn" id="clear-autosave-btn" title="Clear auto-saved layout from local storage" style="margin-top:8px;width:100%">✕ Clear saved layout</button>
             </div>
         </div>
     </aside>
@@ -499,6 +502,20 @@
         </div>
     </main>
 
+    <!-- Context Menu (right-click on canvas structural element) -->
+    <div id="structural-context-menu" class="context-menu">
+        <button class="context-menu-btn" data-action="sctx-select">
+            <span class="context-menu-icon">◎</span> Select
+        </button>
+        <button class="context-menu-btn" id="sctx-flip-btn" data-action="sctx-flip">
+            <span class="context-menu-icon">⇄</span> Flip Swing
+        </button>
+        <div class="context-menu-sep"></div>
+        <button class="context-menu-btn context-menu-btn--danger" data-action="sctx-remove">
+            <span class="context-menu-icon">✕</span> Remove
+        </button>
+    </div>
+
     <!-- Context Menu (right-click on canvas table) -->
     <div id="context-menu" class="context-menu">
         <button class="context-menu-btn" data-action="ctx-duplicate">
@@ -526,6 +543,7 @@
         </button>
     </div>
 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.2/jspdf.umd.min.js"></script>
     <script src="data.js?v=3"></script>
     <script src="constants.js?v=3"></script>
     <script src="theme.js?v=3"></script>

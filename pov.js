@@ -3,6 +3,8 @@
 // Animated eye height override — set by setPosture() during smooth transitions.
 // When non-null, renderPOV uses this instead of the state.posture-derived value.
 let _animEyeHeight = null;
+// Cached dither noise pattern — regenerated only when canvas dimensions change
+let _ditherCache = null;
 
 function renderPOV(cw, ch, dpr) {
     // ── Canvas sizing ────────────────────────────────────
@@ -21,11 +23,49 @@ function renderPOV(cw, ch, dpr) {
     bgCtx.clearRect(0, 0, cw, ch);
 
     // ── Sky / floor gradient background ──────────────────
+    // Intermediate stops at 0.25 / 0.75 interpolate linearly between the
+    // three theme stops to give the GPU/browser more anchor points, which
+    // prevents visible color banding on high-DPI (retina) displays.
+    const _lerpHex = (a, b, t) => {
+        const ah = parseInt(a.slice(1), 16), bh = parseInt(b.slice(1), 16);
+        const ar = (ah >> 16) & 0xff, ag = (ah >> 8) & 0xff, ab = ah & 0xff;
+        const br = (bh >> 16) & 0xff, bg = (bh >> 8) & 0xff, bb = bh & 0xff;
+        const r = Math.round(ar + (br - ar) * t);
+        const gv = Math.round(ag + (bg - ag) * t);
+        const bv = Math.round(ab + (bb - ab) * t);
+        return '#' + ((1 << 24) | (r << 16) | (gv << 8) | bv).toString(16).slice(1);
+    };
+    const gTop = cc().povGradTop, gMid = cc().povGradMid, gBot = cc().povGradBot;
     const g = ctx.createLinearGradient(0, 0, 0, ch);
-    g.addColorStop(0, cc().povGradTop);
-    g.addColorStop(0.5, cc().povGradMid);
-    g.addColorStop(1, cc().povGradBot);
+    g.addColorStop(0,    gTop);
+    g.addColorStop(0.25, _lerpHex(gTop, gMid, 0.5));
+    g.addColorStop(0.5,  gMid);
+    g.addColorStop(0.75, _lerpHex(gMid, gBot, 0.5));
+    g.addColorStop(1,    gBot);
     ctx.fillStyle = g;
+    ctx.fillRect(0, 0, cw, ch);
+
+    // ── Dither pass — breaks up residual banding on retina screens ──
+    // Build (and cache) a 256×256 noise pattern with semi-transparent gray
+    // pixels (α ≈ 0.012–0.020).  Seeded from canvas CSS dimensions so the
+    // texture is stable across frames.
+    if (!_ditherCache || _ditherCache.cw !== cw || _ditherCache.ch !== ch) {
+        const NS = 256;
+        const nc = document.createElement('canvas');
+        nc.width = nc.height = NS;
+        const nx = nc.getContext('2d');
+        const id = nx.createImageData(NS, NS);
+        const d  = id.data;
+        let s = (Math.imul(cw, 1664525) + Math.imul(ch, 1013904223)) | 0;
+        for (let i = 0; i < d.length; i += 4) {
+            s = Math.imul(s, 1664525) + 1013904223 | 0;
+            d[i] = d[i + 1] = d[i + 2] = 128;
+            d[i + 3] = 3 + ((s >>> 0) % 3); // 3–5 ≈ α 0.012–0.020
+        }
+        nx.putImageData(id, 0, 0);
+        _ditherCache = { cw, ch, pattern: ctx.createPattern(nc, 'repeat') };
+    }
+    ctx.fillStyle = _ditherCache.pattern;
     ctx.fillRect(0, 0, cw, ch);
 
     // ── Viewer parameters ────────────────────────────────

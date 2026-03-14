@@ -69,33 +69,27 @@ function renderBackground() {
     // Size the background canvas
     _sizeCanvas(bgCanvas, bgCtx, canvasW, canvasH, dpr);
 
-    // Temporarily redirect the global ctx so all drawXxx helpers use bgCtx
-    const _savedCtx = ctx;
-    ctx = bgCtx;
-
     // Canvas background
-    ctx.fillStyle = cc().bg;
-    ctx.fillRect(0, 0, canvasW, canvasH);
+    bgCtx.fillStyle = cc().bg;
+    bgCtx.fillRect(0, 0, canvasW, canvasH);
 
     // Grid
     if (state.showGrid) {
-        drawGrid(rx, ry, rw, rl, ppf);
+        drawGrid(bgCtx, rx, ry, rw, rl, ppf);
     }
 
     // Room outline and front wall accent
-    drawRoom(rx, ry, rw, rl, ppf);
+    drawRoom(bgCtx, rx, ry, rw, rl, ppf);
 
     // Structural elements (windows, doors) on walls
     const wallThickBg = Math.max(3, ppf * 0.2);
-    drawStructuralElements(rx, ry, rw, rl, ppf, wallThickBg);
+    drawStructuralElements(bgCtx, rx, ry, rw, rl, ppf, wallThickBg);
 
     // Dimension labels
-    drawDimensionLabels(ox, oy, rx, ry, rl, ppf);
+    drawDimensionLabels(bgCtx, ox, oy, rx, ry, rl, ppf);
 
     // Scale bar
-    drawScaleBar(rx, ry, rl, ppf);
-
-    ctx = _savedCtx; // restore foreground context
+    drawScaleBar(bgCtx, rx, ry, rl, ppf);
 }
 
 /**
@@ -121,145 +115,89 @@ function renderForeground() {
     const centerEq = EQUIPMENT[getCenterEqKey()];
     const micPodEq = getMicPodEq();
 
-    // Compute device positions based on display wall
-    const dispWidthPx = (state.displaySize * 0.8715 / 12) * ppf;
-    const dispDepthPx = (1.12 / 12) * ppf;
-    const eqWidthPx = eq.width * ppf;
-    const eqDepthPx = Math.max(4, eq.depth * ppf);
-
-    // Display position and facing angle depend on the selected wall.
-    // dispX/dispY = display center; mainDeviceX/Y = video bar center.
-    // facingAngle = direction the device faces into the room (radians).
-    let dispX, dispY, mainDeviceX, mainDeviceY, facingAngle;
-
-    const dw = state.displayWall;
-    const offsetPx = state.displayOffsetX * ppf;
-
-    if (dw === 'north') {
-        dispX = ox + offsetPx;
-        dispY = ry + wallThick + dispDepthPx / 2 + 2;
-        facingAngle = Math.PI / 2;
-    } else if (dw === 'south') {
-        dispX = ox + offsetPx;
-        dispY = ry + rl - wallThick - dispDepthPx / 2 - 2;
-        facingAngle = -Math.PI / 2;
-    } else if (dw === 'east') {
-        dispX = rx + rw - wallThick - dispDepthPx / 2 - 2;
-        dispY = oy + offsetPx;
-        facingAngle = Math.PI;
-    } else { // west
-        dispX = rx + wallThick + dispDepthPx / 2 + 2;
-        dispY = oy + offsetPx;
-        facingAngle = 0;
-    }
-
-    // Video bar / board offset from display (perpendicular to the wall)
-    const isHoriz = (dw === 'north' || dw === 'south');
-    const inwardSign = (dw === 'north' || dw === 'west') ? 1 : -1; // sign pointing into the room
-
-    let eqOffset; // perpendicular distance from display center to equipment center
-    if (eq.type === 'board') {
-        eqOffset = (dispDepthPx / 2 + eqDepthPx / 2) * inwardSign;
-    } else if (state.mountPos === 'above') {
-        eqOffset = -(dispDepthPx / 2 + eqDepthPx / 2 + 2) * inwardSign;
-    } else {
-        eqOffset = (dispDepthPx / 2 + eqDepthPx / 2 + 2) * inwardSign;
-    }
-
-    if (isHoriz) {
-        mainDeviceX = dispX;
-        mainDeviceY = dispY + eqOffset;
-    } else {
-        mainDeviceX = dispX + eqOffset;
-        mainDeviceY = dispY;
-    }
-
-    const selT = getSelectedTable();
-    const tableX_px = ox + selT.x * ppf;
-    const tableY = ry + wallThick + selT.dist * ppf + (selT.length * ppf) / 2;
-    const centerX = tableX_px + state.centerPos.x * ppf;
-    const centerY = tableY + state.centerPos.y * ppf;
-    const center2X = tableX_px + state.center2Pos.x * ppf;
-    const center2Y = tableY + state.center2Pos.y * ppf;
-    const micPodX = tableX_px + state.micPodPos.x * ppf;
-    const micPodY = tableY + state.micPodPos.y * ppf;
-    const micPod2X = tableX_px + state.micPod2Pos.x * ppf;
-    const micPod2Y = tableY + state.micPod2Pos.y * ppf;
+    // Compute device positions (pure function in utils.js)
+    const layout = { ppf, ox, oy, rw, rl, rx, ry, wallThick, selectedTable: getSelectedTable() };
+    const {
+        dispX, dispY, mainDeviceX, mainDeviceY, facingAngle,
+        centerX, centerY, center2X, center2Y,
+        micPodX, micPodY, micPod2X, micPod2Y,
+        dispWidthPx, dispDepthPx, eqWidthPx, eqDepthPx,
+        isHoriz, dispRotation
+    } = computeDevicePositions(state, eq, centerEq, micPodEq, layout);
 
     // Viewing angle overlay
     if (state.showViewAngle) {
         const hovered = isMouseInViewCone(dispX, dispY, rl, ppf);
-        drawViewAngle(dispX, dispY, rl, ppf, hovered);
+        drawViewAngle(ctx, dispX, dispY, rl, ppf, hovered);
     }
 
     // Coverage arcs
-    drawCoverage(mainDeviceX, mainDeviceY, eq, facingAngle);
+    drawCoverage(ctx, mainDeviceX, mainDeviceY, eq, facingAngle);
     if (state.includeCenter) {
-        drawCoverage(centerX, centerY, centerEq, 0);
+        drawCoverage(ctx, centerX, centerY, centerEq, 0);
         if (state.includeDualCenter) {
-            drawCoverage(center2X, center2Y, centerEq, 0);
+            drawCoverage(ctx, center2X, center2Y, centerEq, 0);
         }
     }
     if (state.includeMicPod && state.brand === 'logitech') {
-        drawCoverage(micPodX, micPodY, micPodEq, 0);
+        drawCoverage(ctx, micPodX, micPodY, micPodEq, 0);
         if (state.includeDualMicPod) {
-            drawCoverage(micPod2X, micPod2Y, micPodEq, 0);
+            drawCoverage(ctx, micPod2X, micPod2Y, micPodEq, 0);
         }
     }
 
     // Displays and equipment — use rotated drawing for E/W walls
-    const dispRotation = isHoriz ? 0 : Math.PI / 2;
-    drawDisplaysTopDown(dispX, dispY, dispWidthPx, dispDepthPx, eq, eqWidthPx, eqDepthPx, dispRotation);
+    drawDisplaysTopDown(ctx, dispX, dispY, dispWidthPx, dispDepthPx, eq, eqWidthPx, eqDepthPx, dispRotation);
 
-    drawEquipmentTopDown(dispX, dispY, dispDepthPx, dispWidthPx,
+    drawEquipmentTopDown(ctx, dispX, dispY, dispDepthPx, dispWidthPx,
         mainDeviceX, mainDeviceY, eq, eqWidthPx, eqDepthPx, ppf, dispRotation);
 
     // Mount bracket between video bar and display
     if (eq.type === 'bar') {
-        drawMountBracket(dispX, dispY, mainDeviceX, mainDeviceY, eqWidthPx, isHoriz, dispRotation);
+        drawMountBracket(ctx, dispX, dispY, mainDeviceX, mainDeviceY, eqWidthPx, isHoriz, dispRotation);
     }
 
     // Conference tables
-    drawTable(ox, ry, wallThick, ppf);
+    drawTable(ctx, ox, ry, wallThick, ppf);
 
     // Distance readouts floating near each table edge during drag
     if (isDraggingTableId !== null && dragDistances !== null) {
         const draggedT = state.tables.find(t => t.id === isDraggingTableId);
-        if (draggedT) drawDragDistances(draggedT, ox, ry, wallThick, ppf, dragDistances);
+        if (draggedT) drawDragDistances(ctx, draggedT, ox, ry, wallThick, ppf, dragDistances);
     }
 
     // Center companion device(s)
     if (state.includeCenter) {
-        drawCenterDevice(centerX, centerY, centerEq, ppf, state.includeDualCenter ? '1' : null);
+        drawCenterDevice(ctx, centerX, centerY, centerEq, ppf, state.includeDualCenter ? '1' : null);
         if (state.includeDualCenter) {
-            drawCenterDevice(center2X, center2Y, centerEq, ppf, '2');
-            drawDualCenterDistance(centerX, centerY, center2X, center2Y, ppf);
+            drawCenterDevice(ctx, center2X, center2Y, centerEq, ppf, '2');
+            drawDualCenterDistance(ctx, centerX, centerY, center2X, center2Y, ppf);
         }
     }
 
     // Mic pod(s)
     if (state.includeMicPod && state.brand === 'logitech') {
-        drawMicPod(micPodX, micPodY, micPodEq, ppf, state.includeDualMicPod ? '1' : null);
+        drawMicPod(ctx, micPodX, micPodY, micPodEq, ppf, state.includeDualMicPod ? '1' : null);
         if (state.includeDualMicPod) {
-            drawMicPod(micPod2X, micPod2Y, micPodEq, ppf, '2');
+            drawMicPod(ctx, micPod2X, micPod2Y, micPodEq, ppf, '2');
         }
     }
 
     // Wall boundary glow (drawn on top while table is pressed against a wall)
     if (isDraggingTableId !== null) {
-        drawWallGlow(rx, ry, rw, rl, dragBoundaryHit);
+        drawWallGlow(ctx, rx, ry, rw, rl, dragBoundaryHit);
     }
 
     // Snap / alignment guides (drawn on top while dragging a table)
     if (isDraggingTableId !== null && state.showSnap && snapGuides.length > 0) {
-        drawSnapGuides(snapGuides, rx, ry, rw, rl, wallThick);
+        drawSnapGuides(ctx, snapGuides, rx, ry, rw, rl, wallThick);
     }
 
     // Measurement dimension lines (drawn on top of room content)
-    drawMeasurements(ppf);
+    drawMeasurements(ctx, ppf);
 
     // Equipment hover tooltip (drawn last, on top of everything)
-    drawEquipmentTooltip();
+    drawEquipmentTooltip(ctx);
 
     // Defer DOM updates to after canvas paint to avoid layout thrashing
     queueMicrotask(() => updateHeaderDOM(eq));

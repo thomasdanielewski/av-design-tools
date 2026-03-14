@@ -111,6 +111,21 @@ document.querySelectorAll('[data-toggle-group]').forEach(el => {
     });
 });
 
+// ── Delegated pill listeners (single listener per container) ─
+document.getElementById('table-list').addEventListener('click', e => {
+    const pill = e.target.closest('.table-pill');
+    if (!pill) return;
+    selectTable(parseInt(pill.dataset.tableId, 10));
+    pushHistory();
+});
+
+document.getElementById('element-list').addEventListener('click', e => {
+    const pill = e.target.closest('.element-pill');
+    if (!pill) return;
+    selectElement(parseInt(pill.dataset.elementId, 10));
+    pushHistory();
+});
+
 // ── Table manager buttons ────────────────────────────────────
 document.getElementById('add-table-btn').addEventListener('click', addTable);
 document.getElementById('remove-table-btn').addEventListener('click', removeTable);
@@ -182,11 +197,16 @@ document.querySelectorAll('[data-action="set-units"]').forEach(btn => {
 
 // ── Download, Export, Import ─────────────────────────────────
 document.getElementById('download-btn').addEventListener('click', downloadLayout);
+document.getElementById('download-pdf-btn').addEventListener('click', downloadPDF);
 document.getElementById('export-btn').addEventListener('click', exportConfig);
 document.getElementById('import-btn').addEventListener('click', () => {
     document.getElementById('import-file-input').click();
 });
 document.getElementById('import-file-input').addEventListener('change', importConfig);
+document.getElementById('clear-autosave-btn').addEventListener('click', () => {
+    localStorage.removeItem('av-planner-autosave');
+    showToast('Saved layout cleared');
+});
 
 // ── Info overlay toggle ──────────────────────────────────────
 document.querySelectorAll('[data-action="toggle-overlay"]').forEach(btn => {
@@ -292,9 +312,17 @@ if (window.innerWidth <= 900) {
     DOM['info-overlay'].classList.add('minimized');
 }
 
-// Load from URL hash if present, then initial render + first snapshot
+// Recover autosaved layout if no URL hash is present
+const savedLayout = localStorage.getItem('av-planner-autosave');
 const hadHash = loadFromHash();
-if (hadHash) {
+if (!hadHash && savedLayout) {
+    try {
+        Object.assign(state, JSON.parse(savedLayout));
+        syncUIFromState();
+        syncMeasureNextId();
+        showToast('Recovered unsaved layout', 'success');
+    } catch (_) {}
+} else if (hadHash) {
     syncUIFromState();
     syncMeasureNextId();
 }

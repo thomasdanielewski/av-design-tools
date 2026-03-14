@@ -50,8 +50,19 @@ function debouncedSerializeToHash() {
     _hashDebounceTimer = setTimeout(serializeToHash, DEBOUNCE_HISTORY);
 }
 
+// Debounced auto-save to localStorage — persists state 1 second after last change.
+let _autoSaveTimer = null;
+function debouncedAutoSave() {
+    clearTimeout(_autoSaveTimer);
+    _autoSaveTimer = setTimeout(() => {
+        try {
+            localStorage.setItem('av-planner-autosave', JSON.stringify(snapshotState()));
+        } catch (_) {}
+    }, 1000);
+}
+
 function snapshotState() {
-    return JSON.parse(JSON.stringify(state));
+    return typeof structuredClone === 'function' ? structuredClone(state) : JSON.parse(JSON.stringify(state));
 }
 
 function pushHistory(desc = '') {
@@ -64,6 +75,7 @@ function pushHistory(desc = '') {
     if (history.length > MAX_HISTORY) history.shift();
     historyIndex = history.length - 1;
     updateUndoRedoBtns();
+    debouncedAutoSave();
 }
 
 function updateUndoRedoBtns() {
@@ -99,6 +111,28 @@ function redo() {
     const desc = history[historyIndex].desc;
     if (desc) showToast('Redo: ' + desc);
 }
+
+// ── Valid Ranges for Hash Deserialization ────────────────────
+
+const VALID_RANGES = {
+    roomLength:    { min: 6,    max: 60  },
+    roomWidth:     { min: 6,    max: 40  },
+    ceilingHeight: { min: 7,    max: 20  },
+    tableLength:   { min: 2,    max: 20  },
+    tableWidth:    { min: 1,    max: 12  },
+    tableDist:     { min: 0,    max: 50  },
+    tableHeight:   { min: 20,   max: 42  },
+    tableRotation: { min: -180, max: 180 },
+    displaySize:   { min: 32,   max: 98  },
+    displayElev:   { min: 24,   max: 84  },
+    displayOffsetX:{ min: -15,  max: 15  },
+    viewerDist:    { min: 1,    max: 60  },
+    viewerOffset:  { min: -20,  max: 20  },
+    povYaw:        { min: -180, max: 180 },
+};
+
+const VALID_DISPLAY_WALLS = new Set(['north', 'south', 'east', 'west']);
+const VALID_BRANDS = new Set(['neat', 'logitech']);
 
 // ── URL Hash Serialization ───────────────────────────────────
 
@@ -150,7 +184,14 @@ function loadFromHash() {
             if (sk === 'micPod2PosX') { state.micPod2Pos.x = parseFloat(raw); continue; }
             if (sk === 'micPod2PosY') { state.micPod2Pos.y = parseFloat(raw); continue; }
             if (typeof state[sk] === 'boolean') { state[sk] = raw === '1'; continue; }
-            if (typeof state[sk] === 'number') { state[sk] = parseFloat(raw); continue; }
+            if (typeof state[sk] === 'number') {
+                const range = VALID_RANGES[sk];
+                const val = parseFloat(raw);
+                state[sk] = range ? Math.max(range.min, Math.min(range.max, val)) : val;
+                continue;
+            }
+            if (sk === 'displayWall') { state[sk] = VALID_DISPLAY_WALLS.has(raw) ? raw : 'north'; continue; }
+            if (sk === 'brand') { state[sk] = VALID_BRANDS.has(raw) ? raw : 'neat'; continue; }
             state[sk] = raw;
         }
         // Load tables array (or build from legacy flat state)

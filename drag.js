@@ -852,13 +852,15 @@ canvas.addEventListener('mousedown', e => {
         if (state.measureToolActive) {
             if (!_measurePending) {
                 // First click: set start point
-                const ft = canvasPxToRoomFt(mx, my);
+                const raw = canvasPxToRoomFt(mx, my);
+                const ft = snapMeasurePoint(raw.x, raw.y);
                 _measurePending = { x1: ft.x, y1: ft.y };
                 _measureHoverPx = { x: mx, y: my };
                 scheduleRender();
             } else {
                 // Second click: complete measurement
-                const ft = canvasPxToRoomFt(mx, my);
+                const raw = canvasPxToRoomFt(mx, my);
+                const ft = snapMeasurePoint(raw.x, raw.y);
                 addMeasurement(_measurePending.x1, _measurePending.y1, ft.x, ft.y);
                 _measurePending = null;
                 _measureHoverPx = null;
@@ -1553,12 +1555,32 @@ canvas.addEventListener('dblclick', e => {
 
 // ── Context menu (right-click) ───────────────────────────────
 const _ctxMenu = document.getElementById('context-menu');
+const _sctxMenu = document.getElementById('structural-context-menu');
 let _ctxTargetTableId = null;
+let _sctxTargetElementId = null;
 
 function hideContextMenu() {
-    if (_ctxMenu) {
-        _ctxMenu.classList.remove('visible');
-    }
+    if (_ctxMenu) _ctxMenu.classList.remove('visible');
+    if (_sctxMenu) _sctxMenu.classList.remove('visible');
+}
+
+function _showMenuAt(menu, clientX, clientY) {
+    let left = clientX;
+    let top = clientY;
+    menu.style.left = left + 'px';
+    menu.style.top = top + 'px';
+    menu.classList.add('visible');
+    requestAnimationFrame(() => {
+        const r = menu.getBoundingClientRect();
+        if (r.right > window.innerWidth) {
+            left -= (r.right - window.innerWidth + 8);
+            menu.style.left = left + 'px';
+        }
+        if (r.bottom > window.innerHeight) {
+            top -= (r.bottom - window.innerHeight + 8);
+            menu.style.top = top + 'px';
+        }
+    });
 }
 
 canvas.addEventListener('contextmenu', e => {
@@ -1567,7 +1589,7 @@ canvas.addEventListener('contextmenu', e => {
 
     if (state.viewMode !== 'top') return;
 
-    const { mx, my, ppf, ox, ry, wt } = getDragMetrics(e);
+    const { mx, my, ppf, ox, ry, rx, rw, rl, wt } = getDragMetrics(e);
 
     // Hit-test tables in reverse order (topmost first)
     let hitTable = null;
@@ -1578,43 +1600,53 @@ canvas.addEventListener('contextmenu', e => {
         }
     }
 
-    if (!hitTable) return;
+    if (hitTable) {
+        // Select the right-clicked table
+        if (hitTable.id !== state.selectedTableId) {
+            selectTable(hitTable.id);
+        }
+        _ctxTargetTableId = hitTable.id;
 
-    // Select the right-clicked table
-    if (hitTable.id !== state.selectedTableId) {
-        selectTable(hitTable.id);
+        // Disable delete if only one table
+        const deleteBtn = _ctxMenu.querySelector('[data-action="ctx-delete"]');
+        if (deleteBtn) deleteBtn.disabled = state.tables.length <= 1;
+
+        _showMenuAt(_ctxMenu, e.clientX, e.clientY);
+        return;
     }
-    _ctxTargetTableId = hitTable.id;
 
-    // Disable delete if only one table
-    const deleteBtn = _ctxMenu.querySelector('[data-action="ctx-delete"]');
-    if (deleteBtn) deleteBtn.disabled = state.tables.length <= 1;
-
-    // Position the menu at the mouse location (fixed positioning = viewport coords)
-    let left = e.clientX;
-    let top = e.clientY;
-
-    _ctxMenu.style.left = left + 'px';
-    _ctxMenu.style.top = top + 'px';
-    _ctxMenu.classList.add('visible');
-
-    // Adjust if the menu overflows the viewport
-    requestAnimationFrame(() => {
-        const menuRect = _ctxMenu.getBoundingClientRect();
-        if (menuRect.right > window.innerWidth) {
-            left -= (menuRect.right - window.innerWidth + 8);
-            _ctxMenu.style.left = left + 'px';
+    // Hit-test structural elements
+    let hitElement = null;
+    const hitPad = Math.max(wt, 8);
+    for (const el of state.structuralElements) {
+        const { x, y, isHorizontal, w } = getElementWallCoords(el, rx, ry, rw, rl, ppf, wt);
+        let inBounds;
+        if (isHorizontal) {
+            inBounds = mx >= x && mx <= x + w && my >= y - hitPad && my <= y + hitPad;
+        } else {
+            inBounds = mx >= x - hitPad && mx <= x + hitPad && my >= y && my <= y + w;
         }
-        if (menuRect.bottom > window.innerHeight) {
-            top -= (menuRect.bottom - window.innerHeight + 8);
-            _ctxMenu.style.top = top + 'px';
+        if (inBounds) {
+            hitElement = el;
+            break;
         }
-    });
+    }
+
+    if (!hitElement) return;
+
+    _sctxTargetElementId = hitElement.id;
+
+    // Show/hide "Flip Swing" only for doors
+    const flipBtn = _sctxMenu.querySelector('[data-action="sctx-flip"]');
+    if (flipBtn) flipBtn.style.display = hitElement.type === 'door' ? '' : 'none';
+
+    _showMenuAt(_sctxMenu, e.clientX, e.clientY);
 });
 
 // Global click hides the context menu
 document.addEventListener('mousedown', e => {
-    if (_ctxMenu && !_ctxMenu.contains(e.target)) {
+    if (_ctxMenu && !_ctxMenu.contains(e.target) &&
+        _sctxMenu && !_sctxMenu.contains(e.target)) {
         hideContextMenu();
     }
 });
@@ -1686,6 +1718,31 @@ _ctxMenu.addEventListener('click', e => {
             }
             removeTable();
         }
+    }
+
+    hideContextMenu();
+});
+
+// Structural context menu button handlers
+_sctxMenu.addEventListener('click', e => {
+    const btn = e.target.closest('[data-action]');
+    if (!btn || btn.disabled) return;
+    const action = btn.dataset.action;
+    const el = state.structuralElements.find(s => s.id === _sctxTargetElementId);
+    if (!el) { hideContextMenu(); return; }
+
+    if (action === 'sctx-select') {
+        selectElement(el.id);
+        const cg = document.getElementById('cg-structural');
+        if (cg && cg.getAttribute('aria-expanded') === 'false') {
+            expandGroup(cg);
+        }
+    } else if (action === 'sctx-flip' && el.type === 'door') {
+        if (el.id !== state.selectedElementId) selectElement(el.id);
+        flipSwing();
+    } else if (action === 'sctx-remove') {
+        if (el.id !== state.selectedElementId) selectElement(el.id);
+        removeElement();
     }
 
     hideContextMenu();

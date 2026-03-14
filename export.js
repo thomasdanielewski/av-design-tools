@@ -23,6 +23,83 @@ function downloadLayout() {
     l.click();
 }
 
+function downloadPDF() {
+    // 1. Build composite canvas (same pattern as downloadLayout)
+    const exportCanvas = document.createElement('canvas');
+    exportCanvas.width = canvas.width;
+    exportCanvas.height = canvas.height;
+    const exportCtx = exportCanvas.getContext('2d');
+    exportCtx.fillStyle = cc().exportBg;
+    exportCtx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
+    exportCtx.drawImage(bgCanvas, 0, 0);
+    exportCtx.drawImage(fgCanvas, 0, 0);
+
+    const imgData = exportCanvas.toDataURL('image/jpeg', 0.92);
+
+    // 2. Create landscape A4 PDF
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF('l', 'mm', 'a4');
+
+    // Page dimensions: A4 landscape = 297 × 210 mm
+    const pageW = 297;
+    const pageH = 210;
+    const margin = 10;
+
+    // 3. Embed image scaled to fit with margins, leaving room below for text
+    const textAreaH = 52; // mm reserved for summary text at bottom
+    const imgAreaH = pageH - margin * 2 - textAreaH;
+    const imgAreaW = pageW - margin * 2;
+
+    const canvasAspect = exportCanvas.width / exportCanvas.height;
+    let imgW = imgAreaW;
+    let imgH = imgW / canvasAspect;
+    if (imgH > imgAreaH) {
+        imgH = imgAreaH;
+        imgW = imgH * canvasAspect;
+    }
+    const imgX = margin + (imgAreaW - imgW) / 2;
+    const imgY = margin;
+    doc.addImage(imgData, 'JPEG', imgX, imgY, imgW, imgH);
+
+    // 4. Summary text block
+    const eq = EQUIPMENT[state.videoBar];
+    const timestamp = new Date().toISOString().slice(0, 10);
+    const dimStr = `${formatFtIn(state.roomLength)} × ${formatFtIn(state.roomWidth)} × ${formatFtIn(state.ceilingHeight)} ceiling`;
+    const dispStr = `${state.displayCount === 2 ? 'Dual' : 'Single'} ${state.displaySize}" display`;
+
+    let companionParts = [];
+    if (state.includeCenter) {
+        const centerEq = EQUIPMENT[getCenterEqKey()];
+        companionParts.push(state.includeDualCenter ? `2× ${centerEq.name}` : centerEq.name);
+    }
+    if (state.includeMicPod && state.brand === 'logitech') {
+        const micEq = getMicPodEq();
+        companionParts.push(state.includeDualMicPod ? `2× ${micEq.name}` : micEq.name);
+    }
+    const companionStr = companionParts.length ? companionParts.join(', ') : 'None';
+    const capacityStr = String(calcTotalCapacity());
+
+    const textX = margin;
+    let textY = margin + imgAreaH + margin + 4;
+    const lineH = 6;
+
+    doc.setFontSize(13);
+    doc.setFont('helvetica', 'bold');
+    doc.text('AV Room Layout', textX, textY);
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    textY += lineH + 1;
+    doc.text(`Room Dimensions:  ${dimStr}`, textX, textY); textY += lineH;
+    doc.text(`Video Bar:  ${eq.name}`, textX, textY); textY += lineH;
+    doc.text(`Display:  ${dispStr}`, textX, textY); textY += lineH;
+    doc.text(`Companion Devices:  ${companionStr}`, textX, textY); textY += lineH;
+    doc.text(`Total Seating Capacity:  ${capacityStr}`, textX, textY); textY += lineH;
+    doc.text(`Date:  ${timestamp}`, textX, textY);
+
+    // 5. Save
+    doc.save(`AV-Room-Layout-${timestamp}.pdf`);
+}
+
 function exportConfig() {
     const data = JSON.stringify(
         { avRoomPlannerVersion: 1, state: snapshotState() },

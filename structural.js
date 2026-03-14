@@ -37,12 +37,14 @@ function renderElementList() {
         const wallLabel = { north: 'N', south: 'S', east: 'E', west: 'W' }[el.wall];
         btn.textContent = `${el.type === 'door' ? 'Door' : 'Win'} · ${wallLabel}`;
         btn.title = `${el.type} on ${el.wall} wall, ${formatFtIn(el.width)} wide`;
-        btn.addEventListener('click', () => { selectElement(el.id); pushHistory(); });
+        btn.dataset.elementId = el.id;
         container.appendChild(btn);
     });
     if (DOM['remove-element-btn']) {
         DOM['remove-element-btn'].disabled = !state.selectedElementId;
     }
+    const emptyState = document.getElementById('structural-empty');
+    if (emptyState) emptyState.style.display = state.structuralElements.length === 0 ? '' : 'none';
 }
 
 /** Select a structural element, sync controls */

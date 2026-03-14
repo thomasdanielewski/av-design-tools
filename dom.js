@@ -6,8 +6,8 @@ const bgCanvas = document.getElementById('bg-canvas');
 const bgCtx = bgCanvas.getContext('2d');
 
 const fgCanvas = document.getElementById('fg-canvas');
-// ctx always points to fgCtx; renderBackground() temporarily redirects it to bgCtx.
-let ctx = fgCanvas.getContext('2d');
+// ctx always points to fgCtx; never reassigned.
+const ctx = fgCanvas.getContext('2d');
 
 // Backward-compat alias used by drag handlers, cursor management, and export
 const canvas = fgCanvas;

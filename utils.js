@@ -85,6 +85,87 @@ function roundRect(c, x, y, w, h, r) {
     c.closePath();
 }
 
+// ── Device Position Computation ──────────────────────────────
+// Pure function: computes all device pixel positions from state + layout.
+// No canvas drawing, no DOM access, no global mutation.
+
+function computeDevicePositions(state, eq, centerEq, micPodEq, layout) {
+    const { ppf, ox, oy, ry, wallThick } = layout;
+
+    const dispWidthPx = (state.displaySize * 0.8715 / 12) * ppf;
+    const dispDepthPx = (1.12 / 12) * ppf;
+    const eqWidthPx = eq.width * ppf;
+    const eqDepthPx = Math.max(4, eq.depth * ppf);
+
+    let dispX, dispY, mainDeviceX, mainDeviceY, facingAngle;
+
+    const dw = state.displayWall;
+    const offsetPx = state.displayOffsetX * ppf;
+    const rw = layout.rw;
+    const rl = layout.rl;
+    const rx = layout.rx;
+
+    if (dw === 'north') {
+        dispX = ox + offsetPx;
+        dispY = ry + wallThick + dispDepthPx / 2 + 2;
+        facingAngle = Math.PI / 2;
+    } else if (dw === 'south') {
+        dispX = ox + offsetPx;
+        dispY = ry + rl - wallThick - dispDepthPx / 2 - 2;
+        facingAngle = -Math.PI / 2;
+    } else if (dw === 'east') {
+        dispX = rx + rw - wallThick - dispDepthPx / 2 - 2;
+        dispY = oy + offsetPx;
+        facingAngle = Math.PI;
+    } else { // west
+        dispX = rx + wallThick + dispDepthPx / 2 + 2;
+        dispY = oy + offsetPx;
+        facingAngle = 0;
+    }
+
+    const isHoriz = (dw === 'north' || dw === 'south');
+    const inwardSign = (dw === 'north' || dw === 'west') ? 1 : -1;
+
+    let eqOffset;
+    if (eq.type === 'board') {
+        eqOffset = (dispDepthPx / 2 + eqDepthPx / 2) * inwardSign;
+    } else if (state.mountPos === 'above') {
+        eqOffset = -(dispDepthPx / 2 + eqDepthPx / 2 + 2) * inwardSign;
+    } else {
+        eqOffset = (dispDepthPx / 2 + eqDepthPx / 2 + 2) * inwardSign;
+    }
+
+    if (isHoriz) {
+        mainDeviceX = dispX;
+        mainDeviceY = dispY + eqOffset;
+    } else {
+        mainDeviceX = dispX + eqOffset;
+        mainDeviceY = dispY;
+    }
+
+    const selT = layout.selectedTable;
+    const tableX_px = ox + selT.x * ppf;
+    const tableY = ry + wallThick + selT.dist * ppf + (selT.length * ppf) / 2;
+    const centerX = tableX_px + state.centerPos.x * ppf;
+    const centerY = tableY + state.centerPos.y * ppf;
+    const center2X = tableX_px + state.center2Pos.x * ppf;
+    const center2Y = tableY + state.center2Pos.y * ppf;
+    const micPodX = tableX_px + state.micPodPos.x * ppf;
+    const micPodY = tableY + state.micPodPos.y * ppf;
+    const micPod2X = tableX_px + state.micPod2Pos.x * ppf;
+    const micPod2Y = tableY + state.micPod2Pos.y * ppf;
+
+    const dispRotation = isHoriz ? 0 : Math.PI / 2;
+
+    return {
+        dispX, dispY, mainDeviceX, mainDeviceY, facingAngle,
+        centerX, centerY, center2X, center2Y,
+        micPodX, micPodY, micPod2X, micPod2Y,
+        dispWidthPx, dispDepthPx, eqWidthPx, eqDepthPx,
+        isHoriz, dispRotation
+    };
+}
+
 // ── Cached Top-Down Layout ───────────────────────────────────
 // Shared by render.js and drag.js. Invalidated on resize or room dim change.
 let _layoutCache = null;
