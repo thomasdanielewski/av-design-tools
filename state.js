@@ -25,7 +25,8 @@ const state = {
     selectedElementId: null,
     units: 'imperial',
     measurements: [],
-    measureToolActive: false
+    measureToolActive: false,
+    roomName: ''
 };
 
 // ── Undo / Redo ──────────────────────────────────────────────
@@ -300,6 +301,7 @@ function syncUIFromState() {
     DOM['show-grid'].checked = state.showGrid;
     DOM['show-view-angle'].checked = state.showViewAngle;
     if (DOM['show-snap']) DOM['show-snap'].checked = state.showSnap;
+    if (DOM['room-name']) DOM['room-name'].value = state.roomName || '';
 
     // Display count, wall, posture, view mode, perspective
     setDisplayCount(state.displayCount);

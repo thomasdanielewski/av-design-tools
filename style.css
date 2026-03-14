@@ -723,6 +723,35 @@ input[type="range"]::-moz-range-track {
 /* ══════════════════════════════════════════════════════════════
    SELECT DROPDOWNS
    ══════════════════════════════════════════════════════════════ */
+input[type="text"] {
+    width: 100%;
+    padding: 10px 14px;
+    background: var(--bg-input);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    font-family: var(--font-body);
+    font-size: var(--text-base);
+    font-weight: 500;
+    outline: none;
+    box-sizing: border-box;
+    transition: border-color 0.25s var(--ease-out), box-shadow 0.25s var(--ease-out);
+}
+
+input[type="text"]::placeholder {
+    color: var(--text-tertiary);
+    font-weight: 400;
+}
+
+input[type="text"]:hover {
+    border-color: var(--border-focus);
+}
+
+input[type="text"]:focus-visible {
+    border-color: var(--border-focus);
+    box-shadow: inset 0 1px 3px rgba(0,0,0,0.15), var(--focus-ring);
+}
+
 select {
     width: 100%;
     padding: 10px 14px;
@@ -761,6 +790,41 @@ select option {
 
 [data-theme="light"] select {
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' fill='none'%3E%3Cpath d='M1 1l4 4 4-4' stroke='rgba(0,0,0,0.25)' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+
+input[type="number"] {
+    width: 100%;
+    padding: 10px 14px;
+    background: var(--bg-input);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    font-family: var(--font-body);
+    font-size: var(--text-base);
+    font-weight: 500;
+    outline: none;
+    -moz-appearance: textfield;
+    box-sizing: border-box;
+    transition: border-color 0.25s var(--ease-out), box-shadow 0.25s var(--ease-out);
+}
+
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+    opacity: 0.4;
+}
+
+input[type="number"]:hover {
+    border-color: var(--border-focus);
+}
+
+input[type="number"]:focus-visible {
+    border-color: var(--border-focus);
+    box-shadow: inset 0 1px 3px rgba(0,0,0,0.15), var(--focus-ring);
+}
+
+input[type="number"]::placeholder {
+    color: var(--text-muted);
+    font-weight: 400;
 }
 
 
@@ -1316,6 +1380,16 @@ select option {
 
 .secondary-btn:active {
     transform: scale(0.98);
+}
+
+.reset-btn {
+    color: var(--text-muted);
+    border-color: transparent;
+}
+
+.reset-btn:hover {
+    color: var(--text-primary);
+    border-color: var(--border-focus);
 }
 
 

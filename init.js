@@ -32,6 +32,15 @@ bindSelect('table-shape', 'tableShape');
 bindSelect('seating-density', 'seatingDensity');
 bindSelect('video-bar', 'videoBar');
 
+// ── Seating capacity number input ────────────────────────────
+DOM['seat-capacity-input'].addEventListener('change', () => {
+    const target = parseInt(DOM['seat-capacity-input'].value, 10);
+    if (!isNaN(target) && target >= 0) autoConfigureForCapacity(target);
+});
+DOM['seat-capacity-input'].addEventListener('keydown', e => {
+    if (e.key === 'Enter') DOM['seat-capacity-input'].blur();
+});
+
 // ── Wire up center mode select ──────────────────────────────
 DOM['center-mode'].addEventListener('change', () => {
     const val = DOM['center-mode'].value;
@@ -198,6 +207,7 @@ document.querySelectorAll('[data-action="set-units"]').forEach(btn => {
 // ── Download, Export, Import ─────────────────────────────────
 document.getElementById('download-btn').addEventListener('click', downloadLayout);
 document.getElementById('download-pdf-btn').addEventListener('click', downloadPDF);
+document.getElementById('room-name').addEventListener('input', e => { state.roomName = e.target.value; debouncedAutoSave(); });
 document.getElementById('export-btn').addEventListener('click', exportConfig);
 document.getElementById('import-btn').addEventListener('click', () => {
     document.getElementById('import-file-input').click();
@@ -206,6 +216,40 @@ document.getElementById('import-file-input').addEventListener('change', importCo
 document.getElementById('clear-autosave-btn').addEventListener('click', () => {
     localStorage.removeItem('av-planner-autosave');
     showToast('Saved layout cleared');
+});
+document.getElementById('reset-defaults-btn').addEventListener('click', () => {
+    _suppressHistory = true;
+    Object.assign(state, {
+        roomLength: 20, roomWidth: 15, ceilingHeight: 9,
+        tableLength: 8, tableWidth: 4, tableDist: 4,
+        tableShape: 'rectangular', tableHeight: 30, tableX: 0, tableRotation: 0,
+        seatingDensity: 'normal',
+        tables: [{ id: 1, shape: 'rectangular', length: 8, width: 4, x: 0, dist: 4, height: 30, rotation: 0 }],
+        selectedTableId: 1,
+        displayCount: 1, displaySize: 65, displayElev: 54, displayOffsetX: 0, displayWall: 'north',
+        brand: 'neat', videoBar: 'neat-bar-gen2',
+        mountPos: 'below',
+        includeCenter: false, includeDualCenter: false, includeMicPod: false, includeDualMicPod: false,
+        showCamera: false, showMic: false,
+        showGrid: false, showViewAngle: false, showSnap: true,
+        viewMode: 'top',
+        centerPos: { x: 0, y: 0 }, center2Pos: { x: 0, y: 0 },
+        micPodPos: { x: 0, y: 0 }, micPod2Pos: { x: 0, y: 0 },
+        viewerDist: 12, viewerOffset: 0,
+        povYaw: 0,
+        posture: 'seated',
+        povPerspective: 'audience',
+        structuralElements: [],
+        selectedElementId: null,
+        measurements: [],
+        measureToolActive: false,
+        roomName: ''
+    });
+    _suppressHistory = false;
+    syncUIFromState();
+    render();
+    pushHistory('Reset to defaults');
+    showToast('Reset to defaults', 'success');
 });
 
 // ── Info overlay toggle ──────────────────────────────────────

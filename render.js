@@ -10,7 +10,10 @@ function updateHeaderDOM(eq) {
         ? ' + 2× ' + EQUIPMENT[getCenterEqKey()].name
         : (state.includeCenter ? ' + ' + EQUIPMENT[getCenterEqKey()].name : '');
     DOM['header-device'].textContent = eq.name + centerSuffix;
-    DOM['header-capacity'].textContent = `Capacity: ${calcTotalCapacity()}`;
+    const cap = calcTotalCapacity();
+    DOM['header-capacity'].textContent = `Capacity: ${cap}`;
+    const capInput = DOM['seat-capacity-input'];
+    if (capInput && document.activeElement !== capInput) capInput.value = cap;
     DOM['mount-row'].style.display =
         (eq.type === 'bar') ? '' : 'none';
 
@@ -82,7 +85,7 @@ function renderBackground() {
     drawRoom(bgCtx, rx, ry, rw, rl, ppf);
 
     // Structural elements (windows, doors) on walls
-    const wallThickBg = Math.max(3, ppf * 0.2);
+    const wallThickBg = Math.max(5, ppf * 0.25);
     drawStructuralElements(bgCtx, rx, ry, rw, rl, ppf, wallThickBg);
 
     // Dimension labels

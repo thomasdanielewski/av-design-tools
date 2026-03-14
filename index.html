@@ -197,6 +197,10 @@
                             <option value="dense">Dense</option>
                         </select>
                     </div>
+                    <div class="control-row">
+                        <div class="control-label"><label for="seat-capacity-input">Seating Capacity</label></div>
+                        <input type="number" id="seat-capacity-input" min="0" max="60" step="1" placeholder="—" title="Enter a target seat count to auto-resize the selected table">
+                    </div>
                     <!-- Table manager: list + add/remove + arrangements -->
                     <div class="table-manager">
                         <div class="table-manager-header">
@@ -425,16 +429,18 @@
 
             <!-- Actions -->
             <div class="control-group" style="border-bottom:none;padding-bottom:24px">
-                <button class="download-btn" id="download-btn">↓ Download Layout</button>
-                <button class="download-btn" id="download-pdf-btn" style="margin-top:8px">↓ Download PDF</button>
-                <div class="action-btn-row">
-                    <button class="secondary-btn" id="export-btn" title="Export JSON configuration">⬇ Export
-                        Config</button>
-                    <button class="secondary-btn" id="import-btn" title="Import JSON configuration">⬆ Import
-                        Config</button>
+                <input type="text" id="room-name" placeholder="Room / space name (optional)" maxlength="80">
+                <div class="action-btn-row" style="margin-top:8px">
+                    <button class="download-btn" id="download-btn">↓ Layout</button>
+                    <button class="download-btn" id="download-pdf-btn">↓ PDF</button>
+                </div>
+                <div class="action-btn-row" style="margin-top:8px">
+                    <button class="secondary-btn" id="export-btn" title="Export JSON configuration">⬇ Export Config</button>
+                    <button class="secondary-btn" id="import-btn" title="Import JSON configuration">⬆ Import Config</button>
                     <input type="file" id="import-file-input" accept=".json" style="display:none">
                 </div>
                 <button class="secondary-btn" id="clear-autosave-btn" title="Clear auto-saved layout from local storage" style="margin-top:8px;width:100%">✕ Clear saved layout</button>
+                <button class="secondary-btn reset-btn" id="reset-defaults-btn" title="Reset all settings to defaults" style="margin-top:8px;width:100%">⟲ Reset to Defaults</button>
             </div>
         </div>
     </aside>
@@ -543,7 +549,7 @@
         </button>
     </div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.2/jspdf.umd.min.js"></script>
+    <script src="jspdf.umd.min.js"></script>
     <script src="data.js?v=3"></script>
     <script src="constants.js?v=3"></script>
     <script src="theme.js?v=3"></script>

@@ -481,3 +481,59 @@ function circleOverlapsAABB(circle, rect) {
 
     return (dx * dx + dy * dy) < (circle.radius * circle.radius);
 }
+
+/**
+ * Auto-configure the selected table's length (and density if needed) to
+ * achieve a target total seating capacity as closely as possible.
+ */
+function autoConfigureForCapacity(target) {
+    syncTableFromFlatState();
+    const sel = getSelectedTable();
+
+    // Target = 0 → turn off seating
+    if (target <= 0) {
+        state.seatingDensity = 'none';
+        DOM['seating-density'].value = 'none';
+        pushHistory('set seating capacity');
+        scheduleRender();
+        return;
+    }
+
+    const origDensity = state.seatingDensity === 'none' ? 'normal' : state.seatingDensity;
+    // Try current density first; fall back to others only if needed
+    const densityOrder = [origDensity, ...['sparse', 'normal', 'dense'].filter(d => d !== origDensity)];
+
+    let bestDensity = origDensity;
+    let bestLength = sel.length;
+    let bestDiff = Infinity;
+
+    const TABLE_MIN = 4, TABLE_MAX = 24, TABLE_STEP = 0.5;
+
+    outer:
+    for (const density of densityOrder) {
+        state.seatingDensity = density;
+        for (let len = TABLE_MIN; len <= TABLE_MAX; len += TABLE_STEP) {
+            const testTable = { ...sel, length: len };
+            const count = getChairPositions(testTable).length;
+            const diff = Math.abs(count - target);
+            if (diff < bestDiff) {
+                bestDiff = diff;
+                bestDensity = density;
+                bestLength = len;
+            }
+            if (diff === 0) break outer;
+        }
+    }
+
+    // Apply the best-found configuration
+    state.seatingDensity = bestDensity;
+    DOM['seating-density'].value = bestDensity;
+
+    sel.length = bestLength;
+    state.tableLength = bestLength;
+    syncFlatStateFromTable(sel);
+    updateTableSliders();
+
+    pushHistory('set seating capacity');
+    scheduleRender();
+}

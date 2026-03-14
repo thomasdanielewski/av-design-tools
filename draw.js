@@ -203,13 +203,13 @@ function drawGrid(drawCtx, rx, ry, rw, rl, ppf) {
 function drawRoom(drawCtx, rx, ry, rw, rl, ppf) {
     drawCtx.fillStyle = cc().bg;
     drawCtx.strokeStyle = cc().roomStroke;
-    drawCtx.lineWidth = 1.5;
-    roundRect(ctx, rx, ry, rw, rl, 4);
+    drawCtx.lineWidth = 3;
+    roundRect(drawCtx, rx, ry, rw, rl, 4);
     drawCtx.fill();
     drawCtx.stroke();
 
     // Display wall accent strip
-    const wallThick = Math.max(3, ppf * 0.2);
+    const wallThick = Math.max(5, ppf * 0.25);
     drawCtx.fillStyle = cc().wallAccent;
     if (state.displayWall === 'south') {
         drawCtx.fillRect(rx, ry + rl - wallThick, rw, wallThick);
@@ -272,7 +272,7 @@ function drawViewAngle(drawCtx, dispX, dispY, rl, ppf, isHovered) {
 
         // Background pill
         drawCtx.fillStyle = cc().viewPill;
-        roundRect(ctx,
+        roundRect(drawCtx,
             labelX - textWidth / 2 - px,
             labelY - 10 - py,
             textWidth + px * 2,
@@ -744,8 +744,8 @@ function drawTable(drawCtx, ox, ry, wallThick, ppf) {
             drawCtx.lineWidth = 2;
             drawCtx.setLineDash([4, 3]);
             if (t.shape === 'rectangular') {
-                roundRect(ctx, x0, y0, tw, tl, 6); drawCtx.fill();
-                roundRect(ctx, x0, y0, tw, tl, 6); drawCtx.stroke();
+                roundRect(drawCtx, x0, y0, tw, tl, 6); drawCtx.fill();
+                roundRect(drawCtx, x0, y0, tw, tl, 6); drawCtx.stroke();
             } else if (t.shape === 'oval') {
                 drawCtx.beginPath(); drawCtx.ellipse(0, 0, tw / 2, tl / 2, 0, 0, Math.PI * 2); drawCtx.fill();
                 drawCtx.beginPath(); drawCtx.ellipse(0, 0, tw / 2, tl / 2, 0, 0, Math.PI * 2); drawCtx.stroke();

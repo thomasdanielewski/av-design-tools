@@ -17,13 +17,15 @@ function downloadLayout() {
 
     // 3. Trigger the download at full quality
     const timestamp = new Date().toISOString().slice(0, 10);
+    const nameSlug = state.roomName ? '-' + state.roomName.trim().replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-|-$/g, '') : '';
     const l = document.createElement('a');
-    l.download = `AV-Room-Layout-${state.viewMode}-${timestamp}.png`;
+    l.download = `AV-Room-Layout${nameSlug}-${state.viewMode}-${timestamp}.png`;
     l.href = exportCanvas.toDataURL('image/png');
     l.click();
 }
 
 function downloadPDF() {
+    try {
     // 1. Build composite canvas (same pattern as downloadLayout)
     const exportCanvas = document.createElement('canvas');
     exportCanvas.width = canvas.width;
@@ -37,6 +39,10 @@ function downloadPDF() {
     const imgData = exportCanvas.toDataURL('image/jpeg', 0.92);
 
     // 2. Create landscape A4 PDF
+    if (!window.jspdf) {
+        showToast('PDF library not loaded. Check your internet connection and try again.', 'error');
+        return;
+    }
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF('l', 'mm', 'a4');
 
@@ -63,7 +69,7 @@ function downloadPDF() {
 
     // 4. Summary text block
     const eq = EQUIPMENT[state.videoBar];
-    const timestamp = new Date().toISOString().slice(0, 10);
+    const timestamp = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
     const dimStr = `${formatFtIn(state.roomLength)} × ${formatFtIn(state.roomWidth)} × ${formatFtIn(state.ceilingHeight)} ceiling`;
     const dispStr = `${state.displayCount === 2 ? 'Dual' : 'Single'} ${state.displaySize}" display`;
 
@@ -85,7 +91,8 @@ function downloadPDF() {
 
     doc.setFontSize(13);
     doc.setFont('helvetica', 'bold');
-    doc.text('AV Room Layout', textX, textY);
+    const title = state.roomName ? `AV Room Layout — ${state.roomName}` : 'AV Room Layout';
+    doc.text(title, textX, textY);
     doc.setFontSize(9);
     doc.setFont('helvetica', 'normal');
     textY += lineH + 1;
@@ -97,7 +104,12 @@ function downloadPDF() {
     doc.text(`Date:  ${timestamp}`, textX, textY);
 
     // 5. Save
-    doc.save(`AV-Room-Layout-${timestamp}.pdf`);
+    const nameSlug = state.roomName ? '-' + state.roomName.trim().replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-|-$/g, '') : '';
+    doc.save(`AV-Room-Layout${nameSlug}-${timestamp}.pdf`);
+    } catch (err) {
+        console.error('PDF export failed:', err);
+        showToast('PDF export failed: ' + err.message, 'error');
+    }
 }
 
 function exportConfig() {
@@ -107,7 +119,8 @@ function exportConfig() {
     );
     const a = document.createElement('a');
     a.href = 'data:application/json,' + encodeURIComponent(data);
-    a.download = 'av-room-config.json';
+    const nameSlug = state.roomName ? '-' + state.roomName.trim().replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-|-$/g, '') : '';
+    a.download = `av-room-config${nameSlug}.json`;
     a.click();
 }
 

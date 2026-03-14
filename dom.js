@@ -46,7 +46,7 @@ function cacheDOMRefs() {
         'mic-warning', 'mic-warning-btn', 'mic-warning-text',
         'micpod-placement-warning', 'micpod-placement-warning-text',
         'room-warning', 'room-warning-text',
-        'seating-density', 'header-capacity',
+        'seating-density', 'seat-capacity-input', 'header-capacity',
         'header-room', 'header-device', 'mount-row', 'info-overlay',
         'info-content', 'info-title', 'undo-btn', 'redo-btn', 'share-btn',
         'legend-camera', 'legend-mic', 'download-btn', 'export-btn',
@@ -63,7 +63,7 @@ function cacheDOMRefs() {
         'val-element-position', 'val-element-width',
         'val-element-height', 'val-element-sill',
         'swing-flip-row', 'flip-swing-btn',
-        'unit-toggle',
+        'unit-toggle', 'room-name',
         'measure-btn',
         'pov-perspective-toggle'
     ];
