@@ -10,6 +10,9 @@ document.querySelectorAll('.control-label .value[data-slider]').forEach(badge =>
 // ── Wire up all sliders ──────────────────────────────────────
 bindSlider('room-length', 'roomLength', 'val-room-length', true);
 bindSlider('room-width', 'roomWidth', 'val-room-width', true);
+
+// Update dual center availability when room depth changes
+DOM['room-length'].addEventListener('input', () => updateCenterModeOptions());
 bindSlider('room-ceiling-height', 'ceilingHeight', 'val-room-ceiling-height', true);
 bindSlider('table-rotation', 'tableRotation', 'val-table-rotation');
 bindSlider('table-x', 'tableX', 'val-table-x');
@@ -22,14 +25,32 @@ bindSlider('display-elev', 'displayElev', 'val-display-elev');
 bindSlider('display-offset-x', 'displayOffsetX', 'val-display-offset-x');
 bindSlider('viewer-dist', 'viewerDist', 'val-viewer-dist');
 bindSlider('viewer-offset', 'viewerOffset', 'val-viewer-offset');
+bindSlider('pov-yaw', 'povYaw', 'val-pov-yaw');
 
 // ── Wire up selects ──────────────────────────────────────────
 bindSelect('table-shape', 'tableShape');
 bindSelect('seating-density', 'seatingDensity');
 bindSelect('video-bar', 'videoBar');
 
+// ── Wire up center mode select ──────────────────────────────
+DOM['center-mode'].addEventListener('change', () => {
+    const val = DOM['center-mode'].value;
+    state.includeCenter = val === 'single' || val === 'dual';
+    state.includeDualCenter = val === 'dual';
+
+    // Auto-place centers in a line along table depth (toward/away from display)
+    if (val === 'dual') {
+        state.centerPos = { x: 0, y: -2 };
+        state.center2Pos = { x: 0, y: 2 };
+    } else if (val === 'single') {
+        state.centerPos = { x: 0, y: 0 };
+    }
+
+    pushHistory();
+    render();
+});
+
 // ── Wire up checkboxes ───────────────────────────────────────
-bindCheckbox('include-center', 'includeCenter');
 bindCheckbox('include-micpod', 'includeMicPod');
 bindCheckbox('show-view-angle', 'showViewAngle');
 bindCheckbox('show-camera', 'showCamera');
@@ -80,6 +101,8 @@ document.getElementById('remove-element-btn').addEventListener('click', removeEl
 document.getElementById('element-wall').addEventListener('change', onElementWallChange);
 document.getElementById('element-position').addEventListener('input', onElementPositionInput);
 document.getElementById('element-width').addEventListener('input', onElementWidthInput);
+document.getElementById('element-height').addEventListener('input', onElementHeightInput);
+document.getElementById('element-sill').addEventListener('input', onElementSillInput);
 document.getElementById('flip-swing-btn').addEventListener('click', flipSwing);
 
 // ── Room preset pills ────────────────────────────────────────

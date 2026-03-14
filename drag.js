@@ -113,9 +113,11 @@ function getDragMetrics(e) {
     const tableX_px = ox + selT.x * ppf;
     const ty2 = ry + wt + selT.dist * ppf + (selT.length * ppf) / 2;
 
-    // Center device position
+    // Center device positions
     const cX = tableX_px + state.centerPos.x * ppf;
     const cY = ty2 + state.centerPos.y * ppf;
+    const c2X = tableX_px + state.center2Pos.x * ppf;
+    const c2Y = ty2 + state.center2Pos.y * ppf;
 
     // Display / video-bar position (wall-aware)
     const eq = EQUIPMENT[state.videoBar];
@@ -163,9 +165,22 @@ function getDragMetrics(e) {
         mainDeviceY = dispY;
     }
 
-    return { mx, my, ppf, ox, oy, ry, wt, ty2, tableX_px, cX, cY,
+    return { mx, my, ppf, ox, oy, rw, rl, rx, ry, wt, ty2, tableX_px, cX, cY, c2X, c2Y,
              dispOx: dispX, dispY, dispWidthPx, dispDepthPx, eqWidthPx, eqDepthPx,
              mainDeviceX, mainDeviceY, isHoriz };
+}
+
+/** Hit-test a structural element (door/window) on a wall for drag */
+function hitTestStructuralElement(mx, my, el, rx, ry, rw, rl, ppf, wt) {
+    const { x, y, isHorizontal, w } = getElementWallCoords(el, rx, ry, rw, rl, ppf, wt);
+    const tol = DRAG_TOLERANCE + 4;
+    if (isHorizontal) {
+        return mx >= x - tol && mx <= x + w + tol &&
+               my >= y - tol && my <= y + wt + tol;
+    } else {
+        return mx >= x - tol && mx <= x + wt + tol &&
+               my >= y - tol && my <= y + w + tol;
+    }
 }
 
 /** Hit-test the display + video bar area for lateral drag */
@@ -221,19 +236,29 @@ canvas.addEventListener('mousemove', e => {
     mousePos.x = (e.clientX - _rect.left) / _mzoom;
     mousePos.y = (e.clientY - _rect.top)  / _mzoom;
 
-    // POV mode: display is grabbable, background shows pan cursor
+    // POV mode: display is grabbable, structural elements grabbable/resizable, background shows pan cursor
     if (state.viewMode === 'pov') {
-        if (!isDraggingDisplayPOV && !isDraggingViewerOffset) {
+        if (!isDraggingDisplayPOV && !isDraggingViewerOffset && !isDraggingPOVYaw && !isDraggingElementPOV && !isResizingElementPOV) {
             const b = getPOVDisplayScreenBounds();
-            canvas.style.cursor =
-                (mousePos.x >= b.left && mousePos.x <= b.right &&
-                 mousePos.y >= b.top  && mousePos.y <= b.bot)
-                ? 'grab' : 'ew-resize';
+            const onDisplay = (mousePos.x >= b.left && mousePos.x <= b.right &&
+                 mousePos.y >= b.top  && mousePos.y <= b.bot);
+            if (onDisplay) {
+                canvas.style.cursor = 'grab';
+            } else {
+                const hit = hitTestStructuralElementPOV(mousePos.x, mousePos.y);
+                if (hit) {
+                    if (hit.edge === 'left' || hit.edge === 'right') canvas.style.cursor = 'ew-resize';
+                    else if (hit.edge === 'top' || hit.edge === 'bottom') canvas.style.cursor = 'ns-resize';
+                    else canvas.style.cursor = 'grab';
+                } else {
+                    canvas.style.cursor = 'grab';
+                }
+            }
         }
         return;
     }
 
-    if (state.viewMode !== 'top' || isPanning || isDraggingTableId !== null || isDraggingCenter || isDraggingDisplay || isDraggingRotate) return;
+    if (state.viewMode !== 'top' || isPanning || isDraggingTableId !== null || isDraggingCenter || isDraggingCenter2 || isDraggingDisplay || isDraggingRotate) return;
 
     // Space-pan mode: show grab hand, skip normal hit-testing.
     if (isSpaceDown) {
@@ -245,7 +270,7 @@ canvas.addEventListener('mousemove', e => {
         return;
     }
 
-    const { mx, my, ppf, ox, ry, wt, cX, cY, dispOx, dispY, dispWidthPx, dispDepthPx, eqWidthPx, eqDepthPx, mainDeviceX, mainDeviceY, isHoriz } = getDragMetrics(e);
+    const { mx, my, ppf, ox, oy, rw, rl, rx, ry, wt, cX, cY, c2X, c2Y, dispOx, dispY, dispWidthPx, dispDepthPx, eqWidthPx, eqDepthPx, mainDeviceX, mainDeviceY, isHoriz } = getDragMetrics(e);
 
     // Rotation handle takes cursor priority over table body
     const selT = getSelectedTable();
@@ -257,6 +282,7 @@ canvas.addEventListener('mousemove', e => {
             const ceq = EQUIPMENT[getCenterEqKey()];
             const cs = Math.max(12, ceq.width * ppf * 3);
             if (Math.sqrt((mx - cX) ** 2 + (my - cY) ** 2) <= cs) onTarget = true;
+            if (!onTarget && state.includeDualCenter && Math.sqrt((mx - c2X) ** 2 + (my - c2Y) ** 2) <= cs) onTarget = true;
         }
         if (!onTarget && isPointOnDisplay(mx, my, dispOx, dispY, dispWidthPx, dispDepthPx, eqWidthPx, eqDepthPx, mainDeviceX, mainDeviceY, isHoriz)) {
             onTarget = true;
@@ -264,6 +290,11 @@ canvas.addEventListener('mousemove', e => {
         if (!onTarget) {
             for (const t of state.tables) {
                 if (isPointInTableHitbox(mx, my, t, ox, ry, wt, ppf)) { onTarget = true; break; }
+            }
+        }
+        if (!onTarget) {
+            for (const el of state.structuralElements) {
+                if (hitTestStructuralElement(mx, my, el, rx, ry, rw, rl, ppf, wt)) { onTarget = true; break; }
             }
         }
     }
@@ -284,13 +315,16 @@ function getPOVDisplayScreenBounds() {
     const rect = canvas.getBoundingClientRect();
     const cw = rect.width;
     const ch = rect.height;
-    const cx = cw / 2;
-    const cy = ch / 2;
+    const screenCX = cw / 2;
+    const screenCY = ch / 2;
     const vd = Math.max(1, state.viewerDist);
     const vo = state.viewerOffset;
     const eye = state.posture === 'seated' ? 48 : 65;
-    const s = 1000 / vd; // px per foot at the display wall
-    // frontWallWidth is used for drag bounds clamping
+    const FOCAL = 1000;
+    const NEAR = 0.3;
+    const yaw = (state.povYaw || 0) * Math.PI / 180;
+    const cosY = Math.cos(yaw), sinY = Math.sin(yaw);
+
     const isNS = (state.displayWall === 'north' || state.displayWall === 'south');
     const frontWallWidth = isNS ? state.roomWidth : state.roomLength;
 
@@ -313,27 +347,177 @@ function getPOVDisplayScreenBounds() {
         dvc = dyb - ehi / 2 - 2;
     }
 
-    // Screen x for a given world-x (feet)
-    const px = x => cx + (x - vo) * s;
-    // Screen y for a given world-y (inches)
-    const py = y => cy - (y - eye) * (s / 12);
+    // Yaw-aware projection for display wall (z=0)
+    function projPOV(x, yIn) {
+        const dx = x - vo;
+        const dz = 0 - vd; // display wall at z=0
+        const forward = dx * sinY - dz * cosY;
+        if (forward < NEAR) return null;
+        const right = dx * cosY + dz * sinY;
+        const s = FOCAL / forward;
+        return { x: screenCX + right * s, y: screenCY - (yIn - eye) * (s / 12) };
+    }
 
-    // Widest horizontal extent (display or videobar)
     const halfW = Math.max(
         state.displayCount === 1 ? dwf / 2 : dwf + 0.25,
         ewf / 2
     );
-    // Tallest vertical extent
     const topIn  = state.mountPos === 'above' ? dvc + ehi / 2 : dyt;
     const botIn  = state.mountPos === 'above' ? dyb            : dvc - ehi / 2;
 
+    const pTL = projPOV(dox - halfW, topIn);
+    const pBR = projPOV(dox + halfW, botIn);
+
+    if (!pTL || !pBR) {
+        return { left: -9999, right: -9999, top: -9999, bot: -9999, s: 0, cx: screenCX };
+    }
+
+    const s = FOCAL / Math.max(NEAR, vd); // approximate for drag scaling
     return {
-        left:  px(dox - halfW) - DRAG_TOLERANCE,
-        right: px(dox + halfW) + DRAG_TOLERANCE,
-        top:   py(topIn)       - DRAG_TOLERANCE,
-        bot:   py(botIn)       + DRAG_TOLERANCE,
-        s, cx
+        left:  Math.min(pTL.x, pBR.x) - DRAG_TOLERANCE,
+        right: Math.max(pTL.x, pBR.x) + DRAG_TOLERANCE,
+        top:   Math.min(pTL.y, pBR.y) - DRAG_TOLERANCE,
+        bot:   Math.max(pTL.y, pBR.y) + DRAG_TOLERANCE,
+        s, cx: screenCX
     };
+}
+
+/**
+ * Get POV element geometry for a structural element.
+ * Returns per-element height values in inches and screen-projected corners.
+ */
+function getElementPOVHeights(el) {
+    const elHeightIn = (el.height || (el.type === 'door' ? DOOR_HEIGHT_DEFAULT : WINDOW_HEIGHT_DEFAULT)) * 12;
+    const elSillIn = el.type === 'window'
+        ? (el.sillHeight != null ? el.sillHeight : WINDOW_SILL_DEFAULT) * 12
+        : 0;
+    const topIn = el.type === 'window' ? elSillIn + elHeightIn : elHeightIn;
+    const botIn = elSillIn;
+    return { topIn, botIn };
+}
+
+/**
+ * Hit-test structural elements in POV mode.
+ * Returns { el, edge } where edge is null (body), 'left', 'right', 'top', or 'bottom'.
+ */
+function hitTestStructuralElementPOV(mx, my) {
+    const rect = canvas.getBoundingClientRect();
+    const cw = rect.width;
+    const ch = rect.height;
+    const screenCX = cw / 2;
+    const screenCY = ch / 2;
+    const vd = Math.max(1, state.viewerDist);
+    const vo = state.viewerOffset;
+    const eye = state.posture === 'seated' ? 48 : 65;
+    const FOCAL = 1000;
+    const NEAR = 0.3;
+    const yaw = (state.povYaw || 0) * Math.PI / 180;
+    const cosYaw = Math.cos(yaw), sinYaw = Math.sin(yaw);
+
+    const dw = state.displayWall;
+    const isNS = (dw === 'north' || dw === 'south');
+    const frontWallWidth = isNS ? state.roomWidth : state.roomLength;
+    const roomDepth = isNS ? state.roomLength : state.roomWidth;
+    const rHW = frontWallWidth / 2;
+
+    function proj(x, y, z) {
+        const dx = x - vo;
+        const dz = z - vd;
+        const forward = dx * sinYaw - dz * cosYaw;
+        if (forward < NEAR) return null;
+        const right = dx * cosYaw + dz * sinYaw;
+        const s = FOCAL / forward;
+        return { x: screenCX + right * s, y: screenCY - (y - eye) * (s / 12) };
+    }
+
+    const EDGE_ZONE = 8; // pixels from edge to trigger resize
+
+    for (const el of state.structuralElements) {
+        let elX, elZ, elW = el.width;
+        let isSideWall = false;
+
+        if (el.wall === dw) {
+            const wallLen = getWallLength(el.wall);
+            elX = el.position + elW / 2 - wallLen / 2;
+            elZ = 0;
+        } else if (
+            (dw === 'north' && el.wall === 'south') ||
+            (dw === 'south' && el.wall === 'north') ||
+            (dw === 'east' && el.wall === 'west') ||
+            (dw === 'west' && el.wall === 'east')
+        ) {
+            const wallLen = getWallLength(el.wall);
+            if (dw === 'north' || dw === 'south') {
+                elX = (dw === 'north')
+                    ? el.position + elW / 2 - wallLen / 2
+                    : -(el.position + elW / 2 - wallLen / 2);
+            } else {
+                elX = (dw === 'east')
+                    ? el.position + elW / 2 - wallLen / 2
+                    : -(el.position + elW / 2 - wallLen / 2);
+            }
+            elZ = roomDepth;
+        } else {
+            isSideWall = true;
+            let isLeftWall;
+            if (dw === 'north') isLeftWall = el.wall === 'west';
+            else if (dw === 'south') isLeftWall = el.wall === 'east';
+            else if (dw === 'east') isLeftWall = el.wall === 'north';
+            else isLeftWall = el.wall === 'south';
+
+            elX = isLeftWall ? -rHW : rHW;
+
+            if (dw === 'north') {
+                elZ = el.wall === 'west' ? el.position : (getWallLength(el.wall) - el.position - elW);
+            } else if (dw === 'south') {
+                elZ = el.wall === 'east' ? el.position : (getWallLength(el.wall) - el.position - elW);
+            } else if (dw === 'east') {
+                elZ = el.wall === 'north' ? el.position : (getWallLength(el.wall) - el.position - elW);
+            } else {
+                elZ = el.wall === 'south' ? el.position : (getWallLength(el.wall) - el.position - elW);
+            }
+        }
+
+        const { topIn, botIn } = getElementPOVHeights(el);
+
+        if (isSideWall) {
+            const pTL = proj(elX, topIn, elZ);
+            const pTR = proj(elX, topIn, elZ + elW);
+            const pBL = proj(elX, botIn, elZ);
+            const pBR = proj(elX, botIn, elZ + elW);
+            if (!pTL || !pTR || !pBL || !pBR) continue;
+            const left = Math.min(pTL.x, pTR.x, pBL.x, pBR.x);
+            const right = Math.max(pTL.x, pTR.x, pBL.x, pBR.x);
+            const top = Math.min(pTL.y, pTR.y);
+            const bot = Math.max(pBL.y, pBR.y);
+            if (mx >= left - DRAG_TOLERANCE && mx <= right + DRAG_TOLERANCE &&
+                my >= top - DRAG_TOLERANCE && my <= bot + DRAG_TOLERANCE) {
+                let edge = null;
+                if (my <= top + EDGE_ZONE) edge = 'top';
+                else if (my >= bot - EDGE_ZONE) edge = 'bottom';
+                return { el, edge };
+            }
+        } else {
+            const halfW = elW / 2;
+            const pTL = proj(elX - halfW, topIn, elZ);
+            const pBR = proj(elX + halfW, botIn, elZ);
+            if (!pTL || !pBR) continue;
+            const left = Math.min(pTL.x, pBR.x);
+            const right = Math.max(pTL.x, pBR.x);
+            const top = Math.min(pTL.y, pBR.y);
+            const bot = Math.max(pTL.y, pBR.y);
+            if (mx >= left - DRAG_TOLERANCE && mx <= right + DRAG_TOLERANCE &&
+                my >= top - DRAG_TOLERANCE && my <= bot + DRAG_TOLERANCE) {
+                let edge = null;
+                if (mx <= left + EDGE_ZONE) edge = 'left';
+                else if (mx >= right - EDGE_ZONE) edge = 'right';
+                else if (my <= top + EDGE_ZONE) edge = 'top';
+                else if (my >= bot - EDGE_ZONE) edge = 'bottom';
+                return { el, edge };
+            }
+        }
+    }
+    return null;
 }
 
 // ── Drag state ───────────────────────────────────────────────
@@ -341,6 +525,7 @@ let isDraggingTableId = null;
 let dragTableOffset = null;
 let dragTableGhost = null;
 let isDraggingCenter = false;
+let isDraggingCenter2 = false;
 let isDraggingDisplay = false;
 let dragDisplayOffsetX = 0;
 let isDraggingDisplayPOV = false;
@@ -351,8 +536,26 @@ let dragDisplayPOVStartElev = 0;
 let isDraggingViewerOffset = false;
 let dragViewerOffsetStartX = 0;
 let dragViewerOffsetStartVal = 0;
+let isDraggingPOVYaw = false;
+let dragPOVYawStartX = 0;
+let dragPOVYawStartVal = 0;
 let isDraggingRotate = false;
 let isDraggingRotateTableId = null;
+let isDraggingElement = false;
+let isDraggingElementId = null;
+let dragElementOffset = 0;
+let isDraggingElementPOV = false;
+let isDraggingElementPOVId = null;
+let dragElementPOVStartMouse = 0;
+let dragElementPOVStartPos = 0;
+let isResizingElementPOV = false;
+let resizeElementPOVId = null;
+let resizeElementPOVEdge = null;   // 'left','right','top','bottom'
+let resizeElementPOVStartMouse = 0;
+let resizeElementPOVStartWidth = 0;
+let resizeElementPOVStartHeight = 0;
+let resizeElementPOVStartSill = 0;
+let resizeElementPOVStartPos = 0;
 
 // ── Viewport pan state (middle-click or Space+left-drag) ─────
 let isPanning = false;
@@ -367,11 +570,19 @@ function resetDrag() {
     isPanning = false;
     isDraggingTableId = null; dragTableOffset = null; dragTableGhost = null;
     isDraggingCenter = false;
+    isDraggingCenter2 = false;
     isDraggingDisplay = false; dragDisplayOffsetX = 0;
     isDraggingDisplayPOV = false; dragDisplayPOVStartX = 0; dragDisplayPOVStartY = 0;
     dragDisplayPOVStartOffset = 0; dragDisplayPOVStartElev = 0;
     isDraggingViewerOffset = false; dragViewerOffsetStartX = 0; dragViewerOffsetStartVal = 0;
+    isDraggingPOVYaw = false; dragPOVYawStartX = 0; dragPOVYawStartVal = 0;
     isDraggingRotate = false; isDraggingRotateTableId = null;
+    isDraggingElement = false; isDraggingElementId = null; dragElementOffset = 0;
+    isDraggingElementPOV = false; isDraggingElementPOVId = null;
+    dragElementPOVStartMouse = 0; dragElementPOVStartPos = 0;
+    isResizingElementPOV = false; resizeElementPOVId = null; resizeElementPOVEdge = null;
+    resizeElementPOVStartMouse = 0; resizeElementPOVStartWidth = 0;
+    resizeElementPOVStartHeight = 0; resizeElementPOVStartSill = 0; resizeElementPOVStartPos = 0;
 }
 
 // ── Mouse down: start drag ───────────────────────────────────
@@ -388,7 +599,7 @@ canvas.addEventListener('mousedown', e => {
         return;
     }
 
-    // POV mode: display drag or viewer pan
+    // POV mode: display drag, structural element drag, or viewer pan
     if (state.viewMode === 'pov') {
         const rect = canvas.getBoundingClientRect();
         const mx = e.clientX - rect.left;
@@ -403,22 +614,62 @@ canvas.addEventListener('mousedown', e => {
             canvas.style.cursor = 'grabbing';
             pushHistory();
         } else {
-            isDraggingViewerOffset = true;
-            dragViewerOffsetStartX = mx;
-            dragViewerOffsetStartVal = state.viewerOffset;
-            canvas.style.cursor = 'ew-resize';
-            pushHistory();
+            const hit = hitTestStructuralElementPOV(mx, my);
+            if (hit) {
+                const hitEl = hit.el;
+                const edge = hit.edge;
+                selectElement(hitEl.id);
+
+                if (edge) {
+                    // Edge drag → resize
+                    isResizingElementPOV = true;
+                    resizeElementPOVId = hitEl.id;
+                    resizeElementPOVEdge = edge;
+                    resizeElementPOVStartWidth = hitEl.width;
+                    resizeElementPOVStartHeight = hitEl.height || (hitEl.type === 'door' ? DOOR_HEIGHT_DEFAULT : WINDOW_HEIGHT_DEFAULT);
+                    resizeElementPOVStartSill = hitEl.type === 'window' ? (hitEl.sillHeight != null ? hitEl.sillHeight : WINDOW_SILL_DEFAULT) : 0;
+                    resizeElementPOVStartPos = hitEl.position;
+                    resizeElementPOVStartMouse = (edge === 'left' || edge === 'right') ? mx : my;
+                    canvas.style.cursor = (edge === 'left' || edge === 'right') ? 'ew-resize' : 'ns-resize';
+                    pushHistory();
+                } else {
+                    // Body drag → move position
+                    isDraggingElementPOV = true;
+                    isDraggingElementPOVId = hitEl.id;
+                    const isSideWall = hitEl.wall !== state.displayWall &&
+                        !((state.displayWall === 'north' && hitEl.wall === 'south') ||
+                          (state.displayWall === 'south' && hitEl.wall === 'north') ||
+                          (state.displayWall === 'east' && hitEl.wall === 'west') ||
+                          (state.displayWall === 'west' && hitEl.wall === 'east'));
+                    dragElementPOVStartMouse = isSideWall ? my : mx;
+                    dragElementPOVStartPos = hitEl.position;
+                    canvas.style.cursor = 'grabbing';
+                    pushHistory();
+                }
+            } else {
+                isDraggingPOVYaw = true;
+                dragPOVYawStartX = mx;
+                dragPOVYawStartVal = state.povYaw || 0;
+                canvas.style.cursor = 'grabbing';
+                pushHistory();
+            }
         }
         return;
     }
 
     if (state.viewMode !== 'top') return;
-    const { mx, my, ppf, ox, ry, wt, cX, cY, dispOx, dispY, dispWidthPx, dispDepthPx, eqWidthPx, eqDepthPx, mainDeviceX, mainDeviceY, isHoriz } = getDragMetrics(e);
+    const { mx, my, ppf, ox, ry, wt, cX, cY, c2X, c2Y, dispOx, dispY, dispWidthPx, dispDepthPx, eqWidthPx, eqDepthPx, mainDeviceX, mainDeviceY, isHoriz } = getDragMetrics(e);
 
-    // Center device takes priority
+    // Center device(s) take priority
     if (state.includeCenter) {
         const ceq = EQUIPMENT[getCenterEqKey()];
         const cs = Math.max(12, ceq.width * ppf * 3);
+        if (state.includeDualCenter && Math.sqrt((mx - c2X) ** 2 + (my - c2Y) ** 2) <= cs) {
+            isDraggingCenter2 = true;
+            canvas.style.cursor = 'grabbing';
+            pushHistory();
+            return;
+        }
         if (Math.sqrt((mx - cX) ** 2 + (my - cY) ** 2) <= cs) {
             isDraggingCenter = true;
             canvas.style.cursor = 'grabbing';
@@ -457,6 +708,22 @@ canvas.addEventListener('mousedown', e => {
             const tcx = ox + t.x * ppf;
             const tcy = ry + wt + t.dist * ppf + (t.length * ppf) / 2;
             dragTableOffset = { x: mx - tcx, y: my - tcy };
+            canvas.style.cursor = 'grabbing';
+            pushHistory();
+            return;
+        }
+    }
+
+    // Check structural elements (doors/windows) for drag
+    for (const el of state.structuralElements) {
+        const { rw, rl, rx } = getDragMetrics(e);
+        if (hitTestStructuralElement(mx, my, el, rx, ry, rw, rl, ppf, wt)) {
+            isDraggingElement = true;
+            isDraggingElementId = el.id;
+            selectElement(el.id);
+            const { x, y, isHorizontal } = getElementWallCoords(el, rx, ry, rw, rl, ppf, wt);
+            // Store offset from mouse to element start position
+            dragElementOffset = isHorizontal ? (mx - x) : (my - y);
             canvas.style.cursor = 'grabbing';
             pushHistory();
             return;
@@ -524,8 +791,190 @@ canvas.addEventListener('mousemove', e => {
         return;
     }
 
-    if (isDraggingTableId === null && !isDraggingCenter && !isDraggingDisplay && !isDraggingRotate) return;
-    const { mx, my, ppf, ox, oy, ry, wt, tableX_px, ty2 } = getDragMetrics(e);
+    if (isDraggingPOVYaw) {
+        const rect = canvas.getBoundingClientRect();
+        const mx = e.clientX - rect.left;
+        // Drag sensitivity: ~0.3 deg per pixel
+        let nv = dragPOVYawStartVal + (mx - dragPOVYawStartX) * 0.3;
+        // Wrap to -180..180
+        while (nv > 180) nv -= 360;
+        while (nv < -180) nv += 360;
+        // Snap to nearest 5 degrees
+        nv = Math.round(nv / 5) * 5;
+        state.povYaw = nv;
+        if (DOM['pov-yaw']) {
+            DOM['pov-yaw'].value = nv;
+            DOM['val-pov-yaw'].textContent = nv + '°';
+            updateSliderTrack(DOM['pov-yaw']);
+        }
+        scheduleRender();
+        return;
+    }
+
+    if (isDraggingElementPOV) {
+        const el = state.structuralElements.find(e => e.id === isDraggingElementPOVId);
+        if (el) {
+            const rect = canvas.getBoundingClientRect();
+            const mx = e.clientX - rect.left;
+            const my = e.clientY - rect.top;
+            const vd = Math.max(1, state.viewerDist);
+            const dw = state.displayWall;
+            const isNS = (dw === 'north' || dw === 'south');
+            const roomDepth = isNS ? state.roomLength : state.roomWidth;
+
+            const isSideWall = el.wall !== dw &&
+                !((dw === 'north' && el.wall === 'south') ||
+                  (dw === 'south' && el.wall === 'north') ||
+                  (dw === 'east' && el.wall === 'west') ||
+                  (dw === 'west' && el.wall === 'east'));
+
+            const wallLen = getWallLength(el.wall);
+            let elZ;
+            if (el.wall === dw) elZ = 0;
+            else if (!isSideWall) elZ = roomDepth;
+            else elZ = el.position; // approximate
+
+            const s = 1000 / Math.max(0.5, vd - elZ);
+            let delta;
+            if (isSideWall) {
+                // Side wall: vertical mouse movement maps to position along wall
+                // But the scale changes with depth, so use approximate scale
+                delta = (my - dragElementPOVStartMouse) / (s / 12) / 12;
+                // Need to account for wall orientation
+                let invert = false;
+                if (dw === 'north') invert = el.wall !== 'west';
+                else if (dw === 'south') invert = el.wall !== 'east';
+                else if (dw === 'east') invert = el.wall !== 'north';
+                else invert = el.wall !== 'south';
+                if (invert) delta = -delta;
+            } else {
+                // Front/back wall: horizontal mouse movement maps to position
+                delta = (mx - dragElementPOVStartMouse) / s;
+                // Determine if position direction matches screen direction
+                let invert = false;
+                if (dw === 'south' || dw === 'west') invert = true;
+                // Back wall also needs consideration
+                if (!isSideWall && el.wall !== dw) {
+                    // Back wall - position direction is opposite
+                    invert = !invert;
+                }
+                if (invert) delta = -delta;
+            }
+
+            let newPos = Math.round((dragElementPOVStartPos + delta) * 4) / 4;
+            newPos = Math.max(0, Math.min(wallLen - el.width, newPos));
+            el.position = newPos;
+
+            if (el.id === state.selectedElementId) {
+                DOM['element-position'].value = newPos;
+                DOM['val-element-position'].textContent = formatValue(newPos, 'ft');
+                updateSliderTrack(DOM['element-position']);
+            }
+            scheduleRender();
+        }
+        return;
+    }
+
+    if (isResizingElementPOV) {
+        const el = state.structuralElements.find(e => e.id === resizeElementPOVId);
+        if (el) {
+            const rect = canvas.getBoundingClientRect();
+            const mx = e.clientX - rect.left;
+            const my = e.clientY - rect.top;
+            const vd = Math.max(1, state.viewerDist);
+            const dw = state.displayWall;
+            const isNS = (dw === 'north' || dw === 'south');
+            const roomDepth = isNS ? state.roomLength : state.roomWidth;
+            const wallLen = getWallLength(el.wall);
+
+            const isSideWall = el.wall !== dw &&
+                !((dw === 'north' && el.wall === 'south') ||
+                  (dw === 'south' && el.wall === 'north') ||
+                  (dw === 'east' && el.wall === 'west') ||
+                  (dw === 'west' && el.wall === 'east'));
+
+            let elZ;
+            if (el.wall === dw) elZ = 0;
+            else if (!isSideWall) elZ = roomDepth;
+            else elZ = el.position;
+
+            const s = 1000 / Math.max(0.5, vd - elZ);
+            const edge = resizeElementPOVEdge;
+
+            if (edge === 'left' || edge === 'right') {
+                // Width resize — always screen-based:
+                //   drag right edge right (positive pixDelta) → wider
+                //   drag left edge left  (negative pixDelta) → wider
+                const pixDelta = mx - resizeElementPOVStartMouse;
+                const deltaFt = pixDelta / s;
+
+                // On inverted walls (south/west display, or back wall),
+                // screen-left = position+width edge, screen-right = position edge.
+                // On normal walls, screen-left = position edge, screen-right = position+width edge.
+                let invert = false;
+                if (dw === 'south' || dw === 'west') invert = true;
+                if (!isSideWall && el.wall !== dw) invert = !invert;
+
+                let newWidth, newPos;
+                if (edge === 'right') {
+                    // Right screen edge dragged: width always grows with positive deltaFt
+                    newWidth = resizeElementPOVStartWidth + deltaFt;
+                    // On inverted walls, right screen edge = position edge, so position must adjust
+                    newPos = invert
+                        ? resizeElementPOVStartPos - deltaFt
+                        : resizeElementPOVStartPos;
+                } else {
+                    // Left screen edge dragged: width grows with negative deltaFt
+                    newWidth = resizeElementPOVStartWidth - deltaFt;
+                    // On normal walls, left screen edge = position edge, so position must adjust
+                    newPos = invert
+                        ? resizeElementPOVStartPos
+                        : resizeElementPOVStartPos + deltaFt;
+                }
+
+                newWidth = Math.round(newWidth * 4) / 4;
+                newWidth = Math.max(1, Math.min(8, newWidth));
+                newPos = Math.round(newPos * 4) / 4;
+                newPos = Math.max(0, Math.min(wallLen - newWidth, newPos));
+                el.width = newWidth;
+                el.position = newPos;
+            } else {
+                // Height resize (top/bottom) — screen-based:
+                //   drag top edge up   (negative pixDelta) → taller
+                //   drag bottom edge down (positive pixDelta) → sill lowers / door shorter
+                const pixDelta = my - resizeElementPOVStartMouse;
+                const deltaFt = -pixDelta * 12 / s / 12; // screen Y inverted vs world Y
+
+                if (edge === 'top') {
+                    let newHeight = Math.round((resizeElementPOVStartHeight + deltaFt) * 4) / 4;
+                    newHeight = Math.max(2, Math.min(10, newHeight));
+                    el.height = newHeight;
+                } else {
+                    // Bottom edge: for windows adjust sill, for doors adjust height
+                    if (el.type === 'window') {
+                        // Drag down = negative deltaFt = sill decreases (window bottom lowers)
+                        let newSill = Math.round((resizeElementPOVStartSill + deltaFt) * 4) / 4;
+                        newSill = Math.max(0, Math.min(8, newSill));
+                        el.sillHeight = newSill;
+                    } else {
+                        let newHeight = Math.round((resizeElementPOVStartHeight + deltaFt) * 4) / 4;
+                        newHeight = Math.max(2, Math.min(10, newHeight));
+                        el.height = newHeight;
+                    }
+                }
+            }
+
+            // Sync controls
+            if (el.id === state.selectedElementId) {
+                updateElementControls(el);
+            }
+            scheduleRender();
+        }
+        return;
+    }
+
+    if (isDraggingTableId === null && !isDraggingCenter && !isDraggingCenter2 && !isDraggingDisplay && !isDraggingRotate && !isDraggingElement) return;
+    const { mx, my, ppf, ox, oy, rw, rl, rx, ry, wt, tableX_px, ty2 } = getDragMetrics(e);
 
     if (isDraggingTableId !== null) {
         const t = state.tables.find(tbl => tbl.id === isDraggingTableId);
@@ -558,6 +1007,14 @@ canvas.addEventListener('mousemove', e => {
         ny = Math.max(-selT.length / 2, Math.min(ny, selT.length / 2));
         state.centerPos = { x: nx, y: ny };
         scheduleRender();
+    } else if (isDraggingCenter2) {
+        const selT = getSelectedTable();
+        let nx = (mx - tableX_px) / ppf;
+        let ny = (my - ty2) / ppf;
+        nx = Math.max(-selT.width / 2, Math.min(nx, selT.width / 2));
+        ny = Math.max(-selT.length / 2, Math.min(ny, selT.length / 2));
+        state.center2Pos = { x: nx, y: ny };
+        scheduleRender();
     } else if (isDraggingDisplay) {
         const dw = state.displayWall;
         const isH = (dw === 'north' || dw === 'south');
@@ -589,6 +1046,28 @@ canvas.addEventListener('mousemove', e => {
                 updateSliderTrack(DOM['table-rotation']);
             }
             scheduleRender();
+        }
+    } else if (isDraggingElement) {
+        const el = state.structuralElements.find(e => e.id === isDraggingElementId);
+        if (el) {
+            const isHoriz = (el.wall === 'north' || el.wall === 'south');
+            const wallLen = getWallLength(el.wall);
+            // Convert mouse position to wall-local position
+            let newPos;
+            if (isHoriz) {
+                newPos = (mx - dragElementOffset - rx) / ppf;
+            } else {
+                newPos = (my - dragElementOffset - ry) / ppf;
+            }
+            newPos = Math.round(Math.max(0, Math.min(wallLen - el.width, newPos)) * 4) / 4;
+            el.position = newPos;
+            // Update controls if this element is selected
+            if (el.id === state.selectedElementId) {
+                DOM['element-position'].value = newPos;
+                DOM['val-element-position'].textContent = formatValue(newPos, 'ft');
+                updateSliderTrack(DOM['element-position']);
+            }
+            scheduleBackgroundRender();
         }
     }
 });

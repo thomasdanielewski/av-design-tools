@@ -635,7 +635,7 @@ function drawTable(ox, ry, wallThick, ppf) {
 /**
  * Draw the center companion device (Neat Center / Logitech Sight).
  */
-function drawCenterDevice(centerX, centerY, centerEq, ppf) {
+function drawCenterDevice(centerX, centerY, centerEq, ppf, dualLabel) {
     const cSize = Math.max(12, centerEq.width * ppf * 3);
 
     // Device body (circle)
@@ -659,7 +659,67 @@ function drawCenterDevice(centerX, centerY, centerEq, ppf) {
     ctx.fillStyle = cc().label;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
-    ctx.fillText(centerEq.name.split(' ').pop(), centerX, centerY + cSize / 2 + 3);
+    const label = dualLabel
+        ? centerEq.name.split(' ').pop() + ' ' + dualLabel
+        : centerEq.name.split(' ').pop();
+    ctx.fillText(label, centerX, centerY + cSize / 2 + 3);
+}
+
+/**
+ * Draw distance line between dual center devices with warning indicators.
+ */
+function drawDualCenterDistance(c1x, c1y, c2x, c2y, ppf) {
+    const dx = state.centerPos.x - state.center2Pos.x;
+    const dy = state.centerPos.y - state.center2Pos.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+
+    const tooClose = dist < 3;
+    const tooFar = dist > 16.4;
+    const warn = tooClose || tooFar;
+
+    // Dashed line between centers
+    ctx.save();
+    ctx.setLineDash([4, 4]);
+    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = warn ? 'rgba(239, 68, 68, 0.7)' : 'rgba(148, 163, 184, 0.5)';
+    ctx.beginPath();
+    ctx.moveTo(c1x, c1y);
+    ctx.lineTo(c2x, c2y);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Distance label at midpoint
+    const mx = (c1x + c2x) / 2;
+    const my = (c1y + c2y) / 2;
+    const fontSize = Math.max(8, ppf * 0.2);
+    const label = dist.toFixed(1) + ' ft';
+    const warnLabel = tooClose ? ' (min 3 ft)' : tooFar ? ' (max 16.4 ft)' : '';
+
+    ctx.font = `600 ${fontSize}px 'JetBrains Mono', monospace`;
+    const textW = ctx.measureText(label + warnLabel).width;
+    const pad = 3;
+
+    // Background pill
+    ctx.fillStyle = warn ? 'rgba(239, 68, 68, 0.15)' : 'rgba(30, 41, 59, 0.6)';
+    roundRect(ctx, mx - textW / 2 - pad, my - fontSize / 2 - pad,
+        textW + pad * 2, fontSize + pad * 2, 4);
+    ctx.fill();
+
+    if (warn) {
+        ctx.strokeStyle = 'rgba(239, 68, 68, 0.5)';
+        ctx.lineWidth = 1;
+        roundRect(ctx, mx - textW / 2 - pad, my - fontSize / 2 - pad,
+            textW + pad * 2, fontSize + pad * 2, 4);
+        ctx.stroke();
+    }
+
+    // Text
+    ctx.fillStyle = warn ? 'rgba(239, 68, 68, 0.95)' : 'rgba(203, 213, 225, 0.9)';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(label + warnLabel, mx, my);
+
+    ctx.restore();
 }
 
 /**
@@ -833,28 +893,17 @@ function drawWindowElement(x, y, w, isHorizontal, wallThick, isSelected) {
     }
     ctx.globalCompositeOperation = 'source-over';
 
-    // Draw window frame (light blue fill with border)
-    ctx.fillStyle = isSelected ? 'rgba(99, 180, 255, 0.35)' : 'rgba(99, 180, 255, 0.2)';
-    ctx.strokeStyle = isSelected ? 'rgba(99, 180, 255, 0.9)' : 'rgba(99, 180, 255, 0.6)';
+    // Draw window frame (teal fill with border)
+    ctx.fillStyle = isSelected ? 'rgba(56, 189, 193, 0.35)' : 'rgba(56, 189, 193, 0.2)';
+    ctx.strokeStyle = isSelected ? 'rgba(56, 189, 193, 0.9)' : 'rgba(56, 189, 193, 0.6)';
     ctx.lineWidth = 1.5;
 
     if (isHorizontal) {
         ctx.fillRect(x, y, w, wallThick);
         ctx.strokeRect(x, y, w, wallThick);
-        // Center mullion line
-        const midX = x + w / 2;
-        ctx.beginPath();
-        ctx.moveTo(midX, y);
-        ctx.lineTo(midX, y + wallThick);
-        ctx.stroke();
     } else {
         ctx.fillRect(x, y, wallThick, w);
         ctx.strokeRect(x, y, wallThick, w);
-        const midY = y + w / 2;
-        ctx.beginPath();
-        ctx.moveTo(x, midY);
-        ctx.lineTo(x + wallThick, midY);
-        ctx.stroke();
     }
 
     ctx.restore();
@@ -876,7 +925,7 @@ function drawDoorElement(x, y, w, isHorizontal, wallThick, swingDirX, swingDirY,
     ctx.globalCompositeOperation = 'source-over';
 
     // Door opening edges (two short perpendicular lines at the opening edges)
-    ctx.strokeStyle = isSelected ? '#6366f1' : cc().roomStroke;
+    ctx.strokeStyle = isSelected ? 'rgba(234, 162, 56, 0.9)' : 'rgba(234, 162, 56, 0.5)';
     ctx.lineWidth = 1.5;
 
     const swingRadius = el.width * ppf;
@@ -934,8 +983,8 @@ function drawDoorElement(x, y, w, isHorizontal, wallThick, swingDirX, swingDirY,
     }
 
     // Draw door swing arc (dashed)
-    ctx.strokeStyle = isSelected ? 'rgba(239, 68, 68, 0.6)' : 'rgba(239, 68, 68, 0.3)';
-    ctx.fillStyle = isSelected ? 'rgba(239, 68, 68, 0.08)' : 'rgba(239, 68, 68, 0.04)';
+    ctx.strokeStyle = isSelected ? 'rgba(234, 162, 56, 0.6)' : 'rgba(234, 162, 56, 0.3)';
+    ctx.fillStyle = isSelected ? 'rgba(234, 162, 56, 0.08)' : 'rgba(234, 162, 56, 0.04)';
     ctx.lineWidth = 1;
     ctx.setLineDash([4, 3]);
     ctx.beginPath();
@@ -947,7 +996,7 @@ function drawDoorElement(x, y, w, isHorizontal, wallThick, swingDirX, swingDirY,
     ctx.setLineDash([]);
 
     // Draw the door panel (from hinge to the free end of the door leaf)
-    ctx.strokeStyle = isSelected ? 'rgba(239, 68, 68, 0.8)' : 'rgba(239, 68, 68, 0.5)';
+    ctx.strokeStyle = isSelected ? 'rgba(234, 162, 56, 0.8)' : 'rgba(234, 162, 56, 0.5)';
     ctx.lineWidth = 2;
     ctx.beginPath();
     ctx.moveTo(hingeX, hingeY);

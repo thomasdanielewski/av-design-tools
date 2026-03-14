@@ -37,17 +37,20 @@ function setBrand(brand) {
 
     // Reset companion devices when switching brands
     state.includeCenter = false;
+    state.includeDualCenter = false;
     state.includeMicPod = false;
-    DOM['include-center'].checked = false;
     DOM['include-micpod'].checked = false;
 
     // Update companion label and mic pod visibility
     DOM['center-label'].textContent =
         brand === 'logitech'
-            ? 'Add Logitech Sight (Companion)'
-            : 'Add Neat Center (Companion)';
+            ? 'Logitech Sight'
+            : 'Neat Center';
     DOM['micpod-row'].style.display =
         brand === 'logitech' ? '' : 'none';
+
+    // Rebuild center-mode select options for the current brand/room
+    updateCenterModeOptions();
 
     if (!_suppressHistory) pushHistory();
     render();
@@ -296,4 +299,36 @@ function toggleOverlayLegend(which) {
 function updateLegendState() {
     DOM['legend-camera'].classList.toggle('inactive', !state.showCamera);
     DOM['legend-mic'].classList.toggle('inactive', !state.showMic);
+}
+
+/**
+ * Rebuild the center-mode <select> options based on brand and room depth.
+ * Dual option only available for Neat when room length >= 25 ft.
+ */
+function updateCenterModeOptions() {
+    const sel = DOM['center-mode'];
+    if (!sel) return;
+    const allowDual = state.brand === 'neat' && state.roomLength >= 25;
+
+    // Check if Dual option currently exists
+    const hasDual = !!sel.querySelector('option[value="dual"]');
+
+    if (allowDual && !hasDual) {
+        const opt = document.createElement('option');
+        opt.value = 'dual';
+        opt.textContent = 'Dual';
+        sel.appendChild(opt);
+    } else if (!allowDual && hasDual) {
+        sel.querySelector('option[value="dual"]').remove();
+        // Downgrade if currently set to dual
+        if (state.includeDualCenter) {
+            state.includeDualCenter = false;
+            state.includeCenter = true;
+            sel.value = 'single';
+        }
+    }
+
+    // Sync select value to state
+    const cmVal = state.includeDualCenter ? 'dual' : (state.includeCenter ? 'single' : 'none');
+    sel.value = cmVal;
 }

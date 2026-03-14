@@ -7,7 +7,15 @@
       "Bash(done)",
       "Bash(grep -n \"^import\\\\|^export\\\\|^require\" /c/Users/Thomas/Documents/GitHub/av-design-tools/*.js)",
       "Bash(grep -n \"^function render\\\\|^let render\\\\|^const render\" /c/Users/Thomas/Documents/GitHub/av-design-tools/*.js)",
-      "Bash(wc -l /c/Users/Thomas/Documents/GitHub/av-design-tools/*.js /c/Users/Thomas/Documents/GitHub/av-design-tools/*.html /c/Users/Thomas/Documents/GitHub/av-design-tools/*.css)"
+      "Bash(wc -l /c/Users/Thomas/Documents/GitHub/av-design-tools/*.js /c/Users/Thomas/Documents/GitHub/av-design-tools/*.html /c/Users/Thomas/Documents/GitHub/av-design-tools/*.css)",
+      "Bash(node -c pov.js)",
+      "Bash(node -c drag.js)",
+      "Bash(grep -rn \"distance\\\\|warning\\\\|constraint\\\\|limit\" /c/Users/Thomas/Documents/GitHub/av-design-tools/*.js)",
+      "Bash(grep -n \"stagger\" /c/Users/Thomas/Documents/GitHub/av-design-tools/*.js)",
+      "Bash(grep -n \"getCenterEqKey\\\\|centerEq\\\\|center.*equipment\" /c/Users/Thomas/Documents/GitHub/av-design-tools/*.js)",
+      "Bash(grep -n \"CenterEq\\\\|NEAT.*CENTER\" /c/Users/Thomas/Documents/GitHub/av-design-tools/*.js)",
+      "Bash(grep -n \"neat-center\\\\|sight\\\\|Neat Center\\\\|Logitech Sight\" /c/Users/Thomas/Documents/GitHub/av-design-tools/*.js)",
+      "Bash(grep -n \"updateCenterModeOptions\\\\|dual.*room\\\\|room.*length\" /c/Users/Thomas/Documents/GitHub/av-design-tools/*.js)"
     ]
   }
 }

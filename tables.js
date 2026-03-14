@@ -78,6 +78,7 @@ function selectTable(id) {
     const t = getSelectedTable();
     syncFlatStateFromTable(t);
     state.centerPos = { x: 0, y: 0 };
+    state.center2Pos = { x: 0, y: 0 };
     updateTableSliders();
     renderTableList();
     scheduleRender();
@@ -98,6 +99,7 @@ function addTable() {
     state.selectedTableId = newId;
     syncFlatStateFromTable(newTable);
     state.centerPos = { x: 0, y: 0 };
+    state.center2Pos = { x: 0, y: 0 };
     updateTableSliders();
     renderTableList();
     pushHistory();
@@ -127,6 +129,7 @@ function duplicateTable(sourceId) {
     state.selectedTableId = newId;
     syncFlatStateFromTable(newTable);
     state.centerPos = { x: 0, y: 0 };
+    state.center2Pos = { x: 0, y: 0 };
     updateTableSliders();
     renderTableList();
     pushHistory();
@@ -142,6 +145,7 @@ function removeTable() {
     state.selectedTableId = next.id;
     syncFlatStateFromTable(next);
     state.centerPos = { x: 0, y: 0 };
+    state.center2Pos = { x: 0, y: 0 };
     updateTableSliders();
     renderTableList();
     pushHistory();
@@ -198,6 +202,7 @@ function applyArrangement(name) {
     state.selectedTableId = 1;
     syncFlatStateFromTable(tables[0]);
     state.centerPos = { x: 0, y: 0 };
+    state.center2Pos = { x: 0, y: 0 };
     updateTableSliders();
     renderTableList();
     pushHistory();
@@ -215,7 +220,7 @@ function applyArrangement(name) {
 
 function enableCompanion() {
     state.includeCenter = true;
-    DOM['include-center'].checked = true;
+    DOM['center-mode'].value = 'single';
     pushHistory();
     render();
 }
@@ -376,6 +381,19 @@ function checkRoomWarnings() {
                     issues.push(`Display overlaps ${wallLabel} door swing area.`);
                 }
             }
+        }
+    }
+
+    // Dual Neat Center spacing checks
+    if (state.includeDualCenter) {
+        const dx = state.centerPos.x - state.center2Pos.x;
+        const dy = state.centerPos.y - state.center2Pos.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < 3) {
+            issues.push(`Neat Centers are ${dist.toFixed(1)} ft apart (min 3 ft required).`);
+        }
+        if (dist > 16.4) {
+            issues.push(`Neat Centers are ${dist.toFixed(1)} ft apart (max 16.4 ft / 5 m recommended).`);
         }
     }
 

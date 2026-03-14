@@ -112,6 +112,16 @@
                             </div>
                             <input type="range" id="element-width" min="1" max="8" step="0.5" value="3">
                         </div>
+                        <div class="control-row" id="element-height-row">
+                            <div class="control-label"><label for="element-height">Height</label><span class="value" id="val-element-height">7' 0"</span>
+                            </div>
+                            <input type="range" id="element-height" min="2" max="10" step="0.5" value="7">
+                        </div>
+                        <div class="control-row" id="element-sill-row" style="display:none">
+                            <div class="control-label"><label for="element-sill">Sill Height</label><span class="value" id="val-element-sill">3' 0"</span>
+                            </div>
+                            <input type="range" id="element-sill" min="0" max="8" step="0.5" value="3">
+                        </div>
                         <div class="control-row" id="swing-flip-row" style="display:none">
                             <div class="control-label"><label>Swing Direction</label></div>
                             <button class="table-action-btn" id="flip-swing-btn" title="Flip the direction the door swings open">⇄ Flip Swing</button>
@@ -283,10 +293,13 @@
                                 Display</button>
                         </div>
                     </div>
-                    <div class="check-row" style="margin-top:16px" id="center-row">
-                        <span id="center-label">Add Neat Center (Companion)</span>
-                        <label class="switch"><input type="checkbox" id="include-center"><span
-                                class="slider"></span></label>
+                    <div class="control-row" style="margin-top:16px" id="center-row">
+                        <div class="control-label"><label for="center-mode" id="center-label">Neat Center</label></div>
+                        <select id="center-mode">
+                            <option value="none">None</option>
+                            <option value="single">Single</option>
+                            <option value="dual">Dual</option>
+                        </select>
                     </div>
                     <div class="check-row" id="micpod-row" style="display:none">
                         <span style="display:flex;align-items:center">Rally Mic Pod (Far End)
@@ -388,6 +401,13 @@
                                 data-unit="ft">0' 0"</span>
                         </div>
                         <input type="range" id="viewer-offset" min="-15" max="15" step="0.5" value="0">
+                    </div>
+                    <div class="control-row">
+                        <div class="control-label"><label for="pov-yaw">Look Direction</label><span class="value"
+                                id="val-pov-yaw" data-slider="pov-yaw" data-key="povYaw"
+                                data-unit="deg">0°</span>
+                        </div>
+                        <input type="range" id="pov-yaw" min="-180" max="180" step="5" value="0">
                     </div>
                     <div class="control-row">
                         <div class="control-label"><label>Posture</label></div>

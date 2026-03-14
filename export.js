@@ -57,6 +57,7 @@ function importConfig(event) {
             _suppressHistory = true;
             Object.assign(state, snap);
             if (snap.centerPos) state.centerPos = snap.centerPos;
+            if (snap.center2Pos) state.center2Pos = snap.center2Pos;
             _suppressHistory = false;
             syncUIFromState();
             pushHistory();

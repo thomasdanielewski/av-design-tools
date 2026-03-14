@@ -3,9 +3,9 @@
   "configurations": [
     {
       "name": "dev",
-      "runtimeExecutable": "node",
-      "runtimeArgs": ["-e", "require('http').createServer((q,r)=>{const fs=require('fs'),p=require('path'),f=p.join('.',q.url==='/'?'index.html':q.url.split('?')[0]),e={'.html':'text/html','.js':'text/javascript','.css':'text/css'}[p.extname(f)]||'application/octet-stream';fs.readFile(f,(err,d)=>{if(err){r.writeHead(404);r.end()}else{r.writeHead(200,{'Content-Type':e});r.end(d)}})}).listen(3000)"],
-      "port": 3000
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "http.server", "8080"],
+      "port": 8080
     }
   ]
 }

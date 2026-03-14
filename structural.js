@@ -66,8 +66,25 @@ function updateElementControls(el) {
     DOM['element-width'].value = el.width;
     DOM['val-element-position'].textContent = formatValue(el.position, 'ft');
     DOM['val-element-width'].textContent = formatValue(el.width, 'ft');
-    // Show Flip Swing button only for doors
+
+    // Height controls
     const isDoor = el.type === 'door';
+    const height = el.height || (isDoor ? DOOR_HEIGHT_DEFAULT : WINDOW_HEIGHT_DEFAULT);
+    DOM['element-height'].value = height;
+    DOM['val-element-height'].textContent = formatValue(height, 'ft');
+    updateSliderTrack(DOM['element-height']);
+
+    // Sill height (windows only)
+    if (!isDoor) {
+        const sill = el.sillHeight != null ? el.sillHeight : WINDOW_SILL_DEFAULT;
+        DOM['element-sill'].value = sill;
+        DOM['val-element-sill'].textContent = formatValue(sill, 'ft');
+        updateSliderTrack(DOM['element-sill']);
+    }
+    DOM['element-sill-row'].style.display = isDoor ? 'none' : '';
+    DOM['element-height-row'].style.display = '';
+
+    // Show Flip Swing button only for doors
     DOM['swing-flip-row'].style.display = isDoor ? '' : 'none';
     if (isDoor) {
         DOM['flip-swing-btn'].textContent = el.swingInverted ? '⇄ Flip Swing (inverted)' : '⇄ Flip Swing';
@@ -87,6 +104,7 @@ function addDoor() {
         wall: 'south',
         position: Math.max(0, (wallLen - DOOR_WIDTH_DEFAULT) / 2),
         width: DOOR_WIDTH_DEFAULT,
+        height: DOOR_HEIGHT_DEFAULT,
         swingInverted: false
     };
     state.structuralElements.push(el);
@@ -109,7 +127,9 @@ function addWindow() {
         type: 'window',
         wall: 'east',
         position: Math.max(0, (wallLen - WINDOW_WIDTH_DEFAULT) / 2),
-        width: WINDOW_WIDTH_DEFAULT
+        width: WINDOW_WIDTH_DEFAULT,
+        height: WINDOW_HEIGHT_DEFAULT,
+        sillHeight: WINDOW_SILL_DEFAULT
     };
     state.structuralElements.push(el);
     state.selectedElementId = newId;
@@ -185,6 +205,34 @@ function onElementWidthInput() {
         DOM['val-element-position'].textContent = formatValue(el.position, 'ft');
     }
     updateElementSliderRanges();
+    debouncedPushHistory();
+    scheduleBackgroundRender();
+}
+
+/** Handle height slider input */
+function onElementHeightInput() {
+    const el = getSelectedElement();
+    if (!el) return;
+    el.height = parseFloat(DOM['element-height'].value);
+    DOM['val-element-height'].textContent = formatValue(el.height, 'ft');
+    const badge = DOM['val-element-height'];
+    badge.classList.remove('value-updated');
+    void badge.offsetWidth;
+    badge.classList.add('value-updated');
+    debouncedPushHistory();
+    scheduleBackgroundRender();
+}
+
+/** Handle sill height slider input (windows only) */
+function onElementSillInput() {
+    const el = getSelectedElement();
+    if (!el || el.type !== 'window') return;
+    el.sillHeight = parseFloat(DOM['element-sill'].value);
+    DOM['val-element-sill'].textContent = formatValue(el.sillHeight, 'ft');
+    const badge = DOM['val-element-sill'];
+    badge.classList.remove('value-updated');
+    void badge.offsetWidth;
+    badge.classList.add('value-updated');
     debouncedPushHistory();
     scheduleBackgroundRender();
 }

@@ -6,8 +6,10 @@
 function updateHeaderDOM(eq) {
     DOM['header-room'].textContent =
         `${formatFtIn(state.roomLength)} × ${formatFtIn(state.roomWidth)}`;
-    DOM['header-device'].textContent =
-        eq.name + (state.includeCenter ? ' + ' + EQUIPMENT[getCenterEqKey()].name : '');
+    const centerSuffix = state.includeDualCenter
+        ? ' + 2× ' + EQUIPMENT[getCenterEqKey()].name
+        : (state.includeCenter ? ' + ' + EQUIPMENT[getCenterEqKey()].name : '');
+    DOM['header-device'].textContent = eq.name + centerSuffix;
     DOM['header-capacity'].textContent = `Capacity: ${calcTotalCapacity()}`;
     DOM['mount-row'].style.display =
         (eq.type === 'bar') ? '' : 'none';
@@ -176,6 +178,8 @@ function renderForeground() {
     const tableY = ry + wallThick + selT.dist * ppf + (selT.length * ppf) / 2;
     const centerX = tableX_px + state.centerPos.x * ppf;
     const centerY = tableY + state.centerPos.y * ppf;
+    const center2X = tableX_px + state.center2Pos.x * ppf;
+    const center2Y = tableY + state.center2Pos.y * ppf;
     const micPodX = tableX_px;
     const micPodY = ry + wallThick + selT.dist * ppf + selT.length * ppf - 0.5 * ppf;
 
@@ -189,6 +193,9 @@ function renderForeground() {
     drawCoverage(mainDeviceX, mainDeviceY, eq, facingAngle);
     if (state.includeCenter) {
         drawCoverage(centerX, centerY, centerEq, 0);
+        if (state.includeDualCenter) {
+            drawCoverage(center2X, center2Y, centerEq, 0);
+        }
     }
     if (state.includeMicPod && state.brand === 'logitech') {
         drawCoverage(micPodX, micPodY, micPodEq, 0);
@@ -204,9 +211,13 @@ function renderForeground() {
     // Conference tables
     drawTable(ox, ry, wallThick, ppf);
 
-    // Center companion device
+    // Center companion device(s)
     if (state.includeCenter) {
-        drawCenterDevice(centerX, centerY, centerEq, ppf);
+        drawCenterDevice(centerX, centerY, centerEq, ppf, state.includeDualCenter ? '1' : null);
+        if (state.includeDualCenter) {
+            drawCenterDevice(center2X, center2Y, centerEq, ppf, '2');
+            drawDualCenterDistance(centerX, centerY, center2X, center2Y, ppf);
+        }
     }
 
     // Mic pod

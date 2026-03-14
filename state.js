@@ -9,12 +9,14 @@ const state = {
     displayCount: 1, displaySize: 65, displayElev: 54, displayOffsetX: 0, displayWall: 'north',
     brand: 'neat', videoBar: 'neat-bar-gen2',
     mountPos: 'below',
-    includeCenter: false, includeMicPod: false,
+    includeCenter: false, includeDualCenter: false, includeMicPod: false,
     showCamera: true, showMic: true,
     showGrid: true, showViewAngle: false,
     viewMode: 'top',
     centerPos: { x: 0, y: 0 },
+    center2Pos: { x: 0, y: 0 },
     viewerDist: 12, viewerOffset: 0,
+    povYaw: 0,
     posture: 'seated',
     structuralElements: [],
     selectedElementId: null,
@@ -92,6 +94,8 @@ function serializeToHash() {
     for (const [k, sk] of Object.entries(HASH_KEYS)) {
         if (sk === 'centerPosX') { params.set(k, state.centerPos.x.toFixed(2)); continue; }
         if (sk === 'centerPosY') { params.set(k, state.centerPos.y.toFixed(2)); continue; }
+        if (sk === 'center2PosX') { params.set(k, state.center2Pos.x.toFixed(2)); continue; }
+        if (sk === 'center2PosY') { params.set(k, state.center2Pos.y.toFixed(2)); continue; }
         const v = state[sk];
         if (typeof v === 'boolean') params.set(k, v ? '1' : '0');
         else params.set(k, v);
@@ -118,6 +122,8 @@ function loadFromHash() {
             const raw = params.get(k);
             if (sk === 'centerPosX') { state.centerPos.x = parseFloat(raw); continue; }
             if (sk === 'centerPosY') { state.centerPos.y = parseFloat(raw); continue; }
+            if (sk === 'center2PosX') { state.center2Pos.x = parseFloat(raw); continue; }
+            if (sk === 'center2PosY') { state.center2Pos.y = parseFloat(raw); continue; }
             if (typeof state[sk] === 'boolean') { state[sk] = raw === '1'; continue; }
             if (typeof state[sk] === 'number') { state[sk] = parseFloat(raw); continue; }
             state[sk] = raw;
@@ -182,6 +188,7 @@ function syncUIFromState() {
         'display-offset-x': ['displayOffsetX', 'val-display-offset-x', 'ft'],
         'viewer-dist': ['viewerDist', 'val-viewer-dist', 'ft'],
         'viewer-offset': ['viewerOffset', 'val-viewer-offset', 'ft'],
+        'pov-yaw': ['povYaw', 'val-pov-yaw', 'deg'],
     };
     for (const [id, [sk, vid, unit]] of Object.entries(sliderMap)) {
         const el = DOM[id];
@@ -209,8 +216,12 @@ function syncUIFromState() {
     // Mount position
     setMountPos(state.mountPos);
 
+    // Center mode select
+    updateCenterModeOptions();
+    const cmVal = state.includeDualCenter ? 'dual' : (state.includeCenter ? 'single' : 'none');
+    DOM['center-mode'].value = cmVal;
+
     // Checkboxes
-    DOM['include-center'].checked = state.includeCenter;
     DOM['include-micpod'].checked = state.includeMicPod;
     DOM['show-camera'].checked = state.showCamera;
     DOM['show-mic'].checked = state.showMic;

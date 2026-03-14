@@ -26,7 +26,10 @@ const TABLE_SLIDER_PROPS = new Set([
 
 /** Default structural element dimensions (feet) */
 const DOOR_WIDTH_DEFAULT = 3;
+const DOOR_HEIGHT_DEFAULT = 7;     // 7 ft (84 in) door opening
 const WINDOW_WIDTH_DEFAULT = 4;
+const WINDOW_HEIGHT_DEFAULT = 3;   // 3 ft (36 in) window height
+const WINDOW_SILL_DEFAULT = 3;     // 3 ft (36 in) sill height
 const DOOR_SWING_ANGLE = Math.PI / 2; // 90° swing arc
 
 /** Compact URL hash keys → state property names */
@@ -36,10 +39,11 @@ const HASH_KEYS = {
     th: 'tableHeight', ts: 'tableShape', tx: 'tableX', tr: 'tableRotation',
     dc: 'displayCount', ds: 'displaySize', de: 'displayElev', dox: 'displayOffsetX', dw: 'displayWall',
     br: 'brand', vb: 'videoBar', mp: 'mountPos',
-    ic: 'includeCenter', im: 'includeMicPod',
+    ic: 'includeCenter', idc: 'includeDualCenter', im: 'includeMicPod',
     sc: 'showCamera', sm: 'showMic', sg: 'showGrid', sv: 'showViewAngle',
-    vm: 'viewMode', vd: 'viewerDist', vo: 'viewerOffset', po: 'posture',
+    vm: 'viewMode', vd: 'viewerDist', vo: 'viewerOffset', py: 'povYaw', po: 'posture',
     cx: 'centerPosX', cy: 'centerPosY',
+    c2x: 'center2PosX', c2y: 'center2PosY',
     sd: 'seatingDensity',
     un: 'units'
 };
