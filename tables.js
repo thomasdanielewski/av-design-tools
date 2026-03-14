@@ -499,35 +499,25 @@ function autoConfigureForCapacity(target) {
         return;
     }
 
-    const origDensity = state.seatingDensity === 'none' ? 'normal' : state.seatingDensity;
-    // Try current density first; fall back to others only if needed
-    const densityOrder = [origDensity, ...['sparse', 'normal', 'dense'].filter(d => d !== origDensity)];
+    const density = state.seatingDensity === 'none' ? 'normal' : state.seatingDensity;
+    state.seatingDensity = density;
+    DOM['seating-density'].value = density;
 
-    let bestDensity = origDensity;
     let bestLength = sel.length;
     let bestDiff = Infinity;
 
     const TABLE_MIN = 4, TABLE_MAX = 24, TABLE_STEP = 0.5;
 
-    outer:
-    for (const density of densityOrder) {
-        state.seatingDensity = density;
-        for (let len = TABLE_MIN; len <= TABLE_MAX; len += TABLE_STEP) {
-            const testTable = { ...sel, length: len };
-            const count = getChairPositions(testTable).length;
-            const diff = Math.abs(count - target);
-            if (diff < bestDiff) {
-                bestDiff = diff;
-                bestDensity = density;
-                bestLength = len;
-            }
-            if (diff === 0) break outer;
+    for (let len = TABLE_MIN; len <= TABLE_MAX; len += TABLE_STEP) {
+        const testTable = { ...sel, length: len };
+        const count = getChairPositions(testTable).length;
+        const diff = Math.abs(count - target);
+        if (diff < bestDiff) {
+            bestDiff = diff;
+            bestLength = len;
         }
+        if (diff === 0) break;
     }
-
-    // Apply the best-found configuration
-    state.seatingDensity = bestDensity;
-    DOM['seating-density'].value = bestDensity;
 
     sel.length = bestLength;
     state.tableLength = bestLength;

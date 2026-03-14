@@ -19,7 +19,7 @@ function downloadLayout() {
     const timestamp = new Date().toISOString().slice(0, 10);
     const nameSlug = state.roomName ? '-' + state.roomName.trim().replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-|-$/g, '') : '';
     const l = document.createElement('a');
-    l.download = `AV-Room-Layout${nameSlug}-${state.viewMode}-${timestamp}.png`;
+    l.download = `AV-Room-Layout${nameSlug}-${timestamp}.png`;
     l.href = exportCanvas.toDataURL('image/png');
     l.click();
 }
@@ -105,7 +105,8 @@ function downloadPDF() {
 
     // 5. Save
     const nameSlug = state.roomName ? '-' + state.roomName.trim().replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-|-$/g, '') : '';
-    doc.save(`AV-Room-Layout${nameSlug}-${timestamp}.pdf`);
+    const fileDate = new Date().toISOString().slice(0, 10);
+    doc.save(`AV-Room-Layout${nameSlug}-${fileDate}.pdf`);
     } catch (err) {
         console.error('PDF export failed:', err);
         showToast('PDF export failed: ' + err.message, 'error');
@@ -120,7 +121,8 @@ function exportConfig() {
     const a = document.createElement('a');
     a.href = 'data:application/json,' + encodeURIComponent(data);
     const nameSlug = state.roomName ? '-' + state.roomName.trim().replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-|-$/g, '') : '';
-    a.download = `av-room-config${nameSlug}.json`;
+    const fileDate = new Date().toISOString().slice(0, 10);
+    a.download = `AV-Room-Layout${nameSlug}-${fileDate}.json`;
     a.click();
 }
 
