@@ -377,6 +377,7 @@
                                 id="show-mic" checked><span class="slider"></span></label></div>
                     <div class="check-row"><span>Grid</span><label class="switch"><input type="checkbox" id="show-grid"
                                 checked><span class="slider"></span></label></div>
+                    <div class="check-row"><span>Snap to Grid</span><label class="switch"><input type="checkbox" id="show-snap" checked><span class="slider"></span></label></div>
                 </div>
             </div>
 
@@ -449,6 +450,7 @@
             <div style="display:flex;align-items:center;gap:14px">
                 <div class="undo-redo-group">
                     <button class="undo-btn" id="undo-btn" title="Undo (Ctrl+Z)" disabled data-action="undo">↩</button>
+                    <span id="history-badge" class="history-badge"></span>
                     <button class="redo-btn" id="redo-btn" title="Redo (Ctrl+Shift+Z)" disabled
                         data-action="redo">↪</button>
                 </div>

@@ -4,6 +4,8 @@
 
 const MAX_HISTORY = 50;
 const GRID_SPACING = 2;
+const SNAP_THRESHOLD = 0.5;   // ft — snap to grid if within this distance
+const ALIGN_THRESHOLD = 0.25; // ft — show alignment guide if within this distance
 const DRAG_TOLERANCE = 4;
 const TOAST_DURATION = 4000;
 const DEBOUNCE_HISTORY = 300;
@@ -40,7 +42,7 @@ const HASH_KEYS = {
     dc: 'displayCount', ds: 'displaySize', de: 'displayElev', dox: 'displayOffsetX', dw: 'displayWall',
     br: 'brand', vb: 'videoBar', mp: 'mountPos',
     ic: 'includeCenter', idc: 'includeDualCenter', im: 'includeMicPod',
-    sc: 'showCamera', sm: 'showMic', sg: 'showGrid', sv: 'showViewAngle',
+    sc: 'showCamera', sm: 'showMic', sg: 'showGrid', sv: 'showViewAngle', sn: 'showSnap',
     vm: 'viewMode', vd: 'viewerDist', vo: 'viewerOffset', py: 'povYaw', po: 'posture',
     cx: 'centerPosX', cy: 'centerPosY',
     c2x: 'center2PosX', c2y: 'center2PosY',

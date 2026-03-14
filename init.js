@@ -56,6 +56,7 @@ bindCheckbox('show-view-angle', 'showViewAngle');
 bindCheckbox('show-camera', 'showCamera');
 bindCheckbox('show-mic', 'showMic');
 bindCheckbox('show-grid', 'showGrid', true);
+bindCheckbox('show-snap', 'showSnap');
 
 // ── Expand All / Collapse All ────────────────────────────────
 document.getElementById('expand-all-btn').addEventListener('click', () => {

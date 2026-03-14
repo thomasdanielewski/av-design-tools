@@ -211,6 +211,12 @@ function renderForeground() {
     // Conference tables
     drawTable(ox, ry, wallThick, ppf);
 
+    // Distance readouts floating near each table edge during drag
+    if (isDraggingTableId !== null && dragDistances !== null) {
+        const draggedT = state.tables.find(t => t.id === isDraggingTableId);
+        if (draggedT) drawDragDistances(draggedT, ox, ry, wallThick, ppf, dragDistances);
+    }
+
     // Center companion device(s)
     if (state.includeCenter) {
         drawCenterDevice(centerX, centerY, centerEq, ppf, state.includeDualCenter ? '1' : null);
@@ -223,6 +229,16 @@ function renderForeground() {
     // Mic pod
     if (state.includeMicPod && state.brand === 'logitech') {
         drawMicPod(micPodX, micPodY, micPodEq, ppf);
+    }
+
+    // Wall boundary glow (drawn on top while table is pressed against a wall)
+    if (isDraggingTableId !== null) {
+        drawWallGlow(rx, ry, rw, rl, dragBoundaryHit);
+    }
+
+    // Snap / alignment guides (drawn on top while dragging a table)
+    if (isDraggingTableId !== null && state.showSnap && snapGuides.length > 0) {
+        drawSnapGuides(snapGuides, rx, ry, rw, rl, wallThick);
     }
 
     // Defer DOM updates to after canvas paint to avoid layout thrashing

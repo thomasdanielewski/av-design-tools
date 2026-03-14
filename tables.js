@@ -102,7 +102,7 @@ function addTable() {
     state.center2Pos = { x: 0, y: 0 };
     updateTableSliders();
     renderTableList();
-    pushHistory();
+    pushHistory('added table');
     scheduleRender();
 }
 
@@ -132,7 +132,7 @@ function duplicateTable(sourceId) {
     state.center2Pos = { x: 0, y: 0 };
     updateTableSliders();
     renderTableList();
-    pushHistory();
+    pushHistory('duplicated table');
     scheduleRender();
 }
 
@@ -148,7 +148,7 @@ function removeTable() {
     state.center2Pos = { x: 0, y: 0 };
     updateTableSliders();
     renderTableList();
-    pushHistory();
+    pushHistory('removed table');
     scheduleRender();
 }
 
@@ -205,7 +205,7 @@ function applyArrangement(name) {
     state.center2Pos = { x: 0, y: 0 };
     updateTableSliders();
     renderTableList();
-    pushHistory();
+    pushHistory('applied arrangement');
     scheduleRender();
 
     // Click feedback animation

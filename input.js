@@ -76,7 +76,12 @@ function bindSelect(id, sk) {
             }
         }
 
-        pushHistory();
+        const descMap = {
+            tableShape: 'changed table shape',
+            videoBar: 'changed device',
+            seatingDensity: 'changed seating density',
+        };
+        pushHistory(descMap[sk] || '');
         render();
     });
 }
@@ -164,7 +169,16 @@ function makeEditable(badge) {
             DOM['viewer-dist'].max = isNS ? state.roomLength : state.roomWidth;
         }
 
-        pushHistory();
+        const editDescMap = {
+            roomLength: 'changed room size', roomWidth: 'changed room size',
+            ceilingHeight: 'changed ceiling height',
+            tableLength: 'resized table', tableWidth: 'resized table',
+            tableDist: 'moved table', tableX: 'moved table',
+            tableRotation: 'rotated table', tableHeight: 'changed table height',
+            displaySize: 'changed display size', displayElev: 'changed display elevation',
+            displayOffsetX: 'moved display',
+        };
+        pushHistory(editDescMap[stateKey] || '');
         render();
     }
 

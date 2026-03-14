@@ -87,6 +87,17 @@ function updateZoomLabel() {
         viewportPanY = 0;
         markViewportDirty();
         applyViewportTransform();
+
+        // In POV mode, also reset yaw to 0 (facing the display/north wall)
+        if (state.viewMode === 'pov') {
+            state.povYaw = 0;
+            if (DOM['pov-yaw']) {
+                DOM['pov-yaw'].value = 0;
+                DOM['val-pov-yaw'].textContent = '0°';
+                updateSliderTrack(DOM['pov-yaw']);
+            }
+            scheduleRender();
+        }
     });
 })();
 
@@ -520,10 +531,139 @@ function hitTestStructuralElementPOV(mx, my) {
     return null;
 }
 
+// ── Snap guide data (shared with renderForeground for overlay drawing) ───────
+/** Active snap/alignment guide lines. Each entry: { axis:'x'|'y', ft:number, isAlign:boolean }
+ *  axis 'x' → vertical line at `ft` feet from room left edge (rx)
+ *  axis 'y' → horizontal line at `ft` feet from room top edge (ry)
+ *  Populated during table drag; cleared on mouseup / mouseleave. */
+let snapGuides = [];
+
+/**
+ * Compute snap-to-grid and alignment-guide adjustments for a dragged table.
+ * Returns [snappedNx, snappedNd] and populates the module-level `snapGuides`.
+ *
+ * @param {number} nx  - raw table center x, feet from room center
+ * @param {number} nd  - raw table near-edge dist, feet from north wall
+ * @param {object} t   - the table being dragged
+ */
+function _applyTableSnap(nx, nd, t) {
+    const rHW = state.roomWidth / 2;
+    const halfW = t.width / 2;
+    const halfL = t.length / 2;
+
+    // Feature offsets from the center/near-edge reference point
+    const xOffsets    = [-halfW, 0, halfW];    // left edge, center, right edge
+    const yRelOffsets = [0, halfL, t.length]; // near edge, center, far edge
+
+    const xCandidates = []; // { candidateNx, guideFt, delta, isAlign }
+    const yCandidates = []; // { candidateNd, guideFt, delta, isAlign }
+
+    // ── Grid snap ────────────────────────────────────────────
+    for (const xOff of xOffsets) {
+        const featFromLeft = rHW + nx + xOff;
+        const nearest = Math.round(featFromLeft / GRID_SPACING) * GRID_SPACING;
+        const nearestClamped = Math.max(0, Math.min(state.roomWidth, nearest));
+        const delta = Math.abs(featFromLeft - nearestClamped);
+        if (delta < SNAP_THRESHOLD) {
+            xCandidates.push({ candidateNx: (nearestClamped - rHW) - xOff, guideFt: nearestClamped, delta, isAlign: false });
+        }
+    }
+    for (const yOff of yRelOffsets) {
+        const feat = nd + yOff;
+        const nearest = Math.round(feat / GRID_SPACING) * GRID_SPACING;
+        const nearestClamped = Math.max(0, Math.min(state.roomLength, nearest));
+        const delta = Math.abs(feat - nearestClamped);
+        if (delta < SNAP_THRESHOLD) {
+            yCandidates.push({ candidateNd: nearestClamped - yOff, guideFt: nearestClamped, delta, isAlign: false });
+        }
+    }
+
+    // ── Alignment guides with other tables ───────────────────
+    for (const o of state.tables) {
+        if (o.id === t.id) continue;
+        const oXFeats = [rHW + o.x - o.width / 2, rHW + o.x, rHW + o.x + o.width / 2];
+        const oYFeats = [o.dist, o.dist + o.length / 2, o.dist + o.length];
+
+        for (const xOff of xOffsets) {
+            const myFeat = rHW + nx + xOff;
+            for (const oFeat of oXFeats) {
+                const delta = Math.abs(myFeat - oFeat);
+                if (delta < ALIGN_THRESHOLD) {
+                    xCandidates.push({ candidateNx: (oFeat - rHW) - xOff, guideFt: oFeat, delta, isAlign: true });
+                }
+            }
+        }
+        for (const yOff of yRelOffsets) {
+            const myFeat = nd + yOff;
+            for (const oFeat of oYFeats) {
+                const delta = Math.abs(myFeat - oFeat);
+                if (delta < ALIGN_THRESHOLD) {
+                    yCandidates.push({ candidateNd: oFeat - yOff, guideFt: oFeat, delta, isAlign: true });
+                }
+            }
+        }
+    }
+
+    // ── Magnetic edge-to-edge snap (0.5 ft → tables touch with 0 gap) ─────────
+    for (const o of state.tables) {
+        if (o.id === t.id) continue;
+        const oLeft  = rHW + o.x - o.width / 2;
+        const oRight = rHW + o.x + o.width / 2;
+        const oTop   = o.dist;
+        const oBot   = o.dist + o.length;
+        const myLeft  = rHW + nx - halfW;
+        const myRight = rHW + nx + halfW;
+        const myTop   = nd;
+        const myBot   = nd + t.length;
+
+        // My right edge touches their left edge
+        let delta = Math.abs(myRight - oLeft);
+        if (delta < SNAP_THRESHOLD) {
+            xCandidates.push({ candidateNx: (oLeft - halfW) - rHW, guideFt: oLeft, delta, isAlign: true });
+        }
+        // My left edge touches their right edge
+        delta = Math.abs(myLeft - oRight);
+        if (delta < SNAP_THRESHOLD) {
+            xCandidates.push({ candidateNx: (oRight + halfW) - rHW, guideFt: oRight, delta, isAlign: true });
+        }
+        // My bottom edge touches their top edge
+        delta = Math.abs(myBot - oTop);
+        if (delta < SNAP_THRESHOLD) {
+            yCandidates.push({ candidateNd: oTop - t.length, guideFt: oTop, delta, isAlign: true });
+        }
+        // My top edge touches their bottom edge
+        delta = Math.abs(myTop - oBot);
+        if (delta < SNAP_THRESHOLD) {
+            yCandidates.push({ candidateNd: oBot, guideFt: oBot, delta, isAlign: true });
+        }
+    }
+
+    // Apply best (smallest delta) candidate for each axis
+    snapGuides = [];
+    if (xCandidates.length > 0) {
+        xCandidates.sort((a, b) => a.delta - b.delta);
+        const best = xCandidates[0];
+        nx = best.candidateNx;
+        snapGuides.push({ axis: 'x', ft: best.guideFt, isAlign: best.isAlign });
+    }
+    if (yCandidates.length > 0) {
+        yCandidates.sort((a, b) => a.delta - b.delta);
+        const best = yCandidates[0];
+        nd = best.candidateNd;
+        snapGuides.push({ axis: 'y', ft: best.guideFt, isAlign: best.isAlign });
+    }
+
+    return [nx, nd];
+}
+
 // ── Drag state ───────────────────────────────────────────────
 let isDraggingTableId = null;
 let dragTableOffset = null;
 let dragTableGhost = null;
+// Drag feedback state
+let dragBoundaryHit = { north: false, south: false, east: false, west: false };
+let dragTableOverlap = false;
+let dragDistances = null;
 let isDraggingCenter = false;
 let isDraggingCenter2 = false;
 let isDraggingDisplay = false;
@@ -569,6 +709,10 @@ let panStartOffsetY = 0;
 function resetDrag() {
     isPanning = false;
     isDraggingTableId = null; dragTableOffset = null; dragTableGhost = null;
+    snapGuides = [];
+    dragBoundaryHit = { north: false, south: false, east: false, west: false };
+    dragTableOverlap = false;
+    dragDistances = null;
     isDraggingCenter = false;
     isDraggingCenter2 = false;
     isDraggingDisplay = false; dragDisplayOffsetX = 0;
@@ -612,7 +756,7 @@ canvas.addEventListener('mousedown', e => {
             dragDisplayPOVStartOffset = state.displayOffsetX;
             dragDisplayPOVStartElev = state.displayElev;
             canvas.style.cursor = 'grabbing';
-            pushHistory();
+            pushHistory('moved display');
         } else {
             const hit = hitTestStructuralElementPOV(mx, my);
             if (hit) {
@@ -631,7 +775,7 @@ canvas.addEventListener('mousedown', e => {
                     resizeElementPOVStartPos = hitEl.position;
                     resizeElementPOVStartMouse = (edge === 'left' || edge === 'right') ? mx : my;
                     canvas.style.cursor = (edge === 'left' || edge === 'right') ? 'ew-resize' : 'ns-resize';
-                    pushHistory();
+                    pushHistory('resized element');
                 } else {
                     // Body drag → move position
                     isDraggingElementPOV = true;
@@ -644,14 +788,14 @@ canvas.addEventListener('mousedown', e => {
                     dragElementPOVStartMouse = isSideWall ? my : mx;
                     dragElementPOVStartPos = hitEl.position;
                     canvas.style.cursor = 'grabbing';
-                    pushHistory();
+                    pushHistory('moved element');
                 }
             } else {
                 isDraggingPOVYaw = true;
                 dragPOVYawStartX = mx;
                 dragPOVYawStartVal = state.povYaw || 0;
                 canvas.style.cursor = 'grabbing';
-                pushHistory();
+                pushHistory('panned view');
             }
         }
         return;
@@ -667,13 +811,13 @@ canvas.addEventListener('mousedown', e => {
         if (state.includeDualCenter && Math.sqrt((mx - c2X) ** 2 + (my - c2Y) ** 2) <= cs) {
             isDraggingCenter2 = true;
             canvas.style.cursor = 'grabbing';
-            pushHistory();
+            pushHistory('moved center');
             return;
         }
         if (Math.sqrt((mx - cX) ** 2 + (my - cY) ** 2) <= cs) {
             isDraggingCenter = true;
             canvas.style.cursor = 'grabbing';
-            pushHistory();
+            pushHistory('moved center');
             return;
         }
     }
@@ -684,7 +828,7 @@ canvas.addEventListener('mousedown', e => {
         // For N/S walls drag is horizontal; for E/W walls drag is vertical
         dragDisplayOffsetX = isHoriz ? (mx - dispOx) : (my - dispY);
         canvas.style.cursor = 'grabbing';
-        pushHistory();
+        pushHistory('moved display');
         return;
     }
 
@@ -694,7 +838,7 @@ canvas.addEventListener('mousedown', e => {
         isDraggingRotate = true;
         isDraggingRotateTableId = selT.id;
         canvas.style.cursor = 'crosshair';
-        pushHistory();
+        pushHistory('rotated table');
         return;
     }
 
@@ -709,7 +853,7 @@ canvas.addEventListener('mousedown', e => {
             const tcy = ry + wt + t.dist * ppf + (t.length * ppf) / 2;
             dragTableOffset = { x: mx - tcx, y: my - tcy };
             canvas.style.cursor = 'grabbing';
-            pushHistory();
+            pushHistory('moved table');
             return;
         }
     }
@@ -725,7 +869,7 @@ canvas.addEventListener('mousedown', e => {
             // Store offset from mouse to element start position
             dragElementOffset = isHorizontal ? (mx - x) : (my - y);
             canvas.style.cursor = 'grabbing';
-            pushHistory();
+            pushHistory('moved element');
             return;
         }
     }
@@ -983,12 +1127,55 @@ canvas.addEventListener('mousemove', e => {
             const newCY = my - dragTableOffset.y;
 
             let nd = (newCY - ry - wt) / ppf - t.length / 2;
-            nd = Math.round(Math.max(0, Math.min(state.roomLength - t.length, nd)) * 2) / 2;
-
             let nx = (newCX - ox) / ppf;
+
+            // Apply snap-to-grid and alignment guides (Shift held = bypass snap)
+            snapGuides = [];
+            if (state.showSnap && !e.shiftKey) {
+                [nx, nd] = _applyTableSnap(nx, nd, t);
+            }
+
+            // Detect wall boundary hits (before clamping)
+            const rHW_b = state.roomWidth / 2;
+            dragBoundaryHit = {
+                north: nd < 0,
+                south: nd + t.length > state.roomLength,
+                west: nx < -(rHW_b - t.width / 2),
+                east: nx > (rHW_b - t.width / 2)
+            };
+
+            nd = Math.round(Math.max(0, Math.min(state.roomLength - t.length, nd)) * 2) / 2;
             nx = Math.round(Math.max(-(state.roomWidth / 2 - t.width / 2), Math.min(state.roomWidth / 2 - t.width / 2, nx)) * 2) / 2;
 
             t.dist = nd; t.x = nx;
+
+            // Check for overlap with other tables (rotated AABB test)
+            const rHW = state.roomWidth / 2;
+            dragTableOverlap = false;
+            const a1 = t.rotation * Math.PI / 180;
+            const rw1h = (Math.abs(Math.cos(a1)) * t.width + Math.abs(Math.sin(a1)) * t.length) / 2;
+            const rl1h = (Math.abs(Math.sin(a1)) * t.width + Math.abs(Math.cos(a1)) * t.length) / 2;
+            const cx1 = rHW + t.x, cy1 = t.dist + t.length / 2;
+            for (const o of state.tables) {
+                if (o.id === t.id) continue;
+                const a2 = o.rotation * Math.PI / 180;
+                const rw2h = (Math.abs(Math.cos(a2)) * o.width + Math.abs(Math.sin(a2)) * o.length) / 2;
+                const rl2h = (Math.abs(Math.sin(a2)) * o.width + Math.abs(Math.cos(a2)) * o.length) / 2;
+                const cx2 = rHW + o.x, cy2 = o.dist + o.length / 2;
+                if (Math.abs(cx1 - cx2) < rw1h + rw2h && Math.abs(cy1 - cy2) < rl1h + rl2h) {
+                    dragTableOverlap = true;
+                    break;
+                }
+            }
+
+            // Compute distances from table edges to room walls
+            dragDistances = {
+                north: t.dist,
+                south: state.roomLength - t.dist - t.length,
+                west: rHW + t.x - t.width / 2,
+                east: rHW - t.x - t.width / 2,
+                displayWall: state.displayWall
+            };
 
             // Keep flat state in sync for the selected table
             if (t.id === state.selectedTableId) {
@@ -1245,7 +1432,7 @@ _ctxMenu.addEventListener('click', e => {
             DOM['val-table-rotation'].textContent = `${t.rotation}°`;
             updateSliderTrack(DOM['table-rotation']);
         }
-        pushHistory();
+        pushHistory('rotated table');
         scheduleRender();
     } else if (action === 'ctx-reset-rotation' && t) {
         t.rotation = 0;
@@ -1255,7 +1442,7 @@ _ctxMenu.addEventListener('click', e => {
             DOM['val-table-rotation'].textContent = '0°';
             updateSliderTrack(DOM['table-rotation']);
         }
-        pushHistory();
+        pushHistory('reset table rotation');
         scheduleRender();
     } else if (action === 'ctx-center' && t) {
         t.x = 0;
@@ -1265,14 +1452,14 @@ _ctxMenu.addEventListener('click', e => {
             DOM['val-table-x'].textContent = formatFtIn(0);
             updateSliderTrack(DOM['table-x']);
         }
-        pushHistory();
+        pushHistory('centered table');
         scheduleRender();
     } else if (action === 'ctx-bring-front' && t) {
         const idx = state.tables.indexOf(t);
         if (idx < state.tables.length - 1) {
             state.tables.splice(idx, 1);
             state.tables.push(t);
-            pushHistory();
+            pushHistory('table to front');
             scheduleRender();
         }
     } else if (action === 'ctx-send-back' && t) {
@@ -1280,7 +1467,7 @@ _ctxMenu.addEventListener('click', e => {
         if (idx > 0) {
             state.tables.splice(idx, 1);
             state.tables.unshift(t);
-            pushHistory();
+            pushHistory('table to back');
             scheduleRender();
         }
     } else if (action === 'ctx-delete') {

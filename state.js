@@ -11,7 +11,7 @@ const state = {
     mountPos: 'below',
     includeCenter: false, includeDualCenter: false, includeMicPod: false,
     showCamera: true, showMic: true,
-    showGrid: true, showViewAngle: false,
+    showGrid: true, showViewAngle: false, showSnap: true,
     viewMode: 'top',
     centerPos: { x: 0, y: 0 },
     center2Pos: { x: 0, y: 0 },
@@ -32,9 +32,9 @@ let _suppressHistory = false;
 // Debounced pushHistory — prevents flooding the undo stack during
 // rapid slider drags. Captures a snapshot 300ms after user stops.
 let _historyDebounceTimer = null;
-function debouncedPushHistory() {
+function debouncedPushHistory(desc = '') {
     clearTimeout(_historyDebounceTimer);
-    _historyDebounceTimer = setTimeout(() => pushHistory(), DEBOUNCE_HISTORY);
+    _historyDebounceTimer = setTimeout(() => pushHistory(desc), DEBOUNCE_HISTORY);
 }
 
 // Debounced serializeToHash — prevents URL serialization on every render frame.
@@ -49,13 +49,13 @@ function snapshotState() {
     return JSON.parse(JSON.stringify(state));
 }
 
-function pushHistory() {
+function pushHistory(desc = '') {
     if (_suppressHistory) return;
     // Trim any redo branch
     if (historyIndex < history.length - 1) {
         history.splice(historyIndex + 1);
     }
-    history.push(snapshotState());
+    history.push({ snap: snapshotState(), desc });
     if (history.length > MAX_HISTORY) history.shift();
     historyIndex = history.length - 1;
     updateUndoRedoBtns();
@@ -64,11 +64,15 @@ function pushHistory() {
 function updateUndoRedoBtns() {
     DOM['undo-btn'].disabled = historyIndex <= 0;
     DOM['redo-btn'].disabled = historyIndex >= history.length - 1;
+    const badge = document.getElementById('history-badge');
+    if (badge) {
+        badge.textContent = history.length > 1 ? `${historyIndex + 1}/${history.length}` : '';
+    }
 }
 
-function applyHistorySnapshot(snap) {
+function applyHistorySnapshot(entry) {
     _suppressHistory = true;
-    Object.assign(state, snap);
+    Object.assign(state, entry.snap);
     syncUIFromState();
     _suppressHistory = false;
     render();
@@ -77,14 +81,18 @@ function applyHistorySnapshot(snap) {
 
 function undo() {
     if (historyIndex <= 0) return;
+    const desc = history[historyIndex].desc;
     historyIndex--;
     applyHistorySnapshot(history[historyIndex]);
+    if (desc) showToast('Undo: ' + desc);
 }
 
 function redo() {
     if (historyIndex >= history.length - 1) return;
     historyIndex++;
     applyHistorySnapshot(history[historyIndex]);
+    const desc = history[historyIndex].desc;
+    if (desc) showToast('Redo: ' + desc);
 }
 
 // ── URL Hash Serialization ───────────────────────────────────
@@ -227,6 +235,7 @@ function syncUIFromState() {
     DOM['show-mic'].checked = state.showMic;
     DOM['show-grid'].checked = state.showGrid;
     DOM['show-view-angle'].checked = state.showViewAngle;
+    if (DOM['show-snap']) DOM['show-snap'].checked = state.showSnap;
 
     // Display count, wall, posture, view mode
     setDisplayCount(state.displayCount);

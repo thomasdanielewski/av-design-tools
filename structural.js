@@ -112,7 +112,7 @@ function addDoor() {
     updateElementControls(el);
     DOM['structural-controls'].style.display = '';
     renderElementList();
-    pushHistory();
+    pushHistory('added door');
     scheduleBackgroundRender();
 }
 
@@ -136,7 +136,7 @@ function addWindow() {
     updateElementControls(el);
     DOM['structural-controls'].style.display = '';
     renderElementList();
-    pushHistory();
+    pushHistory('added window');
     scheduleBackgroundRender();
 }
 
@@ -155,7 +155,7 @@ function removeElement() {
         DOM['structural-controls'].style.display = 'none';
     }
     renderElementList();
-    pushHistory();
+    pushHistory('removed element');
     scheduleBackgroundRender();
 }
 
@@ -168,7 +168,7 @@ function onElementWallChange() {
     const wallLen = getWallLength(el.wall);
     el.position = Math.min(el.position, Math.max(0, wallLen - el.width));
     updateElementControls(el);
-    pushHistory();
+    pushHistory('changed element wall');
     scheduleBackgroundRender();
 }
 
@@ -243,7 +243,7 @@ function flipSwing() {
     if (!el || el.type !== 'door') return;
     el.swingInverted = !el.swingInverted;
     DOM['flip-swing-btn'].textContent = el.swingInverted ? '⇄ Flip Swing (inverted)' : '⇄ Flip Swing';
-    pushHistory();
+    pushHistory('flipped door swing');
     scheduleBackgroundRender();
 }
 

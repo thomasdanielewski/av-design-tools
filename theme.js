@@ -49,6 +49,8 @@ const CANVAS_THEME = {
         micPodDot: 'rgba(74, 222, 128, 0.50)',
         chairFill: 'rgba(160, 162, 170, 0.18)',
         chairStroke: 'rgba(160, 162, 170, 0.30)',
+        snapGuide: 'rgba(91, 156, 245, 0.65)',   // grid snap guide line
+        alignGuide: 'rgba(255, 120, 50, 0.85)',  // alignment guide line
     },
     light: {
         bg: '#F2F3F5',
@@ -96,6 +98,8 @@ const CANVAS_THEME = {
         micPodDot: 'rgba(34, 180, 100, 0.50)',
         chairFill: 'rgba(100, 102, 110, 0.15)',
         chairStroke: 'rgba(100, 102, 110, 0.28)',
+        snapGuide: 'rgba(80, 120, 200, 0.70)',   // grid snap guide line
+        alignGuide: 'rgba(220, 90, 20, 0.90)',   // alignment guide line
     }
 };
 

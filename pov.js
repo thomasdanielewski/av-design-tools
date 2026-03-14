@@ -205,9 +205,10 @@ function renderPOV(cw, ch, dpr) {
         return { px, pz, rotOffset };
     }
 
+    const ceilHI = state.ceilingHeight * 12;
+
     // ── Room wireframe: all 4 walls ──────────────────────
     {
-        const ceilHI = state.ceilingHeight * 12;
 
         // Wall corners in POV-space (z=0 is display wall, z=roomDepth is back)
         // Floor corners: y=0, Ceiling corners: y=ceilHI
@@ -271,20 +272,149 @@ function renderPOV(cw, ch, dpr) {
             { x: rHW, yIn: ceilHI, z: roomDepth }, { x: rHW, yIn: ceilHI, z: 0 }
         ], wallFill, wallStroke, 0);
 
-        // Floor grid lines for spatial reference
-        ctx.save();
-        ctx.strokeStyle = cc().povFloorGrid || 'rgba(128,128,128,0.08)';
-        ctx.lineWidth = 0.5;
-        const gridStep = 2; // every 2 feet
-        // Lines parallel to x-axis (across room width)
-        for (let zg = 0; zg <= roomDepth; zg += gridStep) {
-            drawLine(-rHW, 0, zg, rHW, 0, zg);
+        // ── Ceiling plane with grid ──────────────────────────────
+        {
+            const isDark = (document.documentElement.getAttribute('data-theme') || 'dark') === 'dark';
+            const ceilFillC = isDark ? 'rgba(26,28,34,0.50)' : 'rgba(208,210,218,0.50)';
+            drawPoly([
+                { x: -rHW, yIn: ceilHI, z: 0 },
+                { x:  rHW, yIn: ceilHI, z: 0 },
+                { x:  rHW, yIn: ceilHI, z: roomDepth },
+                { x: -rHW, yIn: ceilHI, z: roomDepth }
+            ], ceilFillC, 'none', 0);
+            ctx.save();
+            const cg1 = isDark ? 'rgba(200,202,210,0.035)' : 'rgba(80,82,90,0.04)';
+            const cg2 = isDark ? 'rgba(200,202,210,0.075)' : 'rgba(80,82,90,0.08)';
+            for (let zg = 0; zg <= roomDepth; zg += 1) {
+                const is2 = (zg % 2 === 0);
+                ctx.strokeStyle = is2 ? cg2 : cg1;
+                ctx.lineWidth = is2 ? 0.5 : 0.28;
+                drawLine(-rHW, ceilHI, zg, rHW, ceilHI, zg);
+            }
+            for (let xg = Math.ceil(-rHW); xg <= Math.floor(rHW); xg += 1) {
+                const is2 = (xg % 2 === 0);
+                ctx.strokeStyle = is2 ? cg2 : cg1;
+                ctx.lineWidth = is2 ? 0.5 : 0.28;
+                drawLine(xg, ceilHI, 0, xg, ceilHI, roomDepth);
+            }
+            ctx.restore();
         }
-        // Lines parallel to z-axis (along room depth)
-        for (let xg = -rHW; xg <= rHW; xg += gridStep) {
-            drawLine(xg, 0, 0, xg, 0, roomDepth);
+
+        // ── Wall ambient occlusion (floor/ceiling edges + corners) ──
+        {
+            const isDark = (document.documentElement.getAttribute('data-theme') || 'dark') === 'dark';
+            const aoA = isDark ? 0.30 : 0.12;
+            const applyWallAO = (wv) => {
+                const pts = clipAndProject(wv);
+                if (!pts || pts.length < 3) return;
+                let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+                for (const p of pts) {
+                    if (p.x < minX) minX = p.x; if (p.x > maxX) maxX = p.x;
+                    if (p.y < minY) minY = p.y; if (p.y > maxY) maxY = p.y;
+                }
+                const wH = maxY - minY, wW = maxX - minX;
+                if (wW < 2 || wH < 2) return;
+                const aoH = Math.max(6, wH * 0.16);
+                const aoW = Math.max(6, wW * 0.10);
+                ctx.save();
+                ctx.beginPath();
+                ctx.moveTo(pts[0].x, pts[0].y);
+                for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+                ctx.closePath();
+                ctx.clip();
+                // Floor edge (high Y = bottom on screen)
+                const g1 = ctx.createLinearGradient(0, maxY, 0, maxY - aoH);
+                g1.addColorStop(0, `rgba(0,0,0,${aoA})`);
+                g1.addColorStop(1, 'rgba(0,0,0,0)');
+                ctx.fillStyle = g1;
+                ctx.fillRect(minX - 2, maxY - aoH, wW + 4, aoH + 1);
+                // Ceiling edge (low Y = top on screen)
+                const g2 = ctx.createLinearGradient(0, minY, 0, minY + aoH * 0.65);
+                g2.addColorStop(0, `rgba(0,0,0,${aoA * 0.55})`);
+                g2.addColorStop(1, 'rgba(0,0,0,0)');
+                ctx.fillStyle = g2;
+                ctx.fillRect(minX - 2, minY, wW + 4, aoH * 0.65);
+                // Left corner
+                const g3 = ctx.createLinearGradient(minX, 0, minX + aoW, 0);
+                g3.addColorStop(0, `rgba(0,0,0,${aoA * 0.45})`);
+                g3.addColorStop(1, 'rgba(0,0,0,0)');
+                ctx.fillStyle = g3;
+                ctx.fillRect(minX, minY - 2, aoW, wH + 4);
+                // Right corner
+                const g4 = ctx.createLinearGradient(maxX, 0, maxX - aoW, 0);
+                g4.addColorStop(0, `rgba(0,0,0,${aoA * 0.45})`);
+                g4.addColorStop(1, 'rgba(0,0,0,0)');
+                ctx.fillStyle = g4;
+                ctx.fillRect(maxX - aoW, minY - 2, aoW, wH + 4);
+                ctx.restore();
+            };
+            applyWallAO([
+                { x: -rHW, yIn: 0, z: 0 }, { x: rHW, yIn: 0, z: 0 },
+                { x: rHW, yIn: ceilHI, z: 0 }, { x: -rHW, yIn: ceilHI, z: 0 }
+            ]);
+            applyWallAO([
+                { x: -rHW, yIn: 0, z: roomDepth }, { x: rHW, yIn: 0, z: roomDepth },
+                { x: rHW, yIn: ceilHI, z: roomDepth }, { x: -rHW, yIn: ceilHI, z: roomDepth }
+            ]);
+            applyWallAO([
+                { x: -rHW, yIn: 0, z: 0 }, { x: -rHW, yIn: 0, z: roomDepth },
+                { x: -rHW, yIn: ceilHI, z: roomDepth }, { x: -rHW, yIn: ceilHI, z: 0 }
+            ]);
+            applyWallAO([
+                { x: rHW, yIn: 0, z: 0 }, { x: rHW, yIn: 0, z: roomDepth },
+                { x: rHW, yIn: ceilHI, z: roomDepth }, { x: rHW, yIn: ceilHI, z: 0 }
+            ]);
         }
-        ctx.restore();
+
+        // Floor texture: 1ft / 2ft grid pattern (thicker + brighter on 2ft marks)
+        {
+            const isDark = (document.documentElement.getAttribute('data-theme') || 'dark') === 'dark';
+            const fg1 = isDark ? 'rgba(180,182,190,0.055)' : 'rgba(80,82,90,0.055)';
+            const fg2 = isDark ? 'rgba(180,182,190,0.115)' : 'rgba(80,82,90,0.105)';
+            ctx.save();
+            for (let zg = 0; zg <= roomDepth; zg += 1) {
+                const is2 = (zg % 2 === 0);
+                ctx.strokeStyle = is2 ? fg2 : fg1;
+                ctx.lineWidth = is2 ? 0.55 : 0.32;
+                drawLine(-rHW, 0, zg, rHW, 0, zg);
+            }
+            for (let xg = Math.ceil(-rHW); xg <= Math.floor(rHW); xg += 1) {
+                const is2 = (xg % 2 === 0);
+                ctx.strokeStyle = is2 ? fg2 : fg1;
+                ctx.lineWidth = is2 ? 0.55 : 0.32;
+                drawLine(xg, 0, 0, xg, 0, roomDepth);
+            }
+            ctx.restore();
+        }
+
+        // Ceiling light indicators (small glow dots at 4ft grid intersections)
+        {
+            const isDark = (document.documentElement.getAttribute('data-theme') || 'dark') === 'dark';
+            const lgInner = isDark ? 'rgba(255,250,210,0.30)' : 'rgba(255,230,100,0.22)';
+            const lgDot   = isDark ? 'rgba(255,255,225,0.60)' : 'rgba(200,175,80,0.65)';
+            ctx.save();
+            const lightSp = 4;
+            const lx0 = Math.ceil(-rHW / lightSp) * lightSp;
+            for (let xg = lx0; xg < rHW; xg += lightSp) {
+                for (let zg = lightSp; zg < roomDepth; zg += lightSp) {
+                    const lp = proj(xg, ceilHI, zg);
+                    if (!lp) continue;
+                    const gr = 9;
+                    const lg = ctx.createRadialGradient(lp.x, lp.y, 0, lp.x, lp.y, gr);
+                    lg.addColorStop(0, lgInner);
+                    lg.addColorStop(1, 'rgba(255,250,200,0)');
+                    ctx.fillStyle = lg;
+                    ctx.beginPath();
+                    ctx.arc(lp.x, lp.y, gr, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.fillStyle = lgDot;
+                    ctx.beginPath();
+                    ctx.arc(lp.x, lp.y, 1.5, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+            ctx.restore();
+        }
 
         // Wall labels (N/S/E/W) rendered on each wall face center
         const wallLabels = { north: 'N', south: 'S', east: 'E', west: 'W' };
@@ -396,6 +526,39 @@ function renderPOV(cw, ch, dpr) {
     const dyb = dyc - dhi / 2;
     const dox = state.displayOffsetX;
 
+    // ── Display screen glow (behind display rectangles) ──
+    {
+        const isDark = (document.documentElement.getAttribute('data-theme') || 'dark') === 'dark';
+        const drawDisplayGlow = (x, y, w, h) => {
+            if (w <= 0 || h <= 0) return;
+            const cx = x + w / 2, cy = y + h / 2;
+            const gr = Math.max(w, h) * 0.9;
+            const gg = ctx.createRadialGradient(cx, cy, 0, cx, cy, gr);
+            gg.addColorStop(0, isDark ? 'rgba(91,156,245,0.20)' : 'rgba(91,156,245,0.10)');
+            gg.addColorStop(0.45, isDark ? 'rgba(160,200,255,0.07)' : 'rgba(120,170,255,0.04)');
+            gg.addColorStop(1, 'rgba(91,156,245,0)');
+            ctx.save();
+            ctx.fillStyle = gg;
+            ctx.beginPath();
+            ctx.ellipse(cx, cy, gr, gr * 0.65, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+        };
+        if (state.displayCount === 1) {
+            const ga = proj(-dwf / 2 + dox, dyt, dz);
+            const gb = proj(dwf / 2 + dox, dyb, dz);
+            if (ga && gb) drawDisplayGlow(ga.x, ga.y, gb.x - ga.x, gb.y - ga.y);
+        } else {
+            const gap = 0.5;
+            const ga = proj(-dwf - gap / 2 + dox, dyt, dz);
+            const gb = proj(-gap / 2 + dox, dyb, dz);
+            if (ga && gb) drawDisplayGlow(ga.x, ga.y, gb.x - ga.x, gb.y - ga.y);
+            const gc = proj(gap / 2 + dox, dyt, dz);
+            const gd = proj(dwf + gap / 2 + dox, dyb, dz);
+            if (gc && gd) drawDisplayGlow(gc.x, gc.y, gd.x - gc.x, gd.y - gc.y);
+        }
+    }
+
     // ── Draw displays ────────────────────────────────────
     // Only draw if display wall is in front of viewer
     {
@@ -456,6 +619,35 @@ function renderPOV(cw, ch, dpr) {
         }
     }
 
+    // ── Table floor shadows (soft elliptical radial gradient) ──
+    {
+        const isDark = (document.documentElement.getAttribute('data-theme') || 'dark') === 'dark';
+        state.tables.forEach(t => {
+            const { px: tPX, pz: tPZ } = tableToPOV(t);
+            const sc = proj(tPX, 0, tPZ);
+            if (!sc) return;
+            const eL = proj(tPX - t.width / 2, 0, tPZ);
+            const eR = proj(tPX + t.width / 2, 0, tPZ);
+            const eF = proj(tPX, 0, tPZ - t.length / 2);
+            const eN = proj(tPX, 0, tPZ + t.length / 2);
+            const rX = (eL && eR) ? Math.abs(eR.x - eL.x) / 2 : 28;
+            const rY = (eF && eN) ? Math.abs(eN.y - eF.y) / 2 : 12;
+            if (rX < 2 || rY < 2) return;
+            ctx.save();
+            ctx.translate(sc.x, sc.y);
+            ctx.scale(1, rY / Math.max(rX, 0.1));
+            const sg = ctx.createRadialGradient(0, 0, 0, 0, 0, rX * 1.15);
+            sg.addColorStop(0, isDark ? 'rgba(0,0,0,0.38)' : 'rgba(0,0,0,0.16)');
+            sg.addColorStop(0.55, isDark ? 'rgba(0,0,0,0.16)' : 'rgba(0,0,0,0.07)');
+            sg.addColorStop(1, 'rgba(0,0,0,0)');
+            ctx.fillStyle = sg;
+            ctx.beginPath();
+            ctx.arc(0, 0, rX * 1.15, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+        });
+    }
+
     // ── Draw all tables in perspective ───────────────────
     state.tables.forEach(t => {
         const thi_t = t.height;
@@ -468,31 +660,43 @@ function renderPOV(cw, ch, dpr) {
             return { x: tPovX + lx * cos_t - lz * sin_t, z: tPovZ + lx * sin_t + lz * cos_t };
         }
 
-        const wc = [rcPOV(-hw, -hl), rcPOV(+hw, -hl), rcPOV(+hw, +hl), rcPOV(-hw, +hl)];
-
-        // Table top as clipped polygon
-        const verts = wc.map(c => ({ x: c.x, yIn: thi_t, z: c.z }));
-
-        if (t.rotation === 0 && (t.shape === 'oval' || t.shape === 'circle')) {
-            // For oval/circle, approximate with the bounding quad (similar to original)
-            const pts = clipAndProject(verts);
-            if (pts && pts.length >= 4) {
-                const fw = Math.abs(pts[1].x - pts[0].x), nw = Math.abs(pts[2].x - pts[3].x);
-                const vs = Math.abs(pts[3].y - pts[0].y);
-                const bb = Math.min(vs * 0.1, fw * 0.15), fb = Math.min(vs * 0.1, nw * 0.15);
-                ctx.fillStyle = cc().surface;
-                ctx.strokeStyle = cc().tableStroke;
-                ctx.lineWidth = 2;
-                ctx.beginPath();
-                ctx.moveTo(pts[0].x, pts[0].y);
-                ctx.quadraticCurveTo((pts[0].x + pts[1].x) / 2, pts[0].y - bb, pts[1].x, pts[1].y);
-                ctx.lineTo(pts[2].x, pts[2].y);
-                ctx.quadraticCurveTo((pts[2].x + pts[3].x) / 2, pts[3].y + fb, pts[3].x, pts[3].y);
-                ctx.closePath();
-                ctx.fill();
-                ctx.stroke();
+        if (t.shape === 'oval' || t.shape === 'circle') {
+            // Approximate ellipse/circle with a polygon in POV-space
+            const SEGS = 32;
+            const ovalVerts = [];
+            for (let i = 0; i < SEGS; i++) {
+                const theta = (2 * Math.PI * i) / SEGS;
+                const lx = hw * Math.cos(theta);
+                const lz = hl * Math.sin(theta);
+                const p = rcPOV(lx, lz);
+                ovalVerts.push({ x: p.x, yIn: thi_t, z: p.z });
             }
+            drawPoly(ovalVerts, cc().surface, cc().tableStroke, 2);
+        } else if (t.shape === 'd-shape') {
+            // Flat top edge + semicircular bottom
+            const SEGS = 16;
+            const dVerts = [];
+            // Top-left to top-right (straight edge)
+            dVerts.push(rcPOV(-hw, -hl));
+            dVerts.push(rcPOV(+hw, -hl));
+            // Right side down to semicircle start
+            const semiCenterZ = hl - hw;
+            dVerts.push(rcPOV(+hw, semiCenterZ));
+            // Semicircle from right (0) to left (PI)
+            for (let i = 0; i <= SEGS; i++) {
+                const theta = (Math.PI * i) / SEGS;
+                const lx = hw * Math.cos(theta);
+                const lz = semiCenterZ + hw * Math.sin(theta);
+                dVerts.push(rcPOV(lx, lz));
+            }
+            // Left side back up
+            dVerts.push(rcPOV(-hw, -hl));
+            const dVertsPOV = dVerts.map(c => ({ x: c.x, yIn: thi_t, z: c.z }));
+            drawPoly(dVertsPOV, cc().surface, cc().tableStroke, 2);
         } else {
+            // Rectangular: 4-corner quad
+            const wc = [rcPOV(-hw, -hl), rcPOV(+hw, -hl), rcPOV(+hw, +hl), rcPOV(-hw, +hl)];
+            const verts = wc.map(c => ({ x: c.x, yIn: thi_t, z: c.z }));
             drawPoly(verts, cc().surface, cc().tableStroke, 2);
         }
     });

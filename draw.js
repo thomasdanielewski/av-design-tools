@@ -22,19 +22,35 @@ function drawDisplay(x, y, w, h) {
 /** Draw a display rectangle (POV perspective view) */
 function drawDisplayPOV(x, y, w, h) {
     if (w <= 0 || h <= 0) return;
+    const bezel = Math.max(2, Math.min(7, w * 0.03));
+    // Outer bezel body
     ctx.fillStyle = cc().displayFill;
     ctx.strokeStyle = cc().displayStrokePOV;
     ctx.lineWidth = 2;
     roundRect(ctx, x, y, w, h, 4);
     ctx.fill();
     ctx.stroke();
-
-    // Screen gradient fill
+    // Inner bezel highlight edge (top/left rim, subtle depth cue)
+    ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+    ctx.lineWidth = 1;
+    roundRect(ctx, x + 1, y + 1, w - 2, h - 2, 3);
+    ctx.stroke();
+    // Screen area gradient fill
     const g = ctx.createLinearGradient(x, y, x + w, y + h);
     g.addColorStop(0, cc().equipmentFill);
     g.addColorStop(1, cc().displayGradEnd);
     ctx.fillStyle = g;
-    ctx.fillRect(x + 2, y + 2, w - 4, h - 4);
+    roundRect(ctx, x + bezel, y + bezel, w - bezel * 2, h - bezel * 2, 2);
+    ctx.fill();
+    // Screen vignette (subtle edge darkening for depth)
+    const vg = ctx.createRadialGradient(
+        x + w / 2, y + h / 2, Math.min(w, h) * 0.15,
+        x + w / 2, y + h / 2, Math.max(w, h) * 0.72
+    );
+    vg.addColorStop(0, 'rgba(0,0,0,0)');
+    vg.addColorStop(1, 'rgba(0,0,0,0.22)');
+    ctx.fillStyle = vg;
+    ctx.fillRect(x + bezel, y + bezel, w - bezel * 2, h - bezel * 2);
 }
 
 /**
@@ -586,6 +602,40 @@ function drawTable(ox, ry, wallThick, ppf) {
             ctx.fillText(`T${t.id}`, 0, 0);
         }
 
+        // Overlap warning: red tint + dashed border + ⚠ icon
+        if (t.id === isDraggingTableId && dragTableOverlap) {
+            ctx.globalAlpha = 1.0;
+            ctx.fillStyle = 'rgba(239, 68, 68, 0.22)';
+            ctx.strokeStyle = 'rgba(239, 68, 68, 0.75)';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([4, 3]);
+            if (t.shape === 'rectangular') {
+                roundRect(ctx, x0, y0, tw, tl, 6); ctx.fill();
+                roundRect(ctx, x0, y0, tw, tl, 6); ctx.stroke();
+            } else if (t.shape === 'oval') {
+                ctx.beginPath(); ctx.ellipse(0, 0, tw / 2, tl / 2, 0, 0, Math.PI * 2); ctx.fill();
+                ctx.beginPath(); ctx.ellipse(0, 0, tw / 2, tl / 2, 0, 0, Math.PI * 2); ctx.stroke();
+            } else if (t.shape === 'circle') {
+                ctx.beginPath(); ctx.arc(0, 0, Math.min(tw, tl) / 2, 0, Math.PI * 2); ctx.fill();
+                ctx.beginPath(); ctx.arc(0, 0, Math.min(tw, tl) / 2, 0, Math.PI * 2); ctx.stroke();
+            } else if (t.shape === 'd-shape') {
+                ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x0 + tw, y0);
+                ctx.lineTo(x0 + tw, y0 + tl - tw / 2); ctx.arc(0, y0 + tl - tw / 2, tw / 2, 0, Math.PI);
+                ctx.lineTo(x0, y0); ctx.fill();
+                ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x0 + tw, y0);
+                ctx.lineTo(x0 + tw, y0 + tl - tw / 2); ctx.arc(0, y0 + tl - tw / 2, tw / 2, 0, Math.PI);
+                ctx.lineTo(x0, y0); ctx.stroke();
+            }
+            ctx.setLineDash([]);
+            // Warning icon
+            const warnSz = Math.max(14, ppf * 0.42);
+            ctx.font = `bold ${warnSz}px sans-serif`;
+            ctx.fillStyle = 'rgba(239, 68, 68, 0.95)';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('⚠', 0, 0);
+        }
+
         ctx.globalAlpha = 1.0;
         ctx.restore();
 
@@ -1003,5 +1053,127 @@ function drawDoorElement(x, y, w, isHorizontal, wallThick, swingDirX, swingDirY,
     ctx.lineTo(hingeX + panelDX, hingeY + panelDY);
     ctx.stroke();
 
+    ctx.restore();
+}
+
+/**
+ * Draw floating distance labels outside each edge of the dragged table.
+ * Labels are positioned in the table's local rotated coordinate space.
+ * The display-wall label is tinted blue to highlight the important distance.
+ */
+function drawDragDistances(t, ox, ry, wt, ppf, dists) {
+    if (!dists) return;
+    const tcx = ox + t.x * ppf;
+    const tcy = ry + wt + t.dist * ppf + (t.length * ppf) / 2;
+    const hw  = (t.width  * ppf) / 2;
+    const hl  = (t.length * ppf) / 2;
+    const angle = t.rotation * Math.PI / 180;
+    const isMetric = state.units === 'metric';
+
+    function fmt(ft) {
+        if (ft < 0) ft = 0;
+        return isMetric ? formatMetric(convertToMetric(ft)) : formatFtIn(ft);
+    }
+
+    function drawLabel(lx, ly, text, isDisplay) {
+        const fontSize = Math.max(9, ppf * 0.22);
+        ctx.font = `600 ${fontSize}px 'JetBrains Mono', monospace`;
+        const textW = ctx.measureText(text).width;
+        const pad = 4;
+        const pillW = textW + pad * 2;
+        const pillH = fontSize + pad * 2;
+        ctx.fillStyle = isDisplay ? 'rgba(37, 99, 235, 0.88)' : 'rgba(15, 23, 42, 0.82)';
+        roundRect(ctx, lx - pillW / 2, ly - pillH / 2, pillW, pillH, 3);
+        ctx.fill();
+        ctx.strokeStyle = isDisplay ? 'rgba(96, 165, 250, 0.55)' : 'rgba(100, 116, 139, 0.35)';
+        ctx.lineWidth = 1;
+        roundRect(ctx, lx - pillW / 2, ly - pillH / 2, pillW, pillH, 3);
+        ctx.stroke();
+        ctx.fillStyle = 'rgba(226, 232, 240, 0.95)';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(text, lx, ly);
+    }
+
+    const GAP = 24; // px from table edge to label center
+    ctx.save();
+    ctx.translate(tcx, tcy);
+    ctx.rotate(angle);
+    drawLabel(0, -(hl + GAP), fmt(dists.north), dists.displayWall === 'north');
+    drawLabel(0,  (hl + GAP), fmt(dists.south), dists.displayWall === 'south');
+    drawLabel(-(hw + GAP), 0, fmt(dists.west),  dists.displayWall === 'west');
+    drawLabel( (hw + GAP), 0, fmt(dists.east),  dists.displayWall === 'east');
+    ctx.restore();
+}
+
+/**
+ * Draw a subtle red glow on room walls that the dragged table is pressing against.
+ * hitWalls: { north, south, east, west } booleans from dragBoundaryHit.
+ */
+function drawWallGlow(rx, ry, rw, rl, hitWalls) {
+    if (!hitWalls || (!hitWalls.north && !hitWalls.south && !hitWalls.east && !hitWalls.west)) return;
+    const gw = 22; // glow depth in px
+    ctx.save();
+    ctx.globalCompositeOperation = 'source-over';
+
+    if (hitWalls.north) {
+        const g = ctx.createLinearGradient(0, ry, 0, ry + gw);
+        g.addColorStop(0, 'rgba(239, 68, 68, 0.55)');
+        g.addColorStop(1, 'rgba(239, 68, 68, 0)');
+        ctx.fillStyle = g;
+        ctx.fillRect(rx, ry, rw, gw);
+    }
+    if (hitWalls.south) {
+        const g = ctx.createLinearGradient(0, ry + rl, 0, ry + rl - gw);
+        g.addColorStop(0, 'rgba(239, 68, 68, 0.55)');
+        g.addColorStop(1, 'rgba(239, 68, 68, 0)');
+        ctx.fillStyle = g;
+        ctx.fillRect(rx, ry + rl - gw, rw, gw);
+    }
+    if (hitWalls.west) {
+        const g = ctx.createLinearGradient(rx, 0, rx + gw, 0);
+        g.addColorStop(0, 'rgba(239, 68, 68, 0.55)');
+        g.addColorStop(1, 'rgba(239, 68, 68, 0)');
+        ctx.fillStyle = g;
+        ctx.fillRect(rx, ry, gw, rl);
+    }
+    if (hitWalls.east) {
+        const g = ctx.createLinearGradient(rx + rw, 0, rx + rw - gw, 0);
+        g.addColorStop(0, 'rgba(239, 68, 68, 0.55)');
+        g.addColorStop(1, 'rgba(239, 68, 68, 0)');
+        ctx.fillStyle = g;
+        ctx.fillRect(rx + rw - gw, ry, gw, rl);
+    }
+
+    ctx.restore();
+}
+
+/**
+ * Draw snap-to-grid and alignment guide lines on the foreground canvas.
+ * guides: array of { axis:'x'|'y', ft:number, isAlign:boolean }
+ *   axis 'x' → vertical dashed line; ft = feet from room left (rx), aligns with grid dots
+ *   axis 'y' → horizontal dashed line; ft = feet from inner north wall (ry+wt), aligns with table edges
+ * wt = wall thickness in canvas pixels (added to y-axis guides)
+ */
+function drawSnapGuides(guides, rx, ry, rw, rl, wt) {
+    if (!guides || guides.length === 0) return;
+    ctx.save();
+    ctx.lineWidth = 1;
+    for (const guide of guides) {
+        ctx.strokeStyle = guide.isAlign ? cc().alignGuide : cc().snapGuide;
+        ctx.setLineDash([5, 4]);
+        ctx.beginPath();
+        if (guide.axis === 'x') {
+            const px = rx + guide.ft * ppf_g;
+            ctx.moveTo(px, ry);
+            ctx.lineTo(px, ry + rl);
+        } else {
+            const py = ry + wt + guide.ft * ppf_g;
+            ctx.moveTo(rx, py);
+            ctx.lineTo(rx + rw, py);
+        }
+        ctx.stroke();
+    }
+    ctx.setLineDash([]);
     ctx.restore();
 }

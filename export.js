@@ -60,7 +60,7 @@ function importConfig(event) {
             if (snap.center2Pos) state.center2Pos = snap.center2Pos;
             _suppressHistory = false;
             syncUIFromState();
-            pushHistory();
+            pushHistory('imported config');
             render();
             showToast('Configuration imported successfully.', 'success');
         } catch (err) {

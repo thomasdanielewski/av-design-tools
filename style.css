@@ -1395,13 +1395,24 @@ select:focus {
 
 .undo-btn:disabled,
 .redo-btn:disabled {
-    opacity: 0.25;
+    opacity: 0.22;
     cursor: not-allowed;
     color: var(--text-tertiary);
     pointer-events: none;
     filter: saturate(0);
 }
 
+.history-badge {
+    font-size: 10px;
+    font-family: var(--font-mono);
+    color: var(--text-tertiary);
+    line-height: 1;
+    min-width: 24px;
+    text-align: center;
+    letter-spacing: 0.02em;
+    pointer-events: none;
+    opacity: 0.7;
+}
 
 /* ══════════════════════════════════════════════════════════════
    INFO OVERLAY — Frosted Glass Panel

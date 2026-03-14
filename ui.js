@@ -52,7 +52,7 @@ function setBrand(brand) {
     // Rebuild center-mode select options for the current brand/room
     updateCenterModeOptions();
 
-    if (!_suppressHistory) pushHistory();
+    if (!_suppressHistory) pushHistory('changed brand');
     render();
 }
 
@@ -66,7 +66,7 @@ function setDisplayCount(n) {
             b.classList.toggle('active', isActive);
             b.setAttribute('aria-pressed', isActive);
         });
-    if (!_suppressHistory) pushHistory();
+    if (!_suppressHistory) pushHistory('changed display count');
     render();
 }
 
@@ -90,7 +90,7 @@ function setDisplayWall(w) {
             opt.textContent = base + suffix;
         });
     }
-    if (!_suppressHistory) pushHistory();
+    if (!_suppressHistory) pushHistory('changed display wall');
     render();
 }
 
@@ -104,7 +104,7 @@ function setMountPos(p) {
             b.classList.toggle('active', isActive);
             b.setAttribute('aria-pressed', isActive);
         });
-    if (!_suppressHistory) pushHistory();
+    if (!_suppressHistory) pushHistory('changed mount position');
     render();
 }
 
@@ -144,7 +144,7 @@ function setViewMode(m) {
         DOM['cg-overlays'].style.display = 'block';
     }
 
-    if (!_suppressHistory) pushHistory();
+    if (!_suppressHistory) pushHistory('switched view');
 
     // Animated view transition: zoom-fade out → render → zoom-fade in
     bgCanvas.style.opacity = '0';
@@ -170,7 +170,7 @@ function setPosture(p) {
             b.classList.toggle('active', isActive);
             b.setAttribute('aria-pressed', isActive);
         });
-    if (!_suppressHistory) pushHistory();
+    if (!_suppressHistory) pushHistory('changed posture');
     render();
 }
 
@@ -272,7 +272,7 @@ function applyPreset(len, wid, targetBtn) {
         DOM['viewer-offset'].max = (isNS ? wid : len) / 2;
     }
 
-    pushHistory();
+    pushHistory('applied room preset');
     render();
 }
 
@@ -292,7 +292,7 @@ function toggleOverlayLegend(which) {
         DOM['show-mic'].checked = state.showMic;
     }
     updateLegendState();
-    pushHistory();
+    pushHistory('toggled overlay');
     render();
 }
 
