@@ -243,8 +243,16 @@ function checkMicPodPlacement() {
     // micPodPos.x is used for east/west walls (auto-placement always uses y, so
     // east/west warnings will reflect actual position).
     function distFromBar(pos) {
-        if (dw === 'north') return selT.dist + halfLen + pos.y;
-        if (dw === 'south') return state.roomLength - selT.dist - halfLen - pos.y;
+        if (dw === 'north') {
+            const depth   = selT.dist + halfLen + pos.y;
+            const lateral = selT.x + pos.x;
+            return Math.sqrt(depth * depth + lateral * lateral);
+        }
+        if (dw === 'south') {
+            const depth   = state.roomLength - selT.dist - halfLen - pos.y;
+            const lateral = selT.x + pos.x;
+            return Math.sqrt(depth * depth + lateral * lateral);
+        }
         if (dw === 'west')  return state.roomWidth / 2 + selT.x + pos.x;
         return state.roomWidth / 2 - selT.x - pos.x; // east
     }
@@ -275,7 +283,8 @@ function checkMicPodPlacement() {
 
 function checkMicRange() {
     const eq = EQUIPMENT[state.videoBar];
-    const fe = state.tableDist + state.tableLength;
+    const corners = getTableCorners(getSelectedTable());
+    const fe = Math.max(...corners.map(([cx, cy]) => Math.sqrt(cx * cx + cy * cy)));
     const ex = fe > eq.micRange;
 
     const w = DOM['mic-warning'];
