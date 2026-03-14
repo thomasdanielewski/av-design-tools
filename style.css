@@ -757,7 +757,6 @@ select:focus-visible {
 
 select option {
     -webkit-font-smoothing: antialiased;
-    font-smoothing: antialiased;
 }
 
 [data-theme="light"] select {
@@ -1540,10 +1539,6 @@ body.animating #fg-canvas {
     background: var(--bg-active);
 }
 
-.zoom-btn + .zoom-btn {
-    border-top: none;
-}
-
 .zoom-divider {
     width: 1px;
     height: 16px;
@@ -1559,7 +1554,6 @@ body.animating #fg-canvas {
     font-size: 9px;
     font-variant-numeric: tabular-nums;
     color: var(--text-tertiary);
-    border-top: none;
     user-select: none;
     line-height: 32px;
 }
