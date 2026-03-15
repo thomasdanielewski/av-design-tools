@@ -276,6 +276,32 @@ function renderForeground() {
         }
     }
 
+    // ── Meeting mode overlays ──────────────────────────────────
+    if (state.meetingMode) {
+        _meetingAutoInvalidate();
+        const meetingData = getMeetingData();
+        if (meetingData) {
+            // Blind spot shading (behind other overlays)
+            if (state.meetingShowBlindSpots) {
+                drawBlindSpotOverlay(ctx, rx, ry, rw, rl, wallThick, ppf);
+            }
+
+            // Camera zone boundary arc
+            drawCameraZoneBoundary(ctx, rx, ry, rw, rl, wallThick, ppf);
+
+            // Seat status dots (on unoccupied seats — occupied ones already have avatars)
+            if (state.meetingShowSeatStatus) {
+                drawSeatStatusIndicators(ctx, meetingData.classified, meetingData.occupied, ppf, rx, ry, wallThick);
+            }
+
+            // Meeting avatars on occupied seats
+            drawMeetingAvatars(ctx, meetingData.occupied, ppf, rx, ry, wallThick);
+
+            // Update camera preview panel info
+            renderMeetingPreviewPanel(meetingData);
+        }
+    }
+
     // Equipment hover tooltip (drawn last, on top of everything)
     drawEquipmentTooltip(ctx);
 

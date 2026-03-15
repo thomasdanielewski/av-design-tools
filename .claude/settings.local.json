@@ -63,7 +63,15 @@
       "Bash(node -c draw.js)",
       "Bash(node -c tables.js)",
       "Bash(netstat -ano)",
-      "Bash(taskkill //F //IM node.exe)"
+      "Bash(taskkill //F //IM node.exe)",
+      "Bash(python -c \":*)",
+      "Bash(where python3:*)",
+      "Bash(ls /c/Python*/python.exe)",
+      "Read(//c/Users/Thomas/AppData/Local/Programs/**)",
+      "WebFetch(domain:support.neat.no)",
+      "WebFetch(domain:www.logitech.com)",
+      "WebSearch",
+      "Bash(taskkill //PID 1371740 //F)"
     ]
   }
 }

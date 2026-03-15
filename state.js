@@ -33,7 +33,14 @@ const state = {
     floorMaterial: 'carpet',
     lightingType: 'led',
     hvacNoise: 'low',
-    showEnvironment: false
+    showEnvironment: false,
+    // Meeting mode
+    meetingMode: false,
+    meetingParticipants: 0,        // 0 = auto (fill all seats)
+    meetingFramingMode: 'group',   // group | individual | speaker | grid
+    meetingShowBlindSpots: true,
+    meetingShowSeatStatus: true,
+    meetingCameraZoneDepth: 1.0    // fraction of cameraRange for framing boundary
 };
 
 // ── Undo / Redo ──────────────────────────────────────────────
@@ -352,6 +359,12 @@ const UI_BINDINGS = [
     { type: 'checkbox', key: 'showEnvironment', dom: 'show-environment' },
     // Text inputs: { type: 'text', key, dom }
     { type: 'text',   key: 'roomName',         dom: 'room-name'         },
+    // Meeting mode
+    { type: 'slider',   key: 'meetingParticipants',    dom: 'meeting-participants',    val: 'val-meeting-participants',    unit: 'count' },
+    { type: 'slider',   key: 'meetingCameraZoneDepth', dom: 'meeting-zone-depth',      val: 'val-meeting-zone-depth',      unit: 'pct'   },
+    { type: 'select',   key: 'meetingFramingMode',     dom: 'meeting-framing'          },
+    { type: 'checkbox', key: 'meetingShowBlindSpots',  dom: 'meeting-blind-spots'      },
+    { type: 'checkbox', key: 'meetingShowSeatStatus',  dom: 'meeting-seat-status'      },
 ];
 
 // ── Sync UI Controls from State ──────────────────────────────
@@ -402,6 +415,13 @@ function syncUIFromState() {
     setPovPerspective(state.povPerspective);
 
     syncStructuralUI();
+
+    // Meeting mode UI sync
+    if (DOM['meeting-mode-btn']) DOM['meeting-mode-btn'].classList.toggle('active', state.meetingMode);
+    if (DOM['cg-meeting']) DOM['cg-meeting'].style.display = state.meetingMode ? '' : 'none';
+    if (DOM['meeting-camera-preview']) DOM['meeting-camera-preview'].style.display = state.meetingMode ? '' : 'none';
+    if (state.meetingMode && typeof updateFramingModeOptions === 'function') updateFramingModeOptions();
+    if (typeof invalidateMeetingCache === 'function') invalidateMeetingCache();
 
     // Wall materials (nested state)
     ['north','south','east','west'].forEach(w => {

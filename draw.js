@@ -1669,3 +1669,260 @@ function drawEquipmentTooltip(drawCtx) {
     drawCtx.fillStyle = cc().tooltipSpec;
     drawCtx.fillText(spec, tx + pad, ty + pad + nameFontSize + gap);
 }
+
+// ── Meeting Mode Drawing Functions ──────────────────────────
+
+/** Get fill/stroke colors for a seat status */
+function _meetingColors(status) {
+    const c = cc();
+    const map = {
+        [SEAT_STATUS.covered]:    { fill: c.avatarCovered,    stroke: c.avatarStrokeCovered },
+        [SEAT_STATUS.outOfRange]: { fill: c.avatarOutOfRange,  stroke: c.avatarStrokeOutOfRange },
+        [SEAT_STATUS.blindSpot]:  { fill: c.avatarBlindSpot,   stroke: c.avatarStrokeBlindSpot },
+        [SEAT_STATUS.obstructed]: { fill: c.avatarObstructed,  stroke: c.avatarStrokeObstructed }
+    };
+    return map[status] || map[SEAT_STATUS.obstructed];
+}
+
+/**
+ * Draw meeting avatars (head + shoulder silhouettes) on occupied seats.
+ * Uses participant-specific colors within status-appropriate outlines.
+ * Coordinates are in room-space feet; this function converts to canvas pixels.
+ */
+function drawMeetingAvatars(drawCtx, occupiedSeats, ppf, rx, ry, wallThick) {
+    const headR = ppf * 0.28;
+    const shoulderW = ppf * 0.52;
+    const shoulderH = ppf * 0.20;
+
+    const { camX, camY } = getCameraRoomPosition();
+
+    for (const seat of occupiedSeats) {
+        const cx = rx + seat.roomX * ppf;
+        const cy = ry + wallThick + seat.roomY * ppf;
+
+        const statusColors = _meetingColors(seat.status);
+        const pColor = _getParticipantColor(seat.seatIdx, seat.tableId);
+
+        // Angle from seat toward camera
+        const angleToCamera = Math.atan2(camY - seat.roomY, camX - seat.roomX);
+
+        drawCtx.save();
+        drawCtx.translate(cx, cy);
+
+        // Glow ring for covered seats
+        if (seat.status === SEAT_STATUS.covered) {
+            drawCtx.beginPath();
+            drawCtx.arc(0, 0, headR + 4, 0, Math.PI * 2);
+            drawCtx.fillStyle = 'rgba(74, 222, 128, 0.08)';
+            drawCtx.fill();
+        }
+
+        // Drop shadow
+        drawCtx.beginPath();
+        drawCtx.arc(1.5, 2, headR * 1.15, 0, Math.PI * 2);
+        drawCtx.fillStyle = 'rgba(0,0,0,0.12)';
+        drawCtx.fill();
+
+        // Shoulders (arc below head)
+        drawCtx.beginPath();
+        drawCtx.ellipse(0, headR + shoulderH * 0.2, shoulderW, shoulderH, 0, Math.PI, 0);
+        drawCtx.fillStyle = statusColors.fill;
+        drawCtx.fill();
+        drawCtx.strokeStyle = statusColors.stroke;
+        drawCtx.lineWidth = 1.5;
+        drawCtx.stroke();
+
+        // Head circle with participant color fill
+        drawCtx.beginPath();
+        drawCtx.arc(0, 0, headR, 0, Math.PI * 2);
+        // Use participant color for covered seats, status color otherwise
+        if (seat.status === SEAT_STATUS.covered) {
+            drawCtx.fillStyle = pColor.bg;
+        } else {
+            drawCtx.fillStyle = statusColors.fill;
+        }
+        drawCtx.fill();
+        drawCtx.strokeStyle = statusColors.stroke;
+        drawCtx.lineWidth = 2;
+        drawCtx.stroke();
+
+        // Facing direction indicator (small wedge toward camera)
+        const faceX = Math.cos(angleToCamera) * headR * 0.65;
+        const faceY = Math.sin(angleToCamera) * headR * 0.65;
+        drawCtx.beginPath();
+        drawCtx.arc(faceX, faceY, headR * 0.18, 0, Math.PI * 2);
+        drawCtx.fillStyle = 'rgba(255,255,255,0.7)';
+        drawCtx.fill();
+
+        drawCtx.restore();
+    }
+}
+
+/**
+ * Draw blind spot overlay — semi-transparent wash over areas outside camera FOV.
+ * Uses hatching pattern for better visibility and clearer communication.
+ */
+// Cached offscreen canvas for blind spot compositing
+let _blindSpotCanvas = null;
+let _blindSpotCtx = null;
+
+function drawBlindSpotOverlay(drawCtx, rx, ry, rw, rl, wallThick, ppf) {
+    const eq = EQUIPMENT[state.videoBar];
+    if (!eq || !eq.cameraFOV) return;
+
+    const { camX, camY, facingAngle } = getCameraRoomPosition();
+    const halfFOV = (eq.cameraFOV / 2) * Math.PI / 180;
+    const range = eq.cameraRange * state.meetingCameraZoneDepth;
+    const rangePx = range * ppf;
+
+    const camPxX = rx + camX * ppf;
+    const camPxY = ry + wallThick + camY * ppf;
+    const isDark = document.documentElement.getAttribute('data-theme') !== 'light';
+
+    // Use an offscreen canvas so the destination-out cutout doesn't erase
+    // existing foreground content (tables, chairs, equipment).
+    const cw = drawCtx.canvas.width;
+    const ch = drawCtx.canvas.height;
+    if (!_blindSpotCanvas || _blindSpotCanvas.width !== cw || _blindSpotCanvas.height !== ch) {
+        _blindSpotCanvas = document.createElement('canvas');
+        _blindSpotCanvas.width = cw;
+        _blindSpotCanvas.height = ch;
+        _blindSpotCtx = _blindSpotCanvas.getContext('2d');
+    }
+    const offCtx = _blindSpotCtx;
+    offCtx.clearRect(0, 0, cw, ch);
+
+    offCtx.save();
+
+    // Clip to room interior
+    offCtx.beginPath();
+    offCtx.rect(rx, ry + wallThick, rw, rl - 2 * wallThick);
+    offCtx.clip();
+
+    // Fill entire room with blind spot wash
+    offCtx.fillStyle = isDark ? 'rgba(239, 68, 68, 0.10)' : 'rgba(217, 42, 29, 0.08)';
+    offCtx.fillRect(rx, ry + wallThick, rw, rl - 2 * wallThick);
+
+    // Cut out the camera's visible wedge
+    offCtx.globalCompositeOperation = 'destination-out';
+    offCtx.beginPath();
+    offCtx.moveTo(camPxX, camPxY);
+    offCtx.arc(camPxX, camPxY, rangePx, facingAngle - halfFOV, facingAngle + halfFOV);
+    offCtx.closePath();
+    offCtx.fillStyle = 'rgba(0,0,0,1)';
+    offCtx.fill();
+
+    offCtx.restore();
+
+    // Composite the blind spot overlay onto the main canvas
+    drawCtx.drawImage(_blindSpotCanvas, 0, 0);
+}
+
+/**
+ * Draw the camera zone boundary arc (dashed line at framing boundary distance).
+ * Includes subtle fill within the active zone and clear FOV edge lines.
+ */
+function drawCameraZoneBoundary(drawCtx, rx, ry, rw, rl, wallThick, ppf) {
+    const eq = EQUIPMENT[state.videoBar];
+    if (!eq || !eq.cameraFOV) return;
+
+    const { camX, camY, facingAngle } = getCameraRoomPosition();
+    const halfFOV = (eq.cameraFOV / 2) * Math.PI / 180;
+    const zoneRange = eq.cameraRange * state.meetingCameraZoneDepth;
+    const rangePx = zoneRange * ppf;
+
+    const camPxX = rx + camX * ppf;
+    const camPxY = ry + wallThick + camY * ppf;
+    const isDark = document.documentElement.getAttribute('data-theme') !== 'light';
+
+    drawCtx.save();
+
+    // Clip to room interior
+    drawCtx.beginPath();
+    drawCtx.rect(rx, ry + wallThick, rw, rl - 2 * wallThick);
+    drawCtx.clip();
+
+    // Visible zone fill — gentle green tint to show "good" area
+    drawCtx.beginPath();
+    drawCtx.moveTo(camPxX, camPxY);
+    drawCtx.arc(camPxX, camPxY, rangePx, facingAngle - halfFOV, facingAngle + halfFOV);
+    drawCtx.closePath();
+    drawCtx.fillStyle = isDark ? 'rgba(74, 222, 128, 0.04)' : 'rgba(34, 180, 100, 0.04)';
+    drawCtx.fill();
+
+    // Dashed arc at zone boundary
+    drawCtx.beginPath();
+    drawCtx.arc(camPxX, camPxY, rangePx, facingAngle - halfFOV, facingAngle + halfFOV);
+    drawCtx.strokeStyle = isDark ? 'rgba(74, 222, 128, 0.40)' : 'rgba(34, 180, 100, 0.45)';
+    drawCtx.lineWidth = 1.8;
+    drawCtx.setLineDash([8, 5]);
+    drawCtx.stroke();
+    drawCtx.setLineDash([]);
+
+    // Radial lines at FOV edges
+    const fovEdges = [facingAngle - halfFOV, facingAngle + halfFOV];
+    for (const angle of fovEdges) {
+        drawCtx.beginPath();
+        drawCtx.moveTo(camPxX, camPxY);
+        drawCtx.lineTo(camPxX + Math.cos(angle) * rangePx, camPxY + Math.sin(angle) * rangePx);
+        drawCtx.strokeStyle = cc().cameraZoneBoundary;
+        drawCtx.lineWidth = 1;
+        drawCtx.setLineDash([4, 4]);
+        drawCtx.stroke();
+        drawCtx.setLineDash([]);
+    }
+
+    // Camera icon at camera position (larger, more visible)
+    drawCtx.beginPath();
+    drawCtx.arc(camPxX, camPxY, 4.5, 0, Math.PI * 2);
+    drawCtx.fillStyle = isDark ? 'rgba(91, 156, 245, 0.70)' : 'rgba(60, 110, 200, 0.65)';
+    drawCtx.fill();
+    drawCtx.strokeStyle = isDark ? 'rgba(91, 156, 245, 0.90)' : 'rgba(60, 110, 200, 0.85)';
+    drawCtx.lineWidth = 1.5;
+    drawCtx.stroke();
+
+    // Small camera lens inner dot
+    drawCtx.beginPath();
+    drawCtx.arc(camPxX, camPxY, 1.5, 0, Math.PI * 2);
+    drawCtx.fillStyle = '#fff';
+    drawCtx.fill();
+
+    drawCtx.restore();
+}
+
+/**
+ * Draw seat status indicator dots on all classified seats.
+ * Uses ring style for unoccupied seats to distinguish from avatars.
+ */
+function drawSeatStatusIndicators(drawCtx, classifiedSeats, occupiedSeats, ppf, rx, ry, wallThick) {
+    const dotR = ppf * 0.13;
+    const occupiedSet = new Set(occupiedSeats.map(s => `${s.tableId}:${s.seatIdx}`));
+
+    for (const seat of classifiedSeats) {
+        const key = `${seat.tableId}:${seat.seatIdx}`;
+        if (occupiedSet.has(key)) continue;
+
+        const cx = rx + seat.roomX * ppf;
+        const cy = ry + wallThick + seat.roomY * ppf;
+        const colors = _meetingColors(seat.status);
+
+        // Subtle fill circle
+        drawCtx.beginPath();
+        drawCtx.arc(cx, cy, dotR, 0, Math.PI * 2);
+        drawCtx.fillStyle = colors.fill;
+        drawCtx.fill();
+
+        // Ring indicator
+        drawCtx.beginPath();
+        drawCtx.arc(cx, cy, dotR, 0, Math.PI * 2);
+        drawCtx.strokeStyle = colors.stroke;
+        drawCtx.lineWidth = 1.5;
+        drawCtx.stroke();
+
+        // Tiny center dot
+        drawCtx.beginPath();
+        drawCtx.arc(cx, cy, dotR * 0.25, 0, Math.PI * 2);
+        drawCtx.fillStyle = colors.stroke;
+        drawCtx.fill();
+    }
+}

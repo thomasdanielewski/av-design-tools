@@ -64,3 +64,37 @@ const VALID_CEILING_TYPES = new Set(['open-exposed', 'drop-tile', 'acoustic']);
 const VALID_FLOOR_MATERIALS = new Set(['carpet', 'hardwood', 'tile', 'concrete']);
 const VALID_LIGHTING_TYPES = new Set(['fluorescent', 'led', 'recessed', 'natural-only']);
 const VALID_HVAC_NOISE = new Set(['none', 'low', 'moderate', 'high']);
+
+// ── Meeting Mode Constants ──────────────────────────────────
+
+/** Maximum individual frames per device (Neat Symmetry) */
+const NEAT_MAX_FRAMES = {
+    'neat-bar-gen2': 8,
+    'neat-board-50': 8,
+    'neat-bar-pro': 15,
+    'neat-board-pro': 15
+};
+
+/** Logitech RightSight 2 distance limits (feet) */
+const LOGI_RIGHTSIGHT = {
+    group:   { min: 3.3, max: 23 },
+    speaker: { min: 3.3, max: 15 },   // Speaker detection range ~4.5m / 15ft
+    grid:    { min: 3.3, max: 16.4 }   // Optimal ~5m / 16.4ft for face detection
+};
+
+/** Logitech Grid View max tiles (MS Teams Rooms on Windows: 4 tiles, no room view) */
+const LOGI_MAX_GRID_TILES = 4;
+
+/** Available framing modes per brand */
+const FRAMING_MODES = {
+    neat:     ['group', 'individual', 'speaker'],
+    logitech: ['group', 'speaker', 'grid']
+};
+
+/** Seat coverage status */
+const SEAT_STATUS = {
+    covered:    'covered',
+    outOfRange: 'outOfRange',
+    blindSpot:  'blindSpot',
+    obstructed: 'obstructed'
+};

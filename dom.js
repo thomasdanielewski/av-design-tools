@@ -69,7 +69,12 @@ function cacheDOMRefs() {
         'wall-mat-north', 'wall-mat-south', 'wall-mat-east', 'wall-mat-west',
         'ceiling-type', 'floor-material', 'lighting-type', 'hvac-noise',
         'show-environment',
-        'env-advisory', 'env-advisory-text'
+        'env-advisory', 'env-advisory-text',
+        'meeting-mode-btn', 'meeting-participants', 'val-meeting-participants',
+        'meeting-framing', 'meeting-blind-spots', 'meeting-seat-status',
+        'meeting-zone-depth', 'val-meeting-zone-depth',
+        'meeting-camera-preview', 'meeting-preview-canvas', 'meeting-preview-info',
+        'cg-meeting'
     ];
     ids.forEach(id => { DOM[id] = document.getElementById(id); });
 }

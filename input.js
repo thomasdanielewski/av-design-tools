@@ -7,10 +7,12 @@ function syncCircleValue(changedKey, v) {
     if (state.tableShape !== 'circle') return;
     if (changedKey === 'tableLength') {
         state.tableWidth = v;
+        setTableProp('tableWidth', v);
         DOM['table-width'].value = v;
         DOM['val-table-width'].textContent = formatFtIn(v);
     } else if (changedKey === 'tableWidth') {
         state.tableLength = v;
+        setTableProp('tableLength', v);
         DOM['table-length'].value = v;
         DOM['val-table-length'].textContent = formatFtIn(v);
     }
@@ -26,6 +28,8 @@ function syncCircleValue(changedKey, v) {
 function bindSlider(id, sk, vl, triggersBg = false) {
     const unit = (sk === 'displaySize' || sk === 'displayElev' || sk === 'tableHeight') ? 'in'
         : (sk === 'tableRotation' || sk === 'povYaw') ? 'deg'
+        : sk === 'meetingParticipants' ? 'count'
+        : sk === 'meetingCameraZoneDepth' ? 'pct'
         : 'ft';
     (DOM[id] || document.getElementById(id)).addEventListener('input', function () {
         let v = parseFloat(this.value);
@@ -109,11 +113,13 @@ function bindCheckbox(id, sk, triggersBg = false) {
 }
 
 /** Align table-length slider range to match table-width when circle is active,
- *  so both thumbs always sit at the same proportional position. */
+ *  so both thumbs always sit at the same proportional position.
+ *  Also hides the width row and renames the length label to "Diameter". */
 function syncCircleSliderRanges() {
     const lenSlider = DOM['table-length'];
     const widSlider = DOM['table-width'];
-    if (state.tableShape === 'circle') {
+    const isCircle = state.tableShape === 'circle';
+    if (isCircle) {
         lenSlider.min = widSlider.min;
         lenSlider.max = widSlider.max;
     } else {
@@ -122,6 +128,11 @@ function syncCircleSliderRanges() {
     }
     updateSliderTrack(lenSlider);
     updateSliderTrack(widSlider);
+
+    const lenLabel = lenSlider.closest('.control-row').querySelector('label');
+    const widRow = widSlider.closest('.control-row');
+    if (lenLabel) lenLabel.textContent = isCircle ? 'Diameter' : 'Table Length';
+    if (widRow) widRow.style.display = isCircle ? 'none' : '';
 }
 
 // ── Editable Value Badges ────────────────────────────────────

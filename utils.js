@@ -58,6 +58,8 @@ function formatFtIn(v) {
 /** Centralized value formatter — returns the correct string for any unit */
 function formatValue(v, unit) {
     if (unit === 'deg') return `${v}°`;
+    if (unit === 'count') return v === 0 ? 'Auto' : `${v}`;
+    if (unit === 'pct') return `${Math.round(v * 100)}%`;
     if (state.units === 'metric') {
         if (unit === 'in') return formatMetricCm(convertInToMetric(v));
         return formatMetric(convertToMetric(v));

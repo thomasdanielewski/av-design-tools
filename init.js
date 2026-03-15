@@ -27,6 +27,14 @@ bindSlider('viewer-dist', 'viewerDist', 'val-viewer-dist');
 bindSlider('viewer-offset', 'viewerOffset', 'val-viewer-offset');
 bindSlider('pov-yaw', 'povYaw', 'val-pov-yaw');
 
+// ── Meeting mode sliders ────────────────────────────────────
+bindSlider('meeting-participants', 'meetingParticipants', 'val-meeting-participants');
+bindSlider('meeting-zone-depth', 'meetingCameraZoneDepth', 'val-meeting-zone-depth');
+
+// Invalidate meeting cache when meeting-specific sliders change
+if (DOM['meeting-participants']) DOM['meeting-participants'].addEventListener('input', invalidateMeetingCache);
+if (DOM['meeting-zone-depth']) DOM['meeting-zone-depth'].addEventListener('input', invalidateMeetingCache);
+
 // ── Wire up selects ──────────────────────────────────────────
 bindSelect('table-shape', 'tableShape');
 bindSelect('seating-density', 'seatingDensity');
@@ -112,6 +120,16 @@ bindCheckbox('show-camera', 'showCamera');
 bindCheckbox('show-mic', 'showMic');
 bindCheckbox('show-grid', 'showGrid', true);
 bindCheckbox('show-snap', 'showSnap');
+
+// Meeting mode checkboxes & select
+bindCheckbox('meeting-blind-spots', 'meetingShowBlindSpots');
+bindCheckbox('meeting-seat-status', 'meetingShowSeatStatus');
+bindSelect('meeting-framing', 'meetingFramingMode');
+
+// Invalidate meeting cache on framing mode change
+if (DOM['meeting-framing']) DOM['meeting-framing'].addEventListener('change', invalidateMeetingCache);
+if (DOM['meeting-blind-spots']) DOM['meeting-blind-spots'].addEventListener('change', invalidateMeetingCache);
+if (DOM['meeting-seat-status']) DOM['meeting-seat-status'].addEventListener('change', invalidateMeetingCache);
 
 // ── Expand All / Collapse All ────────────────────────────────
 document.getElementById('expand-all-btn').addEventListener('click', () => {
@@ -386,6 +404,11 @@ document.querySelector('[data-action="share"]').addEventListener('click', copySh
 // ── Measure tool button ─────────────────────────────────────
 document.querySelector('[data-action="toggle-measure"]').addEventListener('click', toggleMeasureTool);
 
+// ── Meeting mode toggle ─────────────────────────────────────
+document.querySelectorAll('[data-action="toggle-meeting"]').forEach(btn => {
+    btn.addEventListener('click', toggleMeetingMode);
+});
+
 // ── Keyboard shortcuts for undo/redo ─────────────────────────
 document.addEventListener('keydown', e => {
     if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
@@ -577,6 +600,11 @@ document.addEventListener('keydown', e => {
         case 'm':
         case 'M':
             toggleMeasureTool();
+            break;
+
+        case 'f':
+        case 'F':
+            toggleMeetingMode();
             break;
 
         case 't':

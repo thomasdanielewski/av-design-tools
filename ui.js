@@ -53,6 +53,12 @@ function setBrand(brand) {
     // Rebuild center-mode select options for the current brand/room
     updateCenterModeOptions();
 
+    // Update meeting mode framing options when brand changes
+    if (state.meetingMode) {
+        updateFramingModeOptions();
+        invalidateMeetingCache();
+    }
+
     if (!_suppressHistory) pushHistory('changed brand');
     scheduleRender();
 }
@@ -399,6 +405,77 @@ function toggleOverlayLegend(which) {
 function updateLegendState() {
     DOM['legend-camera'].classList.toggle('inactive', !state.showCamera);
     DOM['legend-mic'].classList.toggle('inactive', !state.showMic);
+}
+
+// ── Meeting Mode ─────────────────────────────────────────────
+
+/** Toggle meeting mode on/off */
+function toggleMeetingMode() {
+    if (isAnimating()) return;
+
+    state.meetingMode = !state.meetingMode;
+
+    // Toggle button active state
+    const btn = DOM['meeting-mode-btn'];
+    if (btn) btn.classList.toggle('active', state.meetingMode);
+
+    // Show/hide sidebar section
+    const cg = DOM['cg-meeting'];
+    if (cg) cg.style.display = state.meetingMode ? '' : 'none';
+
+    // Show/hide camera preview panel
+    const preview = DOM['meeting-camera-preview'];
+    if (preview) preview.style.display = state.meetingMode ? '' : 'none';
+
+    // Show/hide color legend
+    const legend = document.getElementById('meeting-legend');
+    if (legend) legend.style.display = state.meetingMode ? '' : 'none';
+
+    // Hide info-overlay (specs panel) when meeting mode is active to avoid overlap
+    const infoOverlay = DOM['info-overlay'];
+    if (infoOverlay) infoOverlay.style.display = state.meetingMode ? 'none' : '';
+
+    // Force top-down view if in POV
+    if (state.meetingMode && state.viewMode === 'pov') {
+        setViewMode('top');
+    }
+
+    // Populate framing mode options for current brand
+    if (state.meetingMode) {
+        updateFramingModeOptions();
+        invalidateMeetingCache();
+    }
+
+    if (!_suppressHistory) pushHistory(state.meetingMode ? 'enabled meeting mode' : 'disabled meeting mode');
+    scheduleRender();
+}
+
+/** Rebuild the framing mode <select> options for the current brand */
+function updateFramingModeOptions() {
+    const sel = DOM['meeting-framing'];
+    if (!sel) return;
+
+    const modes = FRAMING_MODES[state.brand] || FRAMING_MODES.neat;
+    const labels = {
+        group: 'Group',
+        individual: 'Individual (Symmetry)',
+        speaker: 'Speaker',
+        grid: 'Grid View (RightSight 2)'
+    };
+
+    sel.innerHTML = '';
+    for (const mode of modes) {
+        const opt = document.createElement('option');
+        opt.value = mode;
+        opt.textContent = labels[mode] || mode;
+        sel.appendChild(opt);
+    }
+
+    // Ensure current framing mode is valid for this brand
+    if (!modes.includes(state.meetingFramingMode)) {
+        state.meetingFramingMode = modes[0];
+    }
+    sel.value = state.meetingFramingMode;
 }
 
 /**
