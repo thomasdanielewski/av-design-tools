@@ -6,6 +6,12 @@ let _measureNextId = 1;
 let _measurePending = null;  // { x1, y1 } while placing first point
 let _measureHoverPx = null;  // current mouse position in canvas px during placement
 
+/** Getter for the pending first-click point (room-feet coords), or null */
+function getMeasurePending() { return _measurePending; }
+
+/** Getter for the current hover position (canvas px), or null */
+function getMeasureHoverPx() { return _measureHoverPx; }
+
 /** Toggle the measurement tool on/off */
 function toggleMeasureTool() {
     state.measureToolActive = !state.measureToolActive;

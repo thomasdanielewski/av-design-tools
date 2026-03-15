@@ -1,7 +1,20 @@
 // ── Multi-table Helpers ──────────────────────────────────────
 
+/** Flat state key → table-object key */
+const FLAT_TO_TABLE_KEY = {
+    tableShape: 'shape', tableLength: 'length', tableWidth: 'width',
+    tableX: 'x', tableDist: 'dist', tableHeight: 'height', tableRotation: 'rotation'
+};
+
 function getSelectedTable() {
     return state.tables.find(t => t.id === state.selectedTableId) || state.tables[0];
+}
+
+/** Set a table property on both flat state and the active table object */
+function setTableProp(flatKey, value) {
+    state[flatKey] = value;
+    const t = getSelectedTable();
+    if (t) t[FLAT_TO_TABLE_KEY[flatKey]] = value;
 }
 
 /** Copy flat state table props → selected table object */
@@ -73,7 +86,6 @@ function renderTableList() {
 /** Select a table by id, syncing flat state and DOM */
 function selectTable(id) {
     if (id === state.selectedTableId) return;
-    syncTableFromFlatState();
     state.selectedTableId = id;
     const t = getSelectedTable();
     syncFlatStateFromTable(t);
@@ -82,11 +94,14 @@ function selectTable(id) {
     updateTableSliders();
     renderTableList();
     scheduleRender();
+    if (!_contextMenuHintShown) {
+        _contextMenuHintShown = true;
+        showToast('Tip: Right-click table for more options');
+    }
 }
 
 /** Add a new table (copy of current settings, offset slightly) */
 function addTable() {
-    syncTableFromFlatState();
     const newId = Math.max(...state.tables.map(t => t.id)) + 1;
     const sel = getSelectedTable();
     const newDist = Math.min(sel.dist + sel.length + 1, state.roomLength - sel.length - 0.5);
@@ -103,12 +118,13 @@ function addTable() {
     updateTableSliders();
     renderTableList();
     pushHistory('added table');
+    _dragHintShown = false;
+    showDragHint('Drag the table to reposition');
     scheduleRender();
 }
 
 /** Duplicate a specific table (spawns the copy offset slightly from the original) */
 function duplicateTable(sourceId) {
-    syncTableFromFlatState();
     const src = state.tables.find(t => t.id === sourceId);
     if (!src) return;
     const newId = Math.max(...state.tables.map(t => t.id)) + 1;
@@ -154,7 +170,6 @@ function removeTable() {
 
 /** Apply a named table arrangement preset */
 function applyArrangement(name) {
-    syncTableFromFlatState();
     const rl = state.roomLength, rw = state.roomWidth;
     let tables = [];
 
@@ -496,7 +511,6 @@ function circleOverlapsAABB(circle, rect) {
  * achieve a target total seating capacity as closely as possible.
  */
 function autoConfigureForCapacity(target) {
-    syncTableFromFlatState();
     const sel = getSelectedTable();
 
     // Target = 0 → turn off seating
@@ -528,9 +542,7 @@ function autoConfigureForCapacity(target) {
         if (diff === 0) break;
     }
 
-    sel.length = bestLength;
-    state.tableLength = bestLength;
-    syncFlatStateFromTable(sel);
+    setTableProp('tableLength', bestLength);
     updateTableSliders();
 
     pushHistory('set seating capacity');

@@ -1,5 +1,12 @@
 // ── Utility Functions ────────────────────────────────────────
 
+/** Restart the value-updated CSS animation on a badge element */
+function flashBadge(el) {
+    el.classList.remove('value-updated');
+    void el.offsetWidth; // force reflow to restart animation
+    el.classList.add('value-updated');
+}
+
 /** Convert degrees to radians */
 function deg2rad(d) {
     return d * Math.PI / 180;
@@ -44,7 +51,6 @@ function formatFtIn(v) {
     const f = Math.floor(a);
     const i = Math.round((a - f) * 12);
     r = (i === 12) ? `${s}${f + 1}' 0"` : `${s}${f}' ${i}"`;
-    if (_ftInCache.size > 200) _ftInCache.clear();
     _ftInCache.set(v, r);
     return r;
 }
@@ -215,6 +221,7 @@ function scheduleRender() {
     if (_renderPending) return;
     _renderPending = true;
     requestAnimationFrame(() => {
+        if (_bgRenderPending) { _renderPending = false; return; }
         _renderPending = false;
         if (state.viewMode === 'pov') render();
         else renderForeground();
@@ -223,6 +230,7 @@ function scheduleRender() {
 
 function scheduleBackgroundRender() {
     if (_bgRenderPending) return;
+    _renderPending = false;
     _bgRenderPending = true;
     requestAnimationFrame(() => {
         _bgRenderPending = false;
@@ -232,10 +240,17 @@ function scheduleBackgroundRender() {
     });
 }
 
+/** Alias for scheduleBackgroundRender — repaints both background and foreground layers. */
+const scheduleFullRender = scheduleBackgroundRender;
+
 // ── Animation System ─────────────────────────────────────────
-// Global flag: true while any view transition is in progress.
+// Counter tracking how many animations are currently running.
 // Checked by toggle handlers to block interaction during animations.
-let animating = false;
+let _animationCount = 0;
+let _animationSafetyTimer = null;
+
+/** Returns true while any view transition is in progress. */
+function isAnimating() { return _animationCount > 0; }
 
 /** Quadratic ease-in-out: smooth acceleration and deceleration */
 function easeInOut(t) {
@@ -251,16 +266,30 @@ function easeInOut(t) {
  */
 function runAnimation(duration, onFrame, onComplete) {
     const start = performance.now();
-    animating = true;
-    document.body.classList.add('animating');
+    _animationCount++;
+    if (_animationCount === 1) document.body.classList.add('animating');
+
+    // Safety fallback: force-reset if any animation hangs beyond 2 s
+    clearTimeout(_animationSafetyTimer);
+    _animationSafetyTimer = setTimeout(() => {
+        if (_animationCount > 0) {
+            console.warn('runAnimation: safety timeout — resetting stuck animation counter');
+            _animationCount = 0;
+            document.body.classList.remove('animating');
+        }
+    }, 2000);
+
     function tick(now) {
         const t = Math.min(1, (now - start) / duration);
         onFrame(t);
         if (t < 1) {
             requestAnimationFrame(tick);
         } else {
-            animating = false;
-            document.body.classList.remove('animating');
+            _animationCount--;
+            if (_animationCount === 0) {
+                document.body.classList.remove('animating');
+                clearTimeout(_animationSafetyTimer);
+            }
             if (onComplete) onComplete();
         }
     }

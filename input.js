@@ -25,15 +25,13 @@ function bindSlider(id, sk, vl, triggersBg = false) {
 
         syncCircleValue(sk, v);
 
-        state[sk] = v;
-        if (TABLE_SLIDER_PROPS.has(sk)) syncTableFromFlatState();
+        if (TABLE_SLIDER_PROPS.has(sk)) setTableProp(sk, v);
+        else state[sk] = v;
         const badge = DOM[vl];
         badge.textContent = formatValue(v, unit);
 
         // Trigger micro-animation on the value badge
-        badge.classList.remove('value-updated');
-        void badge.offsetWidth; // force reflow to restart animation
-        badge.classList.add('value-updated');
+        flashBadge(badge);
 
         debouncedPushHistory();
         if (triggersBg) scheduleBackgroundRender();
@@ -47,12 +45,13 @@ function bindSelect(id, sk) {
 
         // When table shape changes, align slider ranges first, then enforce equal values
         if (sk === 'tableShape') {
+            setTableProp('tableShape', this.value);
             syncCircleSliderRanges();
             if (this.value === 'circle') {
                 const maxVal = parseFloat(DOM['table-width'].max);
                 const m = Math.min(maxVal, Math.max(state.tableLength, state.tableWidth));
-                state.tableLength = m;
-                state.tableWidth = m;
+                setTableProp('tableLength', m);
+                setTableProp('tableWidth', m);
                 DOM['table-length'].value = m;
                 DOM['table-width'].value = m;
                 DOM['val-table-length'].textContent = formatFtIn(m);
@@ -60,7 +59,6 @@ function bindSelect(id, sk) {
                 updateSliderTrack(DOM['table-length']);
                 updateSliderTrack(DOM['table-width']);
             }
-            syncTableFromFlatState();
         }
 
         // Auto-scale display size for specific board models
@@ -84,7 +82,7 @@ function bindSelect(id, sk) {
             seatingDensity: 'changed seating density',
         };
         pushHistory(descMap[sk] || '');
-        render();
+        scheduleRender();
     });
 }
 
@@ -153,8 +151,8 @@ function makeEditable(badge) {
         v = Math.max(min, Math.min(max, v));
         v = Math.round(v / step) * step;
 
-        state[stateKey] = v;
-        if (TABLE_SLIDER_PROPS.has(stateKey)) syncTableFromFlatState();
+        if (TABLE_SLIDER_PROPS.has(stateKey)) setTableProp(stateKey, v);
+        else state[stateKey] = v;
         slider.value = v;
         badge.textContent = formatValue(v, unit);
 
@@ -181,7 +179,7 @@ function makeEditable(badge) {
             displayOffsetX: 'moved display',
         };
         pushHistory(editDescMap[stateKey] || '');
-        render();
+        scheduleRender();
     }
 
     inp.addEventListener('keydown', e => {

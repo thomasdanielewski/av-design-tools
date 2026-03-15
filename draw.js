@@ -11,14 +11,14 @@ function drawDisplay(drawCtx, x, y, w, h, displaySizeIn) {
     drawCtx.fillStyle = cc().displayFill;
     drawCtx.strokeStyle = cc().displayStroke;
     drawCtx.lineWidth = 1;
-    roundRect(ctx, x, y, w, h, 2);
+    roundRect(drawCtx, x, y, w, h, 2);
     drawCtx.fill();
     drawCtx.restore();
 
     // Outer stroke
     drawCtx.strokeStyle = cc().displayStroke;
     drawCtx.lineWidth = 1;
-    roundRect(ctx, x, y, w, h, 2);
+    roundRect(drawCtx, x, y, w, h, 2);
     drawCtx.stroke();
 
     // Inner screen area
@@ -46,7 +46,7 @@ function drawDisplay(drawCtx, x, y, w, h, displaySizeIn) {
 }
 
 /** Draw a display rectangle (POV perspective view) */
-function drawDisplayPOV(x, y, w, h) {
+function drawDisplayPOV(x, y, w, h, label) {
     if (w <= 0 || h <= 0) return;
     const bezel = Math.max(2, Math.min(7, w * 0.03));
     // Outer bezel body
@@ -77,6 +77,15 @@ function drawDisplayPOV(x, y, w, h) {
     vg.addColorStop(1, 'rgba(0,0,0,0.22)');
     ctx.fillStyle = vg;
     ctx.fillRect(x + bezel, y + bezel, w - bezel * 2, h - bezel * 2);
+    // Size label — only when display is large enough to show it
+    if (label && w > 36 && h > 20) {
+        const fs = Math.max(8, Math.min(13, w * 0.11));
+        ctx.font = `500 ${fs}px 'JetBrains Mono', monospace`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillStyle = 'rgba(255,255,255,0.18)';
+        ctx.fillText(label, x + w / 2, y + h / 2);
+    }
 }
 
 /**
@@ -225,6 +234,56 @@ function drawRoom(drawCtx, rx, ry, rw, rl, ppf) {
 }
 
 /**
+ * Draw wall material color overlay when showEnvironment is enabled.
+ */
+function drawWallMaterialOverlay(drawCtx, rx, ry, rw, rl, ppf) {
+    if (!state.showEnvironment) return;
+    const wallThick = Math.max(5, ppf * 0.25);
+    const colors = {
+        'drywall': 'rgba(180,180,180,0.12)',
+        'glass': 'rgba(140,210,235,0.10)',
+        'wood': 'rgba(160,120,60,0.22)',
+        'concrete': 'rgba(128,128,128,0.22)',
+        'acoustic-panel': 'rgba(100,200,100,0.25)'
+    };
+    const walls = {
+        north: [rx, ry, rw, wallThick],
+        south: [rx, ry + rl - wallThick, rw, wallThick],
+        west:  [rx, ry, wallThick, rl],
+        east:  [rx + rw - wallThick, ry, wallThick, rl]
+    };
+    for (const [wall, rect] of Object.entries(walls)) {
+        drawCtx.fillStyle = colors[state.wallMaterials[wall]] || colors['drywall'];
+        drawCtx.fillRect(...rect);
+    }
+
+    // Glass wall accent — draw dashed translucent line over glass walls
+    for (const [wall, rect] of Object.entries(walls)) {
+        if (state.wallMaterials[wall] !== 'glass') continue;
+        drawCtx.save();
+        drawCtx.strokeStyle = 'rgba(140,220,240,0.45)';
+        drawCtx.lineWidth = 1;
+        drawCtx.setLineDash([6, 4]);
+        const [wx, wy, ww, wh] = rect;
+        const isHoriz = ww > wh;
+        if (isHoriz) {
+            const my = wy + wh / 2;
+            drawCtx.beginPath();
+            drawCtx.moveTo(wx, my);
+            drawCtx.lineTo(wx + ww, my);
+            drawCtx.stroke();
+        } else {
+            const mx = wx + ww / 2;
+            drawCtx.beginPath();
+            drawCtx.moveTo(mx, wy);
+            drawCtx.lineTo(mx, wy + wh);
+            drawCtx.stroke();
+        }
+        drawCtx.restore();
+    }
+}
+
+/**
  * Draw the viewing-angle cone (AVIXA 60° guideline).
  */
 function drawViewAngle(drawCtx, dispX, dispY, rl, ppf, isHovered) {
@@ -309,7 +368,7 @@ function drawMountBracket(drawCtx, dispX, dispY, mainDeviceX, mainDeviceY, eqWid
     drawCtx.fillStyle = cc().mountBracketFill;
     drawCtx.strokeStyle = cc().mountBracket;
     drawCtx.lineWidth = 0.8;
-    roundRect(ctx, -bw / 2, -bh / 2, bw, bh, 1);
+    roundRect(drawCtx, -bw / 2, -bh / 2, bw, bh, 1);
     drawCtx.fill();
     drawCtx.stroke();
 
@@ -372,12 +431,12 @@ function drawEquipmentTopDown(drawCtx, dispX, dispY, dispDepthPx, dispWidthPx,
         drawCtx.fillStyle = cc().surface;
         drawCtx.strokeStyle = cc().equipmentStroke;
         drawCtx.lineWidth = 1.5;
-        roundRect(ctx, -eqWidthPx / 2, by, eqWidthPx, eqDepthPx, 3);
+        roundRect(drawCtx, -eqWidthPx / 2, by, eqWidthPx, eqDepthPx, 3);
         drawCtx.fill();
         drawCtx.restore();
         drawCtx.strokeStyle = cc().equipmentStroke;
         drawCtx.lineWidth = 1.5;
-        roundRect(ctx, -eqWidthPx / 2, by, eqWidthPx, eqDepthPx, 3);
+        roundRect(drawCtx, -eqWidthPx / 2, by, eqWidthPx, eqDepthPx, 3);
         drawCtx.stroke();
 
         // Translucent fill + label
@@ -410,12 +469,12 @@ function drawEquipmentTopDown(drawCtx, dispX, dispY, dispDepthPx, dispWidthPx,
         drawCtx.fillStyle = cc().surface;
         drawCtx.strokeStyle = cc().equipmentStrokeBright;
         drawCtx.lineWidth = 1.5;
-        roundRect(ctx, bx, by, eqWidthPx, eqDepthPx, 2);
+        roundRect(drawCtx, bx, by, eqWidthPx, eqDepthPx, 2);
         drawCtx.fill();
         drawCtx.restore();
         drawCtx.strokeStyle = cc().equipmentStrokeBright;
         drawCtx.lineWidth = 1.5;
-        roundRect(ctx, bx, by, eqWidthPx, eqDepthPx, 2);
+        roundRect(drawCtx, bx, by, eqWidthPx, eqDepthPx, 2);
         drawCtx.stroke();
 
         // Speaker grilles — thin lines near each end of the bar
@@ -476,7 +535,7 @@ function drawEquipmentTopDown(drawCtx, dispX, dispY, dispDepthPx, dispWidthPx,
             const logoX = lensR + 4;
             const logoY = -logoH / 2;
             drawCtx.fillStyle = cc().brandLogo;
-            roundRect(ctx, logoX, logoY, logoW, logoH, 1.5);
+            roundRect(drawCtx, logoX, logoY, logoW, logoH, 1.5);
             drawCtx.fill();
             // Brand initial letter
             const brandInitial = eq.brand === 'neat' ? 'N' : 'L';
@@ -620,7 +679,7 @@ function drawChairsForTable(drawCtx, chairs, ppf, alpha) {
         drawCtx.rotate(chair.angle + Math.PI / 2);
 
         // Seat: rounded rectangle
-        roundRect(ctx, -cw / 2, -cd / 2, cw, cd, 3);
+        roundRect(drawCtx, -cw / 2, -cd / 2, cw, cd, 3);
         drawCtx.fill();
         drawCtx.stroke();
 
@@ -635,13 +694,34 @@ function drawChairsForTable(drawCtx, chairs, ppf, alpha) {
     drawCtx.restore();
 }
 
+/** Draw a "..." context-menu affordance button */
+function drawContextMenuButton(drawCtx, x, y, ppf) {
+    const r = 10;
+    // Filled circle
+    drawCtx.beginPath();
+    drawCtx.arc(x, y, r, 0, Math.PI * 2);
+    drawCtx.fillStyle = cc().surface;
+    drawCtx.fill();
+    drawCtx.strokeStyle = cc().label;
+    drawCtx.lineWidth = 1;
+    drawCtx.stroke();
+    // Three horizontal dots
+    const dotR = 2;
+    drawCtx.fillStyle = cc().label;
+    for (let i = -1; i <= 1; i++) {
+        drawCtx.beginPath();
+        drawCtx.arc(x + i * 5, y, dotR, 0, Math.PI * 2);
+        drawCtx.fill();
+    }
+}
+
 /**
  * Draw the conference table in top-down view.
  */
 function drawTable(drawCtx, ox, ry, wallThick, ppf) {
     // Ghost outline: show original position while dragging a table
-    if (isDraggingTableId !== null && dragTableGhost) {
-        const g = dragTableGhost;
+    if (drag.tableId !== null && drag.tableGhost) {
+        const g = drag.tableGhost;
         const tl = g.length * ppf;
         const tw = g.width * ppf;
         const tcx = ox + g.x * ppf;
@@ -658,7 +738,7 @@ function drawTable(drawCtx, ox, ry, wallThick, ppf) {
         drawCtx.setLineDash([5, 4]);
 
         if (g.shape === 'rectangular') {
-            roundRect(ctx, x0, y0, tw, tl, 6);
+            roundRect(drawCtx, x0, y0, tw, tl, 6);
             drawCtx.stroke();
         } else if (g.shape === 'oval') {
             drawCtx.beginPath();
@@ -701,7 +781,7 @@ function drawTable(drawCtx, ox, ry, wallThick, ppf) {
         drawCtx.lineWidth = isSelected ? 1.5 : 1;
 
         if (t.shape === 'rectangular') {
-            roundRect(ctx, x0, y0, tw, tl, 6);
+            roundRect(drawCtx, x0, y0, tw, tl, 6);
             drawCtx.fill(); drawCtx.stroke();
         } else if (t.shape === 'oval') {
             drawCtx.beginPath();
@@ -737,7 +817,7 @@ function drawTable(drawCtx, ox, ry, wallThick, ppf) {
         }
 
         // Overlap warning: red tint + dashed border + ⚠ icon
-        if (t.id === isDraggingTableId && dragTableOverlap) {
+        if (t.id === drag.tableId && drag.tableOverlap) {
             drawCtx.globalAlpha = 1.0;
             drawCtx.fillStyle = 'rgba(239, 68, 68, 0.22)';
             drawCtx.strokeStyle = 'rgba(239, 68, 68, 0.75)';
@@ -781,7 +861,7 @@ function drawTable(drawCtx, ox, ry, wallThick, ppf) {
             drawCtx.strokeStyle = cc().selectionRing;
             drawCtx.lineWidth = 1.5;
             drawCtx.setLineDash([3, 3]);
-            roundRect(ctx, x0 - 4, y0 - 4, tw + 8, tl + 8, 8);
+            roundRect(drawCtx, x0 - 4, y0 - 4, tw + 8, tl + 8, 8);
             drawCtx.stroke();
             drawCtx.setLineDash([]);
             drawCtx.restore();
@@ -896,7 +976,7 @@ function drawCenterDevice(drawCtx, centerX, centerY, centerEq, ppf, dualLabel) {
         const slotX = centerX - slotW / 2;
         const slotY = centerY - slotH / 2 - bodyR * 0.1;
         drawCtx.fillStyle = cc().centerScreen;
-        roundRect(ctx, slotX, slotY, slotW, slotH, slotW / 2);
+        roundRect(drawCtx, slotX, slotY, slotW, slotH, slotW / 2);
         drawCtx.fill();
 
         // Camera lens dot at top of slot
@@ -967,14 +1047,14 @@ function drawDualCenterDistance(drawCtx, c1x, c1y, c2x, c2y, ppf) {
 
     // Background pill
     drawCtx.fillStyle = warn ? 'rgba(239, 68, 68, 0.15)' : 'rgba(30, 41, 59, 0.6)';
-    roundRect(ctx, mx - textW / 2 - pad, my - fontSize / 2 - pad,
+    roundRect(drawCtx, mx - textW / 2 - pad, my - fontSize / 2 - pad,
         textW + pad * 2, fontSize + pad * 2, 4);
     drawCtx.fill();
 
     if (warn) {
         drawCtx.strokeStyle = 'rgba(239, 68, 68, 0.5)';
         drawCtx.lineWidth = 1;
-        roundRect(ctx, mx - textW / 2 - pad, my - fontSize / 2 - pad,
+        roundRect(drawCtx, mx - textW / 2 - pad, my - fontSize / 2 - pad,
             textW + pad * 2, fontSize + pad * 2, 4);
         drawCtx.stroke();
     }
@@ -1094,7 +1174,7 @@ function drawScaleBar(drawCtx, rx, ry, rl, ppf) {
     const pillW = barPx + 2;
     const pillH = tickH * 2 + 14;
     drawCtx.fillStyle = cc().scaleBarPill;
-    roundRect(ctx, bx - 4, by - tickH - 7, pillW + 8, pillH, 4);
+    roundRect(drawCtx, bx - 4, by - tickH - 7, pillW + 8, pillH, 4);
     drawCtx.fill();
 
     // End ticks and horizontal bar
@@ -1162,53 +1242,18 @@ function getElementWallCoords(el, rx, ry, rw, rl, ppf, wallThick) {
 }
 
 /**
- * Draw structural elements (windows and doors) on the room outline.
+ * Draw structural elements (doors) on the room outline.
  */
 function drawStructuralElements(drawCtx, rx, ry, rw, rl, ppf, wallThick) {
     if (!state.structuralElements || state.structuralElements.length === 0) return;
 
     for (const el of state.structuralElements) {
+        if (el.type !== 'door') continue;
         const { x, y, isHorizontal, w, swingDirX, swingDirY } =
             getElementWallCoords(el, rx, ry, rw, rl, ppf, wallThick);
         const isSelected = el.id === state.selectedElementId;
-
-        if (el.type === 'window') {
-            drawWindowElement(drawCtx, x, y, w, isHorizontal, wallThick, isSelected);
-        } else {
-            drawDoorElement(drawCtx, x, y, w, isHorizontal, wallThick, swingDirX, swingDirY, ppf, el, isSelected);
-        }
+        drawDoorElement(drawCtx, x, y, w, isHorizontal, wallThick, swingDirX, swingDirY, ppf, el, isSelected);
     }
-}
-
-/**
- * Draw a window opening on a wall.
- */
-function drawWindowElement(drawCtx, x, y, w, isHorizontal, wallThick, isSelected) {
-    drawCtx.save();
-
-    // Clear the wall section to show an opening
-    drawCtx.globalCompositeOperation = 'destination-out';
-    if (isHorizontal) {
-        drawCtx.fillRect(x, y - 1, w, wallThick + 2);
-    } else {
-        drawCtx.fillRect(x - 1, y, wallThick + 2, w);
-    }
-    drawCtx.globalCompositeOperation = 'source-over';
-
-    // Draw window frame (teal fill with border)
-    drawCtx.fillStyle = isSelected ? 'rgba(56, 189, 193, 0.35)' : 'rgba(56, 189, 193, 0.2)';
-    drawCtx.strokeStyle = isSelected ? 'rgba(56, 189, 193, 0.9)' : 'rgba(56, 189, 193, 0.6)';
-    drawCtx.lineWidth = 1.5;
-
-    if (isHorizontal) {
-        drawCtx.fillRect(x, y, w, wallThick);
-        drawCtx.strokeRect(x, y, w, wallThick);
-    } else {
-        drawCtx.fillRect(x, y, wallThick, w);
-        drawCtx.strokeRect(x, y, wallThick, w);
-    }
-
-    drawCtx.restore();
 }
 
 /**
@@ -1335,11 +1380,11 @@ function drawDragDistances(drawCtx, t, ox, ry, wt, ppf, dists) {
         const pillW = textW + pad * 2;
         const pillH = fontSize + pad * 2;
         drawCtx.fillStyle = isDisplay ? 'rgba(37, 99, 235, 0.88)' : 'rgba(15, 23, 42, 0.82)';
-        roundRect(ctx, lx - pillW / 2, ly - pillH / 2, pillW, pillH, 3);
+        roundRect(drawCtx, lx - pillW / 2, ly - pillH / 2, pillW, pillH, 3);
         drawCtx.fill();
         drawCtx.strokeStyle = isDisplay ? 'rgba(96, 165, 250, 0.55)' : 'rgba(100, 116, 139, 0.35)';
         drawCtx.lineWidth = 1;
-        roundRect(ctx, lx - pillW / 2, ly - pillH / 2, pillW, pillH, 3);
+        roundRect(drawCtx, lx - pillW / 2, ly - pillH / 2, pillW, pillH, 3);
         drawCtx.stroke();
         drawCtx.fillStyle = 'rgba(226, 232, 240, 0.95)';
         drawCtx.textAlign = 'center';
@@ -1495,7 +1540,7 @@ function drawMeasurements(drawCtx, ppf) {
 
         // Background pill
         drawCtx.fillStyle = cc().scaleBarPill;
-        roundRect(ctx, lblX - pillW / 2, lblY - pillH / 2, pillW, pillH, 3);
+        roundRect(drawCtx, lblX - pillW / 2, lblY - pillH / 2, pillW, pillH, 3);
         drawCtx.fill();
 
         // Label text
@@ -1588,14 +1633,14 @@ function drawEquipmentTooltip(drawCtx) {
     drawCtx.shadowColor = 'rgba(0,0,0,0.25)';
     drawCtx.shadowBlur = 6;
     drawCtx.fillStyle = cc().tooltipBg;
-    roundRect(ctx, tx, ty, pillW, pillH, 5);
+    roundRect(drawCtx, tx, ty, pillW, pillH, 5);
     drawCtx.fill();
     drawCtx.restore();
 
     // Border
     drawCtx.strokeStyle = cc().equipmentStrokeBright;
     drawCtx.lineWidth = 0.5;
-    roundRect(ctx, tx, ty, pillW, pillH, 5);
+    roundRect(drawCtx, tx, ty, pillW, pillH, 5);
     drawCtx.stroke();
 
     // Device name

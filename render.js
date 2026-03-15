@@ -1,5 +1,8 @@
 // ── Top-Down Render Pipeline ─────────────────────────────────
 
+/** Position of the context-menu "..." button (canvas px), or null if not shown */
+let _ctxBtnPos = null;
+
 /**
  * Update the header bar and info overlay after a render.
  */
@@ -14,6 +17,8 @@ function updateHeaderDOM(eq) {
     DOM['header-capacity'].textContent = `Capacity: ${cap}`;
     const capInput = DOM['seat-capacity-input'];
     if (capInput && document.activeElement !== capInput) capInput.value = cap;
+    const rt60El = DOM['header-rt60'];
+    if (rt60El) rt60El.textContent = `RT60: ${calcRT60().toFixed(1)}s`;
     DOM['mount-row'].style.display =
         (eq.type === 'bar') ? '' : 'none';
 
@@ -23,6 +28,7 @@ function updateHeaderDOM(eq) {
     updateLegendState();
     debouncedSerializeToHash();
     checkRoomWarnings();
+    checkEnvironmentAdvisories();
 }
 
 /**
@@ -66,7 +72,6 @@ function _sizeCanvas(cvs, ctxObj, w, h, dpr) {
 function renderBackground() {
     if (state.viewMode === 'pov') return;
 
-    invalidateThemeCache();
     const { dpr, ppf, canvasW, canvasH, ox, oy, rw, rl, rx, ry } = getTopDownLayout();
 
     // Size the background canvas
@@ -84,7 +89,10 @@ function renderBackground() {
     // Room outline and front wall accent
     drawRoom(bgCtx, rx, ry, rw, rl, ppf);
 
-    // Structural elements (windows, doors) on walls
+    // Wall material overlay (when environment toggle is on)
+    drawWallMaterialOverlay(bgCtx, rx, ry, rw, rl, ppf);
+
+    // Structural elements (doors) on walls
     const wallThickBg = Math.max(5, ppf * 0.25);
     drawStructuralElements(bgCtx, rx, ry, rw, rl, ppf, wallThickBg);
 
@@ -102,7 +110,6 @@ function renderBackground() {
 function renderForeground() {
     if (state.viewMode === 'pov') return;
 
-    invalidateThemeCache();
     const { dpr, ppf, canvasW, canvasH, ox, oy, rw, rl, rx, ry, wallThick } = getTopDownLayout();
 
     // Size the foreground canvas to match the background canvas
@@ -163,10 +170,30 @@ function renderForeground() {
     // Conference tables
     drawTable(ctx, ox, ry, wallThick, ppf);
 
+    // Context menu "..." button on selected table (only when idle)
+    _ctxBtnPos = null;
+    if (state.selectedTableId && drag.tableId === null) {
+        const selT = state.tables.find(t => t.id === state.selectedTableId);
+        if (selT) {
+            const tcx = ox + selT.x * ppf;
+            const tcy = ry + wallThick + selT.dist * ppf + (selT.length * ppf) / 2;
+            const tw = selT.width * ppf;
+            const tl = selT.length * ppf;
+            const angle = selT.rotation * Math.PI / 180;
+            // Top-right corner in rotated frame, then transform to canvas coords
+            const crx = tw / 2, cry = -tl / 2;
+            const cornerX = tcx + crx * Math.cos(angle) - cry * Math.sin(angle);
+            const cornerY = tcy + crx * Math.sin(angle) + cry * Math.cos(angle);
+            const bx = cornerX + 8, by = cornerY - 8;
+            drawContextMenuButton(ctx, bx, by, ppf);
+            _ctxBtnPos = { x: bx, y: by, r: 10 };
+        }
+    }
+
     // Distance readouts floating near each table edge during drag
-    if (isDraggingTableId !== null && dragDistances !== null) {
-        const draggedT = state.tables.find(t => t.id === isDraggingTableId);
-        if (draggedT) drawDragDistances(ctx, draggedT, ox, ry, wallThick, ppf, dragDistances);
+    if (drag.tableId !== null && drag.distances !== null) {
+        const draggedT = state.tables.find(t => t.id === drag.tableId);
+        if (draggedT) drawDragDistances(ctx, draggedT, ox, ry, wallThick, ppf, drag.distances);
     }
 
     // Center companion device(s)
@@ -187,17 +214,67 @@ function renderForeground() {
     }
 
     // Wall boundary glow (drawn on top while table is pressed against a wall)
-    if (isDraggingTableId !== null) {
-        drawWallGlow(ctx, rx, ry, rw, rl, dragBoundaryHit);
+    if (drag.tableId !== null) {
+        drawWallGlow(ctx, rx, ry, rw, rl, drag.boundaryHit);
     }
 
     // Snap / alignment guides (drawn on top while dragging a table)
-    if (isDraggingTableId !== null && state.showSnap && snapGuides.length > 0) {
+    if (drag.tableId !== null && state.showSnap && snapGuides.length > 0) {
         drawSnapGuides(ctx, snapGuides, rx, ry, rw, rl, wallThick);
     }
 
     // Measurement dimension lines (drawn on top of room content)
     drawMeasurements(ctx, ppf);
+
+    // Measure tool: pulsing dot on first click + dashed preview line to cursor
+    if (state.measureToolActive) {
+        const pending = getMeasurePending();
+        if (pending) {
+            const p1 = roomFtToCanvasPx(pending.x1, pending.y1);
+            // Pulsing dot at the pending point
+            const pulse = 0.5 + 0.5 * Math.sin(Date.now() / 200);
+            ctx.save();
+            ctx.globalAlpha = pulse;
+            ctx.beginPath();
+            ctx.arc(p1.cx, p1.cy, 6, 0, Math.PI * 2);
+            ctx.fillStyle = cc().lensDot;
+            ctx.fill();
+            ctx.restore();
+
+            // Dashed preview line + distance label to hover position
+            const hoverPx = getMeasureHoverPx();
+            if (hoverPx) {
+                ctx.save();
+                ctx.setLineDash([6, 4]);
+                ctx.strokeStyle = cc().lensDot;
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                ctx.moveTo(p1.cx, p1.cy);
+                ctx.lineTo(hoverPx.x, hoverPx.y);
+                ctx.stroke();
+                ctx.setLineDash([]);
+
+                // Distance label at midpoint
+                const hoverFt = canvasPxToRoomFt(hoverPx.x, hoverPx.y);
+                const dx = hoverFt.x - pending.x1;
+                const dy = hoverFt.y - pending.y1;
+                const distFt = Math.sqrt(dx * dx + dy * dy);
+                const isMetric = state.units === 'metric';
+                const label = isMetric ? formatMetric(convertToMetric(distFt)) : formatFtIn(distFt);
+                const midX = (p1.cx + hoverPx.x) / 2;
+                const midY = (p1.cy + hoverPx.y) / 2;
+                const fontSize = Math.max(9, ppf * 0.28);
+                ctx.font = `600 ${fontSize}px 'JetBrains Mono', monospace`;
+                ctx.fillStyle = cc().lensDot;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'bottom';
+                ctx.fillText(label, midX, midY - 4);
+                ctx.restore();
+            }
+            // Keep animating the pulse
+            scheduleRender();
+        }
+    }
 
     // Equipment hover tooltip (drawn last, on top of everything)
     drawEquipmentTooltip(ctx);
@@ -213,23 +290,34 @@ function renderForeground() {
 
 /**
  * Full render: repaints both background and foreground (or the POV view).
+ * Wrapped in try-catch so a single draw error doesn't freeze the canvas.
  */
+let _renderErrorCount = 0;
 function render() {
-    invalidateThemeCache();
-    invalidateLayoutCache();
+    try {
+        invalidateLayoutCache();
 
-    if (state.viewMode === 'pov') {
-        // Clear the CSS viewport transform — POV renders directly to the canvas.
-        const stack = document.querySelector('.canvas-stack');
-        if (stack) stack.style.transform = '';
-        const dpr = window.devicePixelRatio || 1;
-        const container = document.querySelector('.canvas-container');
-        const cw = container.clientWidth - 64;
-        const ch = container.clientHeight - 64;
-        renderPOV(cw, ch, dpr);
-        return;
+        if (state.viewMode === 'pov') {
+            // Clear the CSS viewport transform — POV renders directly to the canvas.
+            const stack = document.querySelector('.canvas-stack');
+            if (stack) stack.style.transform = '';
+            const dpr = window.devicePixelRatio || 1;
+            const container = document.querySelector('.canvas-container');
+            const cw = container.clientWidth - 64;
+            const ch = container.clientHeight - 64;
+            renderPOV(cw, ch, dpr);
+        } else {
+            renderBackground();
+            renderForeground();
+        }
+        _renderErrorCount = 0;
+    } catch (err) {
+        console.error('Render error:', err);
+        _renderErrorCount++;
+        if (_renderErrorCount > 3) {
+            showToast('Rendering failed repeatedly. Please reload.', 'error');
+        } else {
+            showToast('Rendering error \u2014 try undo (Ctrl+Z)', 'error');
+        }
     }
-
-    renderBackground();
-    renderForeground();
 }

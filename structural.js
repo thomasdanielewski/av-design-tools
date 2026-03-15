@@ -1,4 +1,4 @@
-// ── Structural Elements (Doors & Windows) ────────────────────
+// ── Structural Elements (Doors) ───────────────────────────────
 
 function getSelectedElement() {
     if (!state.selectedElementId) return null;
@@ -10,11 +10,45 @@ function getWallLength(wall) {
     return (wall === 'north' || wall === 'south') ? state.roomWidth : state.roomLength;
 }
 
-/** Update position slider max based on wall and element width */
+/** Validate and clamp a structural element's properties. Returns true if any value was corrected. */
+function validateStructuralElement(el) {
+    let corrected = false;
+    const wallLen = getWallLength(el.wall);
+
+    // Clamp width: min 0.5 ft (6 inches), max wallLen - position (at least 0.5)
+    const minW = 0.5;
+    const maxW = Math.max(minW, wallLen - (el.position || 0));
+    if (el.width < minW)  { el.width = minW; corrected = true; }
+    if (el.width > maxW)  { el.width = maxW; corrected = true; }
+
+    // Clamp position: min 0, max wallLen - width
+    const maxPos = Math.max(0, wallLen - el.width);
+    if (el.position < 0)      { el.position = 0; corrected = true; }
+    if (el.position > maxPos) { el.position = maxPos; corrected = true; }
+
+    // Clamp height: min 1 ft, max ceilingHeight
+    const minH = 1;
+    const maxH = state.ceilingHeight;
+    if (el.height < minH) { el.height = minH; corrected = true; }
+    if (el.height > maxH) { el.height = maxH; corrected = true; }
+
+    return corrected;
+}
+
+/** Update position and width slider max based on wall length */
 function updateElementSliderRanges() {
     const el = getSelectedElement();
     if (!el) return;
     const wallLen = getWallLength(el.wall);
+    // Width slider max = wall length
+    const widthSlider = DOM['element-width'];
+    widthSlider.max = wallLen;
+    if (el.width > wallLen) {
+        el.width = wallLen;
+        widthSlider.value = el.width;
+        DOM['val-element-width'].textContent = formatValue(el.width, 'ft');
+    }
+    // Position slider max = remaining space
     const posSlider = DOM['element-position'];
     posSlider.max = Math.max(0, wallLen - el.width);
     if (el.position > parseFloat(posSlider.max)) {
@@ -23,7 +57,7 @@ function updateElementSliderRanges() {
         DOM['val-element-position'].textContent = formatValue(el.position, 'ft');
     }
     updateSliderTrack(posSlider);
-    updateSliderTrack(DOM['element-width']);
+    updateSliderTrack(widthSlider);
 }
 
 /** Render the element selector pills */
@@ -35,8 +69,8 @@ function renderElementList() {
         const btn = document.createElement('button');
         btn.className = 'element-pill ' + el.type + (el.id === state.selectedElementId ? ' active' : '');
         const wallLabel = { north: 'N', south: 'S', east: 'E', west: 'W' }[el.wall];
-        btn.textContent = `${el.type === 'door' ? 'Door' : 'Win'} · ${wallLabel}`;
-        btn.title = `${el.type} on ${el.wall} wall, ${formatFtIn(el.width)} wide`;
+        btn.textContent = `Door · ${wallLabel}`;
+        btn.title = `door on ${el.wall} wall, ${formatFtIn(el.width)} wide`;
         btn.dataset.elementId = el.id;
         container.appendChild(btn);
     });
@@ -70,27 +104,15 @@ function updateElementControls(el) {
     DOM['val-element-width'].textContent = formatValue(el.width, 'ft');
 
     // Height controls
-    const isDoor = el.type === 'door';
-    const height = el.height || (isDoor ? DOOR_HEIGHT_DEFAULT : WINDOW_HEIGHT_DEFAULT);
+    const height = el.height || DOOR_HEIGHT_DEFAULT;
     DOM['element-height'].value = height;
     DOM['val-element-height'].textContent = formatValue(height, 'ft');
     updateSliderTrack(DOM['element-height']);
-
-    // Sill height (windows only)
-    if (!isDoor) {
-        const sill = el.sillHeight != null ? el.sillHeight : WINDOW_SILL_DEFAULT;
-        DOM['element-sill'].value = sill;
-        DOM['val-element-sill'].textContent = formatValue(sill, 'ft');
-        updateSliderTrack(DOM['element-sill']);
-    }
-    DOM['element-sill-row'].style.display = isDoor ? 'none' : '';
     DOM['element-height-row'].style.display = '';
 
-    // Show Flip Swing button only for doors
-    DOM['swing-flip-row'].style.display = isDoor ? '' : 'none';
-    if (isDoor) {
-        DOM['flip-swing-btn'].textContent = el.swingInverted ? '⇄ Flip Swing (inverted)' : '⇄ Flip Swing';
-    }
+    // Show Flip Swing button for doors
+    DOM['swing-flip-row'].style.display = '';
+    DOM['flip-swing-btn'].textContent = el.swingInverted ? '⇄ Flip Swing (inverted)' : '⇄ Flip Swing';
     updateElementSliderRanges();
 }
 
@@ -118,29 +140,6 @@ function addDoor() {
     scheduleBackgroundRender();
 }
 
-/** Add a new window */
-function addWindow() {
-    const newId = state.structuralElements.length
-        ? Math.max(...state.structuralElements.map(e => e.id)) + 1
-        : 1;
-    const wallLen = getWallLength('east');
-    const el = {
-        id: newId,
-        type: 'window',
-        wall: 'east',
-        position: Math.max(0, (wallLen - WINDOW_WIDTH_DEFAULT) / 2),
-        width: WINDOW_WIDTH_DEFAULT,
-        height: WINDOW_HEIGHT_DEFAULT,
-        sillHeight: WINDOW_SILL_DEFAULT
-    };
-    state.structuralElements.push(el);
-    state.selectedElementId = newId;
-    updateElementControls(el);
-    DOM['structural-controls'].style.display = '';
-    renderElementList();
-    pushHistory('added window');
-    scheduleBackgroundRender();
-}
 
 /** Remove the selected structural element */
 function removeElement() {
@@ -179,11 +178,11 @@ function onElementPositionInput() {
     const el = getSelectedElement();
     if (!el) return;
     el.position = parseFloat(DOM['element-position'].value);
+    if (validateStructuralElement(el)) {
+        DOM['element-position'].value = el.position;
+    }
     DOM['val-element-position'].textContent = formatValue(el.position, 'ft');
-    const badge = DOM['val-element-position'];
-    badge.classList.remove('value-updated');
-    void badge.offsetWidth;
-    badge.classList.add('value-updated');
+    flashBadge(DOM['val-element-position']);
     debouncedPushHistory();
     scheduleBackgroundRender();
 }
@@ -193,19 +192,13 @@ function onElementWidthInput() {
     const el = getSelectedElement();
     if (!el) return;
     el.width = parseFloat(DOM['element-width'].value);
-    DOM['val-element-width'].textContent = formatValue(el.width, 'ft');
-    const badge = DOM['val-element-width'];
-    badge.classList.remove('value-updated');
-    void badge.offsetWidth;
-    badge.classList.add('value-updated');
-    // Clamp position so element stays on wall
-    const wallLen = getWallLength(el.wall);
-    const maxPos = Math.max(0, wallLen - el.width);
-    if (el.position > maxPos) {
-        el.position = maxPos;
+    if (validateStructuralElement(el)) {
+        DOM['element-width'].value = el.width;
         DOM['element-position'].value = el.position;
         DOM['val-element-position'].textContent = formatValue(el.position, 'ft');
     }
+    DOM['val-element-width'].textContent = formatValue(el.width, 'ft');
+    flashBadge(DOM['val-element-width']);
     updateElementSliderRanges();
     debouncedPushHistory();
     scheduleBackgroundRender();
@@ -216,30 +209,17 @@ function onElementHeightInput() {
     const el = getSelectedElement();
     if (!el) return;
     el.height = parseFloat(DOM['element-height'].value);
+    if (validateStructuralElement(el)) {
+        DOM['element-height'].value = el.height;
+    }
     DOM['val-element-height'].textContent = formatValue(el.height, 'ft');
-    const badge = DOM['val-element-height'];
-    badge.classList.remove('value-updated');
-    void badge.offsetWidth;
-    badge.classList.add('value-updated');
-    debouncedPushHistory();
-    scheduleBackgroundRender();
-}
-
-/** Handle sill height slider input (windows only) */
-function onElementSillInput() {
-    const el = getSelectedElement();
-    if (!el || el.type !== 'window') return;
-    el.sillHeight = parseFloat(DOM['element-sill'].value);
-    DOM['val-element-sill'].textContent = formatValue(el.sillHeight, 'ft');
-    const badge = DOM['val-element-sill'];
-    badge.classList.remove('value-updated');
-    void badge.offsetWidth;
-    badge.classList.add('value-updated');
+    flashBadge(DOM['val-element-height']);
     debouncedPushHistory();
     scheduleBackgroundRender();
 }
 
 /** Toggle the swing direction of the selected door */
+
 function flipSwing() {
     const el = getSelectedElement();
     if (!el || el.type !== 'door') return;

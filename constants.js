@@ -30,9 +30,6 @@ const TABLE_SLIDER_PROPS = new Set([
 /** Default structural element dimensions (feet) */
 const DOOR_WIDTH_DEFAULT = 3;
 const DOOR_HEIGHT_DEFAULT = 7;     // 7 ft (84 in) door opening
-const WINDOW_WIDTH_DEFAULT = 4;
-const WINDOW_HEIGHT_DEFAULT = 3;   // 3 ft (36 in) window height
-const WINDOW_SILL_DEFAULT = 3;     // 3 ft (36 in) sill height
 const DOOR_SWING_ANGLE = Math.PI / 2; // 90° swing arc
 
 /** Compact URL hash keys → state property names */
@@ -51,5 +48,19 @@ const HASH_KEYS = {
     mp2x: 'micPod2PosX', mp2y: 'micPod2PosY',
     sd: 'seatingDensity',
     un: 'units',
-    mt: 'measureToolActive'
+    mt: 'measureToolActive',
+    ms: 'measurements',
+    // Room environment
+    wmn: 'wallMatNorth', wms: 'wallMatSouth', wme: 'wallMatEast', wmw: 'wallMatWest',
+    ect: 'ceilingType', efm: 'floorMaterial', elt: 'lightingType',
+    ehn: 'hvacNoise',
+    env: 'showEnvironment',
+    rn: 'roomName'
 };
+
+/** Valid environment values for hash deserialization */
+const VALID_WALL_MATERIALS = new Set(['drywall', 'glass', 'wood', 'concrete', 'acoustic-panel']);
+const VALID_CEILING_TYPES = new Set(['open-exposed', 'drop-tile', 'acoustic']);
+const VALID_FLOOR_MATERIALS = new Set(['carpet', 'hardwood', 'tile', 'concrete']);
+const VALID_LIGHTING_TYPES = new Set(['fluorescent', 'led', 'recessed', 'natural-only']);
+const VALID_HVAC_NOISE = new Set(['none', 'low', 'moderate', 'high']);

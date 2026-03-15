@@ -33,7 +33,7 @@
             </div>
 
             <!-- Room Dimensions -->
-            <div class="control-group" aria-expanded="false" id="cg-room">
+            <div class="control-group" aria-expanded="true" id="cg-room">
                 <div class="control-group-title" data-toggle-group="cg-room">Room Dimensions<svg class="cg-chevron" aria-hidden="true"
                         width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
                         stroke-linecap="round" stroke-linejoin="round">
@@ -54,19 +54,19 @@
                     </div>
                     <div class="control-row">
                         <div class="control-label"><label for="room-length">Length</label><span class="value" id="val-room-length"
-                                data-slider="room-length" data-key="roomLength" data-unit="ft">20' 0"</span>
+                                title="Click to type exact value" data-slider="room-length" data-key="roomLength" data-unit="ft">20' 0"</span>
                         </div>
                         <input type="range" id="room-length" min="8" max="60" step="0.5" value="20">
                     </div>
                     <div class="control-row">
                         <div class="control-label"><label for="room-width">Width</label><span class="value" id="val-room-width"
-                                data-slider="room-width" data-key="roomWidth" data-unit="ft">15' 0"</span>
+                                title="Click to type exact value" data-slider="room-width" data-key="roomWidth" data-unit="ft">15' 0"</span>
                         </div>
                         <input type="range" id="room-width" min="8" max="60" step="0.5" value="15">
                     </div>
                     <div class="control-row">
                         <div class="control-label"><label for="room-ceiling-height">Ceiling Height</label><span class="value" id="val-room-ceiling-height"
-                                data-slider="room-ceiling-height" data-key="ceilingHeight" data-unit="ft">9' 0"</span>
+                                title="Click to type exact value" data-slider="room-ceiling-height" data-key="ceilingHeight" data-unit="ft">9' 0"</span>
                         </div>
                         <input type="range" id="room-ceiling-height" min="7" max="20" step="0.5" value="9">
                     </div>
@@ -86,12 +86,11 @@
                             <span>Elements</span>
                             <div class="structural-manager-actions">
                                 <button class="table-action-btn" id="add-door-btn" title="Add a door">+ Door</button>
-                                <button class="table-action-btn" id="add-window-btn" title="Add a window">+ Window</button>
                                 <button class="table-action-btn table-action-remove" id="remove-element-btn" title="Remove selected element" disabled>Remove</button>
                             </div>
                         </div>
                         <div id="element-list" class="table-list"></div>
-                        <div class="empty-state" id="structural-empty">Add doors and windows to check for clearance conflicts with tables and equipment.</div>
+                        <div class="empty-state" id="structural-empty">Add doors to check for clearance conflicts with tables and equipment.</div>
                     </div>
                     <div id="structural-controls" style="display:none">
                         <div class="control-row">
@@ -118,15 +117,106 @@
                             </div>
                             <input type="range" id="element-height" min="2" max="10" step="0.5" value="7">
                         </div>
-                        <div class="control-row" id="element-sill-row" style="display:none">
-                            <div class="control-label"><label for="element-sill">Sill Height</label><span class="value" id="val-element-sill">3' 0"</span>
-                            </div>
-                            <input type="range" id="element-sill" min="0" max="8" step="0.5" value="3">
-                        </div>
                         <div class="control-row" id="swing-flip-row" style="display:none">
                             <div class="control-label"><label>Swing Direction</label></div>
                             <button class="table-action-btn" id="flip-swing-btn" title="Flip the direction the door swings open">⇄ Flip Swing</button>
                         </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Room Environment -->
+            <div class="control-group" aria-expanded="false" id="cg-environment">
+                <div class="control-group-title" data-toggle-group="cg-environment">Room Environment<svg class="cg-chevron" aria-hidden="true"
+                        width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="6 9 12 15 18 9"></polyline>
+                    </svg></div>
+                <div class="control-group-body">
+                    <div class="env-section-label">Wall Materials</div>
+                    <div class="env-wall-grid">
+                        <div class="control-row">
+                            <div class="control-label"><label for="wall-mat-north">North</label></div>
+                            <select id="wall-mat-north">
+                                <option value="drywall" selected>Drywall</option>
+                                <option value="glass">Glass</option>
+                                <option value="wood">Wood</option>
+                                <option value="concrete">Concrete</option>
+                                <option value="acoustic-panel">Acoustic Panel</option>
+                            </select>
+                        </div>
+                        <div class="control-row">
+                            <div class="control-label"><label for="wall-mat-south">South</label></div>
+                            <select id="wall-mat-south">
+                                <option value="drywall" selected>Drywall</option>
+                                <option value="glass">Glass</option>
+                                <option value="wood">Wood</option>
+                                <option value="concrete">Concrete</option>
+                                <option value="acoustic-panel">Acoustic Panel</option>
+                            </select>
+                        </div>
+                        <div class="control-row">
+                            <div class="control-label"><label for="wall-mat-east">East</label></div>
+                            <select id="wall-mat-east">
+                                <option value="drywall" selected>Drywall</option>
+                                <option value="glass">Glass</option>
+                                <option value="wood">Wood</option>
+                                <option value="concrete">Concrete</option>
+                                <option value="acoustic-panel">Acoustic Panel</option>
+                            </select>
+                        </div>
+                        <div class="control-row">
+                            <div class="control-label"><label for="wall-mat-west">West</label></div>
+                            <select id="wall-mat-west">
+                                <option value="drywall" selected>Drywall</option>
+                                <option value="glass">Glass</option>
+                                <option value="wood">Wood</option>
+                                <option value="concrete">Concrete</option>
+                                <option value="acoustic-panel">Acoustic Panel</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="control-row">
+                        <div class="control-label"><label for="ceiling-type">Ceiling Type</label></div>
+                        <select id="ceiling-type">
+                            <option value="drop-tile" selected>Drop Tile</option>
+                            <option value="open-exposed">Open / Exposed</option>
+                            <option value="acoustic">Acoustic Tile</option>
+                        </select>
+                    </div>
+                    <div class="control-row">
+                        <div class="control-label"><label for="floor-material">Floor Material</label></div>
+                        <select id="floor-material">
+                            <option value="carpet" selected>Carpet</option>
+                            <option value="hardwood">Hardwood</option>
+                            <option value="tile">Tile</option>
+                            <option value="concrete">Concrete</option>
+                        </select>
+                    </div>
+                    <div class="control-row">
+                        <div class="control-label"><label for="lighting-type">Lighting</label></div>
+                        <select id="lighting-type">
+                            <option value="led" selected>LED</option>
+                            <option value="fluorescent">Fluorescent</option>
+                            <option value="recessed">Recessed</option>
+                            <option value="natural-only">Natural Only</option>
+                        </select>
+                    </div>
+                    <div class="control-row">
+                        <div class="control-label"><label for="hvac-noise">HVAC Noise Level</label></div>
+                        <select id="hvac-noise">
+                            <option value="none">None</option>
+                            <option value="low" selected>Low</option>
+                            <option value="moderate">Moderate</option>
+                            <option value="high">High</option>
+                        </select>
+                    </div>
+                    <div class="control-row" style="margin-top:8px">
+                        <label class="checkbox-label"><input type="checkbox" id="show-environment"> Show wall material overlay</label>
+                    </div>
+                    <div class="env-advisory" id="env-advisory" aria-live="polite">
+                        <div class="env-advisory-header"><span class="env-advisory-dot"></span> Environment Advisory</div>
+                        <div class="env-advisory-text" id="env-advisory-text"></div>
                     </div>
                 </div>
             </div>
@@ -150,41 +240,41 @@
                     </div>
                     <div class="control-row">
                         <div class="control-label"><label for="table-length">Table Length</label><span class="value" id="val-table-length"
-                                data-slider="table-length" data-key="tableLength" data-unit="ft">8'
+                                title="Click to type exact value" data-slider="table-length" data-key="tableLength" data-unit="ft">8'
                                 0"</span>
                         </div>
                         <input type="range" id="table-length" min="4" max="24" step="0.5" value="8">
                     </div>
                     <div class="control-row">
                         <div class="control-label"><label for="table-width">Table Width</label><span class="value" id="val-table-width"
-                                data-slider="table-width" data-key="tableWidth" data-unit="ft">4'
+                                title="Click to type exact value" data-slider="table-width" data-key="tableWidth" data-unit="ft">4'
                                 0"</span>
                         </div>
                         <input type="range" id="table-width" min="2" max="8" step="0.5" value="4">
                     </div>
                     <div class="control-row">
                         <div class="control-label"><label for="table-height">Table Height (AFF)</label><span class="value"
-                                id="val-table-height" data-slider="table-height" data-key="tableHeight"
+                                id="val-table-height" title="Click to type exact value" data-slider="table-height" data-key="tableHeight"
                                 data-unit="in">30"</span>
                         </div>
                         <input type="range" id="table-height" min="24" max="42" step="1" value="30">
                     </div>
                     <div class="control-row">
                         <div class="control-label"><label for="table-dist">Distance from Display</label><span class="value"
-                                id="val-table-dist" data-slider="table-dist" data-key="tableDist" data-unit="ft">4'
+                                id="val-table-dist" title="Click to type exact value" data-slider="table-dist" data-key="tableDist" data-unit="ft">4'
                                 0"</span>
                         </div>
                         <input type="range" id="table-dist" min="0" max="30" step="0.5" value="4">
                     </div>
                     <div class="control-row">
                         <div class="control-label"><label for="table-rotation">Rotation</label><span class="value" id="val-table-rotation"
-                                data-slider="table-rotation" data-key="tableRotation" data-unit="deg">0°</span>
+                                title="Click to type exact value" data-slider="table-rotation" data-key="tableRotation" data-unit="deg">0°</span>
                         </div>
                         <input type="range" id="table-rotation" min="0" max="350" step="10" value="0">
                     </div>
                     <div class="control-row">
                         <div class="control-label"><label for="table-x">Side Offset</label><span class="value" id="val-table-x"
-                                data-slider="table-x" data-key="tableX" data-unit="ft">0' 0"</span>
+                                title="Click to type exact value" data-slider="table-x" data-key="tableX" data-unit="ft">0' 0"</span>
                         </div>
                         <input type="range" id="table-x" min="-20" max="20" step="0.5" value="0">
                     </div>
@@ -251,21 +341,21 @@
                     </div>
                     <div class="control-row">
                         <div class="control-label"><label for="display-size">Display Size (Diagonal)</label><span class="value"
-                                id="val-display-size" data-slider="display-size" data-key="displaySize"
+                                id="val-display-size" title="Click to type exact value" data-slider="display-size" data-key="displaySize"
                                 data-unit="in">65"</span>
                         </div>
                         <input type="range" id="display-size" min="40" max="100" step="5" value="65">
                     </div>
                     <div class="control-row">
                         <div class="control-label"><label for="display-elev">Display Elevation (Center)</label><span class="value"
-                                id="val-display-elev" data-slider="display-elev" data-key="displayElev"
+                                id="val-display-elev" title="Click to type exact value" data-slider="display-elev" data-key="displayElev"
                                 data-unit="in">54"</span>
                         </div>
                         <input type="range" id="display-elev" min="40" max="84" step="1" value="54">
                     </div>
                     <div class="control-row">
                         <div class="control-label"><label for="display-offset-x">Display Offset (Lateral)</label><span class="value"
-                                id="val-display-offset-x" data-slider="display-offset-x" data-key="displayOffsetX"
+                                id="val-display-offset-x" title="Click to type exact value" data-slider="display-offset-x" data-key="displayOffsetX"
                                 data-unit="ft">0'0"</span>
                         </div>
                         <input type="range" id="display-offset-x" min="-15" max="15" step="0.5" value="0">
@@ -397,21 +487,21 @@
                     </div>
                     <div class="control-row pov-audience-only">
                         <div class="control-label"><label for="viewer-dist">Viewer Distance</label><span class="value" id="val-viewer-dist"
-                                data-slider="viewer-dist" data-key="viewerDist" data-unit="ft">12'
+                                title="Click to type exact value" data-slider="viewer-dist" data-key="viewerDist" data-unit="ft">12'
                                 0"</span>
                         </div>
                         <input type="range" id="viewer-dist" min="1" max="60" step="0.5" value="12">
                     </div>
                     <div class="control-row pov-audience-only">
                         <div class="control-label"><label for="viewer-offset">Viewer Offset (L/R)</label><span class="value"
-                                id="val-viewer-offset" data-slider="viewer-offset" data-key="viewerOffset"
+                                id="val-viewer-offset" title="Click to type exact value" data-slider="viewer-offset" data-key="viewerOffset"
                                 data-unit="ft">0' 0"</span>
                         </div>
                         <input type="range" id="viewer-offset" min="-15" max="15" step="0.5" value="0">
                     </div>
                     <div class="control-row">
                         <div class="control-label"><label for="pov-yaw">Look Direction</label><span class="value"
-                                id="val-pov-yaw" data-slider="pov-yaw" data-key="povYaw"
+                                id="val-pov-yaw" title="Click to type exact value" data-slider="pov-yaw" data-key="povYaw"
                                 data-unit="deg">0°</span>
                         </div>
                         <input type="range" id="pov-yaw" min="-180" max="180" step="5" value="0">
@@ -456,21 +546,28 @@
                         Bar Gen 2</span></div>
                 <div class="info-item"><span class="dot"
                         style="color:var(--mic-color);background:var(--mic-color)"></span><span id="header-capacity">Capacity: 0</span></div>
+                <div class="info-item"><span class="dot"
+                        style="color:var(--mic-color);background:var(--mic-color)"></span><span id="header-rt60">RT60: —</span></div>
             </div>
             <div style="display:flex;align-items:center;gap:14px">
-                <div class="undo-redo-group">
+                <div class="undo-redo-group" style="position:relative">
                     <button class="undo-btn" id="undo-btn" title="Undo (Ctrl+Z)" disabled data-action="undo">↩</button>
                     <span id="history-badge" class="history-badge"></span>
                     <button class="redo-btn" id="redo-btn" title="Redo (Ctrl+Shift+Z)" disabled
                         data-action="redo">↪</button>
+                    <div id="history-panel" class="history-panel" style="display:none">
+                        <ul id="history-list"></ul>
+                    </div>
                 </div>
                 <button class="undo-btn measure-btn" id="measure-btn" title="Measure" data-action="toggle-measure"
-                    style="width:auto;padding:0 10px;font-size:13px;">📏</button>
+                    style="width:auto;padding:0 10px;font-size:11px;font-family:var(--font-mono);gap:5px"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h20"/><path d="M6 8v8"/><path d="M10 10v4"/><path d="M14 10v4"/><path d="M18 8v8"/></svg>
+                    Measure</button>
                 <button class="undo-btn" id="share-btn" title="Copy shareable link" data-action="share"
                     style="width:auto;padding:0 10px;font-size:11px;font-family:var(--font-mono);gap:5px">🔗
                     Share</button>
+                <button class="tips-btn" id="show-tips-btn" title="Show Tips">?</button>
                 <button class="theme-toggle" id="theme-toggle" title="Toggle light/dark mode"
-                    aria-label="Toggle light/dark mode">☽</button>
+                    aria-label="Toggle light/dark mode"><svg class="theme-icon theme-icon--moon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3a7 7 0 0 0 9.79 9.79z"/></svg><svg class="theme-icon theme-icon--sun" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg></button>
                 <div class="legend">
                     <div class="legend-item" id="legend-camera" title="Toggle Camera FOV overlay"
                         data-action="toggle-legend" data-legend="camera">
@@ -506,7 +603,48 @@
             </div>
             <div id="info-content"></div>
         </div>
+        <!-- Onboarding Overlay -->
+        <div id="onboarding-overlay" class="onboarding-overlay" style="display:none">
+            <div class="onboarding-card">
+                <h2>AV Room Planner</h2>
+                <ul class="onboarding-tips">
+                    <li>Drag tables to reposition</li>
+                    <li>Right-click tables for more options</li>
+                    <li>Use sidebar to configure room &amp; equipment</li>
+                    <li>Press <kbd>?</kbd> for keyboard shortcuts</li>
+                </ul>
+                <button class="onboarding-dismiss" id="onboarding-dismiss">Got it</button>
+            </div>
+        </div>
     </main>
+
+    <!-- Keyboard Shortcut Help Dialog -->
+    <dialog id="shortcut-help" class="shortcut-dialog">
+        <div class="shortcut-dialog-header">
+            <h2>Keyboard Shortcuts</h2>
+            <button class="shortcut-close-btn" id="shortcut-close-btn">&times;</button>
+        </div>
+        <table class="shortcut-table">
+            <thead><tr><th>Key</th><th>Action</th></tr></thead>
+            <tbody>
+                <tr><td><kbd>G</kbd></td><td>Toggle grid</td></tr>
+                <tr><td><kbd>V</kbd></td><td>Switch view (top / POV)</td></tr>
+                <tr><td><kbd>M</kbd></td><td>Toggle measure tool</td></tr>
+                <tr><td><kbd>T</kbd></td><td>Add table</td></tr>
+                <tr><td><kbd>Delete</kbd></td><td>Remove selected table or measurement</td></tr>
+                <tr><td><kbd>0</kbd></td><td>Reset zoom</td></tr>
+                <tr><td><kbd>+</kbd> / <kbd>=</kbd></td><td>Zoom in</td></tr>
+                <tr><td><kbd>-</kbd></td><td>Zoom out</td></tr>
+                <tr><td><kbd>Ctrl+Z</kbd></td><td>Undo</td></tr>
+                <tr><td><kbd>Ctrl+Shift+Z</kbd></td><td>Redo</td></tr>
+                <tr><td><kbd>Ctrl+D</kbd></td><td>Duplicate selected table</td></tr>
+                <tr><td><kbd>Arrow keys</kbd></td><td>Move selected table</td></tr>
+                <tr><td><kbd>Escape</kbd></td><td>Deselect / cancel</td></tr>
+                <tr><td><kbd>?</kbd></td><td>Show this help</td></tr>
+            </tbody>
+        </table>
+        <p class="shortcut-contact">Questions? Contact <a href="mailto:thomas_danielewski@gensler.com">Thomas Danielewski</a></p>
+    </dialog>
 
     <!-- Context Menu (right-click on canvas structural element) -->
     <div id="structural-context-menu" class="context-menu">
@@ -550,23 +688,24 @@
     </div>
 
     <script src="jspdf.umd.min.js"></script>
-    <script src="data.js?v=3"></script>
-    <script src="constants.js?v=3"></script>
-    <script src="theme.js?v=3"></script>
-    <script src="dom.js?v=3"></script>
-    <script src="utils.js?v=3"></script>
-    <script src="state.js?v=3"></script>
-    <script src="input.js?v=3"></script>
-    <script src="tables.js?v=3"></script>
-    <script src="structural.js?v=3"></script>
-    <script src="ui.js?v=3"></script>
-    <script src="measure.js?v=3"></script>
-    <script src="draw.js?v=3"></script>
-    <script src="render.js?v=3"></script>
-    <script src="pov.js?v=3"></script>
-    <script src="drag.js?v=3"></script>
-    <script src="export.js?v=3"></script>
-    <script src="init.js?v=3" defer></script>
+    <script src="data.js?v=4"></script>
+    <script src="constants.js?v=4"></script>
+    <script src="theme.js?v=4"></script>
+    <script src="dom.js?v=4"></script>
+    <script src="utils.js?v=4"></script>
+    <script src="state.js?v=4"></script>
+    <script src="input.js?v=4"></script>
+    <script src="tables.js?v=4"></script>
+    <script src="structural.js?v=4"></script>
+    <script src="environment.js?v=4"></script>
+    <script src="ui.js?v=4"></script>
+    <script src="measure.js?v=4"></script>
+    <script src="draw.js?v=4"></script>
+    <script src="render.js?v=4"></script>
+    <script src="pov.js?v=4"></script>
+    <script src="drag.js?v=4"></script>
+    <script src="export.js?v=4"></script>
+    <script src="init.js?v=4" defer></script>
 </body>
 
 </html>

@@ -35,7 +35,15 @@ bindSelect('video-bar', 'videoBar');
 // ── Seating capacity number input ────────────────────────────
 DOM['seat-capacity-input'].addEventListener('change', () => {
     const target = parseInt(DOM['seat-capacity-input'].value, 10);
-    if (!isNaN(target) && target >= 0) autoConfigureForCapacity(target);
+    if (!isNaN(target) && target >= 0) {
+        autoConfigureForCapacity(target);
+        if (target > 0) {
+            const actual = calcTotalCapacity();
+            if (actual < target) {
+                showToast(`Room too small for ${target} seats — fitted ${actual}`, 'error');
+            }
+        }
+    }
 });
 DOM['seat-capacity-input'].addEventListener('keydown', e => {
     if (e.key === 'Enter') DOM['seat-capacity-input'].blur();
@@ -82,6 +90,21 @@ DOM['micpod-mode'].addEventListener('change', () => {
     pushHistory();
     render();
 });
+
+// ── Wire up environment selects ──────────────────────────────
+['wall-mat-north','wall-mat-south','wall-mat-east','wall-mat-west'].forEach(id => {
+    DOM[id].addEventListener('change', () => {
+        const wall = id.replace('wall-mat-', '');
+        state.wallMaterials[wall] = DOM[id].value;
+        pushHistory('changed wall material');
+        render();
+    });
+});
+bindSelect('ceiling-type', 'ceilingType');
+bindSelect('floor-material', 'floorMaterial');
+bindSelect('lighting-type', 'lightingType');
+bindSelect('hvac-noise', 'hvacNoise');
+bindCheckbox('show-environment', 'showEnvironment', true);
 
 // ── Wire up checkboxes ───────────────────────────────────────
 bindCheckbox('show-view-angle', 'showViewAngle');
@@ -144,13 +167,11 @@ document.querySelectorAll('.arr-pill[data-arrangement]').forEach(btn => {
 
 // ── Structural element controls ──────────────────────────────
 document.getElementById('add-door-btn').addEventListener('click', addDoor);
-document.getElementById('add-window-btn').addEventListener('click', addWindow);
 document.getElementById('remove-element-btn').addEventListener('click', removeElement);
 document.getElementById('element-wall').addEventListener('change', onElementWallChange);
 document.getElementById('element-position').addEventListener('input', onElementPositionInput);
 document.getElementById('element-width').addEventListener('input', onElementWidthInput);
 document.getElementById('element-height').addEventListener('input', onElementHeightInput);
-document.getElementById('element-sill').addEventListener('input', onElementSillInput);
 document.getElementById('flip-swing-btn').addEventListener('click', flipSwing);
 
 // ── Room preset pills ────────────────────────────────────────
@@ -217,7 +238,27 @@ document.getElementById('clear-autosave-btn').addEventListener('click', () => {
     localStorage.removeItem('av-planner-autosave');
     showToast('Saved layout cleared');
 });
-document.getElementById('reset-defaults-btn').addEventListener('click', () => {
+let _resetConfirmTimer = null;
+document.getElementById('reset-defaults-btn').addEventListener('click', function() {
+    const btn = this;
+    if (!btn.dataset.confirming) {
+        btn.dataset.confirming = '1';
+        btn.textContent = '⟲ Confirm Reset?';
+        btn.style.background = 'var(--danger, #e53e3e)';
+        btn.style.color = '#fff';
+        _resetConfirmTimer = setTimeout(() => {
+            delete btn.dataset.confirming;
+            btn.textContent = '⟲ Reset to Defaults';
+            btn.style.background = '';
+            btn.style.color = '';
+        }, 3000);
+        return;
+    }
+    clearTimeout(_resetConfirmTimer);
+    delete btn.dataset.confirming;
+    btn.textContent = '⟲ Reset to Defaults';
+    btn.style.background = '';
+    btn.style.color = '';
     _suppressHistory = true;
     Object.assign(state, {
         roomLength: 20, roomWidth: 15, ceilingHeight: 9,
@@ -243,7 +284,13 @@ document.getElementById('reset-defaults-btn').addEventListener('click', () => {
         selectedElementId: null,
         measurements: [],
         measureToolActive: false,
-        roomName: ''
+        roomName: '',
+        wallMaterials: { north: 'drywall', south: 'drywall', east: 'drywall', west: 'drywall' },
+        ceilingType: 'drop-tile',
+        floorMaterial: 'carpet',
+        lightingType: 'led',
+        hvacNoise: 'low',
+        showEnvironment: false
     });
     _suppressHistory = false;
     syncUIFromState();
@@ -266,6 +313,44 @@ document.querySelectorAll('[data-action="toggle-legend"]').forEach(el => {
 document.querySelector('[data-action="undo"]').addEventListener('click', undo);
 document.querySelector('[data-action="redo"]').addEventListener('click', redo);
 
+// ── History panel toggle ─────────────────────────────────────
+const historyBadge = document.getElementById('history-badge');
+const historyPanel = document.getElementById('history-panel');
+
+historyBadge.addEventListener('mousedown', (e) => e.stopPropagation());
+historyBadge.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const open = historyPanel.style.display === 'none';
+    historyPanel.style.display = open ? 'block' : 'none';
+    if (open) {
+        const cur = historyPanel.querySelector('.current');
+        if (cur) cur.scrollIntoView({ block: 'nearest' });
+    }
+});
+
+historyPanel.addEventListener('mousedown', (e) => e.stopPropagation());
+
+document.getElementById('history-list').addEventListener('click', (e) => {
+    const li = e.target.closest('li[data-index]');
+    if (!li) return;
+    const idx = parseInt(li.dataset.index, 10);
+    historyIndex = idx;
+    applyHistorySnapshot(history[idx]);
+    historyPanel.style.display = 'none';
+});
+
+document.addEventListener('mousedown', (e) => {
+    if (historyPanel.style.display !== 'none' && !historyPanel.contains(e.target) && e.target !== historyBadge) {
+        historyPanel.style.display = 'none';
+    }
+});
+
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && historyPanel.style.display !== 'none') {
+        historyPanel.style.display = 'none';
+    }
+});
+
 // ── Share button ─────────────────────────────────────────────
 document.querySelector('[data-action="share"]').addEventListener('click', copyShareLink);
 
@@ -282,10 +367,21 @@ document.addEventListener('keydown', e => {
         e.preventDefault();
         redo();
     }
-    // Delete selected measurement
+    // Ctrl+D → duplicate selected table
+    if ((e.ctrlKey || e.metaKey) && e.key === 'd') {
+        e.preventDefault();
+        if (state.selectedTableId) {
+            duplicateTable(state.selectedTableId);
+            pushHistory('duplicated table');
+        }
+    }
+    // Delete selected measurement, or selected table (guard: keep at least 1 table)
     if (e.key === 'Delete' && _selectedMeasureId !== null) {
         removeMeasurement(_selectedMeasureId);
         _selectedMeasureId = null;
+    } else if (e.key === 'Delete' && state.selectedTableId && state.tables.length > 1) {
+        removeTable();
+        scheduleRender();
     }
     // Escape cancels measure tool or pending measurement
     if (e.key === 'Escape' && state.measureToolActive) {
@@ -306,13 +402,12 @@ canvas.addEventListener('keydown', e => {
     const t = getSelectedTable();
     if (!t) return;
     let handled = false;
-    if (e.key === 'ArrowLeft')  { t.x = Math.max(-(state.roomWidth / 2 - t.width / 2), t.x - step); handled = true; }
-    if (e.key === 'ArrowRight') { t.x = Math.min(state.roomWidth / 2 - t.width / 2, t.x + step); handled = true; }
-    if (e.key === 'ArrowUp')    { t.dist = Math.max(0, t.dist - step); handled = true; }
-    if (e.key === 'ArrowDown')  { t.dist = Math.min(state.roomLength - t.length, t.dist + step); handled = true; }
+    if (e.key === 'ArrowLeft')  { setTableProp('tableX', Math.max(-(state.roomWidth / 2 - t.width / 2), t.x - step)); handled = true; }
+    if (e.key === 'ArrowRight') { setTableProp('tableX', Math.min(state.roomWidth / 2 - t.width / 2, t.x + step)); handled = true; }
+    if (e.key === 'ArrowUp')    { setTableProp('tableDist', Math.max(0, t.dist - step)); handled = true; }
+    if (e.key === 'ArrowDown')  { setTableProp('tableDist', Math.min(state.roomLength - t.length, t.dist + step)); handled = true; }
     if (handled) {
         e.preventDefault();
-        syncFlatStateFromTable(t);
         updateTableSliders();
         debouncedPushHistory();
         scheduleRender();
@@ -324,6 +419,7 @@ let _resizeTimer;
 window.addEventListener('resize', () => {
     clearTimeout(_resizeTimer);
     invalidateLayoutCache();
+    updateDotGridSize();
     _resizeTimer = setTimeout(render, DEBOUNCE_RESIZE);
 });
 
@@ -378,3 +474,115 @@ pushHistory(); // first snapshot so undo always has a base
 if (state.viewMode === 'top') {
     setTimeout(() => showDragHint('Drag the table to reposition'), DRAG_HINT_DELAY);
 }
+
+// ── Onboarding overlay ─────────────────────────────────────────
+(function initOnboarding() {
+    const overlay = document.getElementById('onboarding-overlay');
+    const dismissBtn = document.getElementById('onboarding-dismiss');
+    const tipsBtn = document.getElementById('show-tips-btn');
+
+    function hideOnboarding() {
+        overlay.style.display = 'none';
+        localStorage.setItem('av-planner-visited', '1');
+    }
+
+    function showOnboarding() {
+        overlay.style.display = 'flex';
+    }
+
+    // Show on first visit
+    if (!localStorage.getItem('av-planner-visited')) {
+        showOnboarding();
+    }
+
+    dismissBtn.addEventListener('click', hideOnboarding);
+    overlay.addEventListener('click', e => {
+        if (e.target === overlay) hideOnboarding();
+    });
+
+    tipsBtn.addEventListener('click', () => {
+        document.getElementById('shortcut-help').showModal();
+    });
+})();
+
+// ── Shortcut help dialog ───────────────────────────────────────
+document.getElementById('shortcut-close-btn').addEventListener('click', () => {
+    document.getElementById('shortcut-help').close();
+});
+
+// ── Keyboard shortcuts (non-modifier keys) ─────────────────────
+document.addEventListener('keydown', e => {
+    // Don't intercept when typing in inputs
+    if (e.target.matches('input, select, textarea')) return;
+    // Don't intercept modifier combos (handled by existing Ctrl+Z/Y/D listener)
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+
+    const key = e.key;
+
+    switch (key) {
+        case 'g':
+        case 'G':
+            state.showGrid = !state.showGrid;
+            DOM['show-grid'].checked = state.showGrid;
+            pushHistory();
+            render();
+            break;
+
+        case 'v':
+        case 'V':
+            setViewMode(state.viewMode === 'top' ? 'pov' : 'top');
+            break;
+
+        case 'm':
+        case 'M':
+            toggleMeasureTool();
+            break;
+
+        case 't':
+        case 'T':
+            addTable();
+            break;
+
+        case '0':
+            // Reset zoom
+            document.getElementById('zoom-reset-btn')?.click();
+            break;
+
+        case '+':
+        case '=':
+            if (typeof zoomByStep === 'function') zoomByStep(0.2);
+            break;
+
+        case '-':
+            if (typeof zoomByStep === 'function') zoomByStep(-0.2);
+            break;
+
+        case '?':
+            document.getElementById('shortcut-help').showModal();
+            break;
+
+        case 'Escape':
+            // Close shortcut dialog if open
+            if (document.getElementById('shortcut-help').open) {
+                document.getElementById('shortcut-help').close();
+                break;
+            }
+            // Close onboarding if showing
+            if (document.getElementById('onboarding-overlay').style.display !== 'none') {
+                document.getElementById('onboarding-overlay').style.display = 'none';
+                localStorage.setItem('av-planner-visited', '1');
+                break;
+            }
+            // Deselect table (existing Escape for measure tool is handled in the earlier listener)
+            if (!state.measureToolActive && state.selectedTableId && state.tables.length > 1) {
+                state.selectedTableId = state.tables[0].id;
+                renderTableList();
+                syncUIFromState();
+                render();
+            }
+            break;
+
+        default:
+            return; // Don't preventDefault for unhandled keys
+    }
+});

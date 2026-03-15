@@ -149,14 +149,25 @@ function initTheme() {
     applyTheme(theme);
 }
 
+function updateDotGridSize() {
+    const gridPx = Math.round(28 * devicePixelRatio) / devicePixelRatio;
+    document.documentElement.style.setProperty('--dot-grid-size', gridPx + 'px');
+}
+
 function applyTheme(theme) {
     document.documentElement.setAttribute('data-theme', theme);
     invalidateThemeCache();
+    updateDotGridSize();
     document.querySelector('meta[name="color-scheme"]')
         ?.setAttribute('content', theme);
     const btn = document.getElementById('theme-toggle');
     if (btn) {
-        btn.textContent = theme === 'dark' ? '☽' : '☀';
+        const moon = btn.querySelector('.theme-icon--moon');
+        const sun = btn.querySelector('.theme-icon--sun');
+        if (moon && sun) {
+            moon.style.display = theme === 'dark' ? '' : 'none';
+            sun.style.display = theme === 'dark' ? 'none' : '';
+        }
         btn.title = theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode';
     }
 }

@@ -2,6 +2,7 @@
 
 // ── Drag discoverability hint ────────────────────────────────
 let _dragHintShown = false;
+let _contextMenuHintShown = false;
 
 function showDragHint(msg) {
     if (_dragHintShown) return;
@@ -51,6 +52,7 @@ function updateZoomLabel() {
     const zoomResetBtn = document.getElementById('zoom-reset-btn');
     if (!zoomInBtn) return;
 
+    window.zoomByStep = zoomByStep;
     function zoomByStep(stepDelta) {
         const container = document.querySelector('.canvas-container');
         if (!container) return;
@@ -188,7 +190,7 @@ function getDragMetrics(e) {
              mainDeviceX, mainDeviceY, isHoriz };
 }
 
-/** Hit-test a structural element (door/window) on a wall for drag */
+/** Hit-test a structural element (door) on a wall for drag */
 function hitTestStructuralElement(mx, my, el, rx, ry, rw, rl, ppf, wt) {
     const { x, y, isHorizontal, w } = getElementWallCoords(el, rx, ry, rw, rl, ppf, wt);
     const tol = DRAG_TOLERANCE + 4;
@@ -245,6 +247,56 @@ function isPointOnRotateHandle(mx, my, t, ox, ry, wt, ppf) {
 
 // ── Cursor feedback on hover ─────────────────────────────────
 let _lastViewAngleX = -9999, _lastViewAngleY = -9999;
+let _mousemovePending = false;
+let _lastHoverEvent = null;
+
+/**
+ * Consolidated hit-test for cursor feedback in idle state.
+ * Short-circuits on first hit: tables → display → center/mic → structural → measurements.
+ */
+function hitTestAll(metrics) {
+    const { mx, my, ppf, ox, oy, rw, rl, rx, ry, wt, cX, cY, c2X, c2Y, mpX, mpY, mp2X, mp2Y, dispOx, dispY, dispWidthPx, dispDepthPx, eqWidthPx, eqDepthPx, mainDeviceX, mainDeviceY, isHoriz } = metrics;
+
+    // Tables first (most common interaction target)
+    for (const t of state.tables) {
+        if (isPointInTableHitbox(mx, my, t, ox, ry, wt, ppf)) return { target: true, type: 'table' };
+    }
+
+    // Display
+    if (isPointOnDisplay(mx, my, dispOx, dispY, dispWidthPx, dispDepthPx, eqWidthPx, eqDepthPx, mainDeviceX, mainDeviceY, isHoriz)) {
+        return { target: true, type: 'display' };
+    }
+
+    // Center companion devices
+    if (state.includeCenter) {
+        const ceq = EQUIPMENT[getCenterEqKey()];
+        const cs = Math.max(12, ceq.width * ppf * 3);
+        if (Math.sqrt((mx - cX) ** 2 + (my - cY) ** 2) <= cs) return { target: true, type: 'center' };
+        if (state.includeDualCenter && Math.sqrt((mx - c2X) ** 2 + (my - c2Y) ** 2) <= cs) return { target: true, type: 'center2' };
+    }
+
+    // Mic pods
+    if (state.includeMicPod && state.brand === 'logitech') {
+        const mpEq = getMicPodEq();
+        const mps = Math.max(10, mpEq.width * ppf * 2);
+        if (Math.sqrt((mx - mpX) ** 2 + (my - mpY) ** 2) <= mps / 2) return { target: true, type: 'micpod' };
+        if (state.includeDualMicPod && Math.sqrt((mx - mp2X) ** 2 + (my - mp2Y) ** 2) <= mps / 2) return { target: true, type: 'micpod2' };
+    }
+
+    // Structural elements
+    for (const el of state.structuralElements) {
+        if (hitTestStructuralElement(mx, my, el, rx, ry, rw, rl, ppf, wt)) return { target: true, type: 'structural' };
+    }
+
+    // Measurements
+    if (state.measurements.length > 0) {
+        if (hitTestMeasureDelete(mx, my) !== null) return { target: 'delete', type: 'measureDelete' };
+        if (hitTestMeasureLine(mx, my)) return { target: 'measure', type: 'measureLine' };
+    }
+
+    return { target: false, type: null };
+}
+
 canvas.addEventListener('mousemove', e => {
     const _rect = canvas.getBoundingClientRect();
     // In top-down view the canvas-stack has a CSS scale applied, so divide by
@@ -256,7 +308,7 @@ canvas.addEventListener('mousemove', e => {
 
     // POV mode: display is grabbable, structural elements grabbable/resizable, background shows pan cursor
     if (state.viewMode === 'pov') {
-        if (!isDraggingDisplayPOV && !isDraggingViewerOffset && !isDraggingPOVYaw && !isDraggingElementPOV && !isResizingElementPOV) {
+        if (!drag.displayPOV && !drag.viewerOffset && !drag.povYaw && !drag.elementPOV && !drag.resizingElementPOV) {
             const b = getPOVDisplayScreenBounds();
             const onDisplay = (mousePos.x >= b.left && mousePos.x <= b.right &&
                  mousePos.y >= b.top  && mousePos.y <= b.bot);
@@ -276,10 +328,10 @@ canvas.addEventListener('mousemove', e => {
         return;
     }
 
-    if (state.viewMode !== 'top' || isPanning || isDraggingTableId !== null || isDraggingCenter || isDraggingCenter2 || isDraggingMicPod || isDraggingMicPod2 || isDraggingDisplay || isDraggingRotate) return;
+    if (state.viewMode !== 'top' || drag.panning || drag.tableId !== null || drag.center || drag.center2 || drag.micPod || drag.micPod2 || drag.display || drag.rotate) return;
 
     // Space-pan mode: show grab hand, skip normal hit-testing.
-    if (isSpaceDown) {
+    if (drag.spaceDown) {
         canvas.style.cursor = 'grab';
         if (state.showViewAngle && (Math.abs(mousePos.x - _lastViewAngleX) > 2 || Math.abs(mousePos.y - _lastViewAngleY) > 2)) {
             _lastViewAngleX = mousePos.x; _lastViewAngleY = mousePos.y;
@@ -288,114 +340,96 @@ canvas.addEventListener('mousemove', e => {
         return;
     }
 
-    const { mx, my, ppf, ox, oy, rw, rl, rx, ry, wt, cX, cY, c2X, c2Y, mpX, mpY, mp2X, mp2Y, dispOx, dispY, dispWidthPx, dispDepthPx, eqWidthPx, eqDepthPx, mainDeviceX, mainDeviceY, isHoriz } = getDragMetrics(e);
+    // Throttle expensive hit-testing to once per animation frame
+    _lastHoverEvent = e;
+    if (_mousemovePending) return;
+    _mousemovePending = true;
+    requestAnimationFrame(() => {
+        _mousemovePending = false;
+        const ev = _lastHoverEvent;
 
-    // Rotation handle takes cursor priority over table body
-    const selT = getSelectedTable();
-    const onRotateHandle = selT ? isPointOnRotateHandle(mx, my, selT, ox, ry, wt, ppf) : false;
+        const { mx, my, ppf, ox, oy, rw, rl, rx, ry, wt, cX, cY, c2X, c2Y, mpX, mpY, mp2X, mp2Y, dispOx, dispY, dispWidthPx, dispDepthPx, eqWidthPx, eqDepthPx, mainDeviceX, mainDeviceY, isHoriz } = getDragMetrics(ev);
 
-    let onTarget = false;
-    if (!onRotateHandle) {
-        if (state.includeCenter) {
+        // Rotation handle takes cursor priority over table body
+        const selT = getSelectedTable();
+        const onRotateHandle = selT ? isPointOnRotateHandle(mx, my, selT, ox, ry, wt, ppf) : false;
+
+        let onTarget = false;
+        if (!onRotateHandle) {
+            const hit = hitTestAll({ mx, my, ppf, ox, oy, rw, rl, rx, ry, wt, cX, cY, c2X, c2Y, mpX, mpY, mp2X, mp2Y, dispOx, dispY, dispWidthPx, dispDepthPx, eqWidthPx, eqDepthPx, mainDeviceX, mainDeviceY, isHoriz });
+            onTarget = hit.target;
+        }
+
+        canvas.style.cursor = state.measureToolActive ? 'crosshair'
+            : onRotateHandle ? 'crosshair'
+            : onTarget === 'delete' ? 'pointer'
+            : onTarget === 'measure' ? 'grab'
+            : onTarget ? 'grab' : '';
+
+        // Equipment hover detection for tooltips (generous padding since devices are thin in top-down)
+        let newHover = null;
+        const eq = EQUIPMENT[state.videoBar];
+        const hoverPad = 6; // extra px tolerance for thin devices
+        // Hit test video bar / board
+        if (eq.type === 'bar') {
+            const halfW = (isHoriz ? eqWidthPx / 2 : eqDepthPx / 2) + hoverPad;
+            const halfH = (isHoriz ? eqDepthPx / 2 : eqWidthPx / 2) + hoverPad;
+            if (mx >= mainDeviceX - halfW && mx <= mainDeviceX + halfW &&
+                my >= mainDeviceY - halfH && my <= mainDeviceY + halfH) {
+                newHover = { name: eq.name, spec: eq.cameraFOV + '° FOV', x: mx, y: my };
+            }
+        } else if (eq.type === 'board') {
+            const halfW = (isHoriz ? eqWidthPx / 2 : eqDepthPx / 2) + hoverPad;
+            const halfH = (isHoriz ? eqDepthPx / 2 : eqWidthPx / 2) + hoverPad;
+            if (mx >= dispOx - halfW && mx <= dispOx + halfW &&
+                my >= dispY - halfH && my <= dispY + halfH) {
+                newHover = { name: eq.name, spec: eq.cameraFOV + '° FOV', x: mx, y: my };
+            }
+        }
+        // Hit test display
+        if (!newHover) {
+            const dHalfW = (isHoriz ? dispWidthPx / 2 : dispDepthPx / 2) + hoverPad;
+            const dHalfH = (isHoriz ? dispDepthPx / 2 : dispWidthPx / 2) + hoverPad;
+            if (mx >= dispOx - dHalfW && mx <= dispOx + dHalfW &&
+                my >= dispY - dHalfH && my <= dispY + dHalfH) {
+                newHover = { name: state.displaySize + '\u2033 Display', spec: state.displayCount === 2 ? 'Dual' : 'Single', x: mx, y: my };
+            }
+        }
+        // Hit test center devices
+        if (!newHover && state.includeCenter) {
             const ceq = EQUIPMENT[getCenterEqKey()];
             const cs = Math.max(12, ceq.width * ppf * 3);
-            if (Math.sqrt((mx - cX) ** 2 + (my - cY) ** 2) <= cs) onTarget = true;
-            if (!onTarget && state.includeDualCenter && Math.sqrt((mx - c2X) ** 2 + (my - c2Y) ** 2) <= cs) onTarget = true;
+            if (Math.sqrt((mx - cX) ** 2 + (my - cY) ** 2) <= cs) {
+                newHover = { name: ceq.name, spec: ceq.cameraFOV + '° FOV', x: mx, y: my };
+            }
+            if (!newHover && state.includeDualCenter && Math.sqrt((mx - c2X) ** 2 + (my - c2Y) ** 2) <= cs) {
+                newHover = { name: ceq.name + ' #2', spec: ceq.cameraFOV + '° FOV', x: mx, y: my };
+            }
         }
-        if (!onTarget && state.includeMicPod && state.brand === 'logitech') {
+        // Hit test mic pods
+        if (!newHover && state.includeMicPod && state.brand === 'logitech') {
             const mpEq = getMicPodEq();
             const mps = Math.max(10, mpEq.width * ppf * 2);
-            if (Math.sqrt((mx - mpX) ** 2 + (my - mpY) ** 2) <= mps / 2) onTarget = true;
-            if (!onTarget && state.includeDualMicPod && Math.sqrt((mx - mp2X) ** 2 + (my - mp2Y) ** 2) <= mps / 2) onTarget = true;
-        }
-        if (!onTarget && isPointOnDisplay(mx, my, dispOx, dispY, dispWidthPx, dispDepthPx, eqWidthPx, eqDepthPx, mainDeviceX, mainDeviceY, isHoriz)) {
-            onTarget = true;
-        }
-        if (!onTarget) {
-            for (const t of state.tables) {
-                if (isPointInTableHitbox(mx, my, t, ox, ry, wt, ppf)) { onTarget = true; break; }
+            if (Math.sqrt((mx - mpX) ** 2 + (my - mpY) ** 2) <= mps / 2) {
+                newHover = { name: mpEq.name, spec: mpEq.micCount + ' omni mics · ' + mpEq.micRange + ' ft range', x: mx, y: my };
+            }
+            if (!newHover && state.includeDualMicPod && Math.sqrt((mx - mp2X) ** 2 + (my - mp2Y) ** 2) <= mps / 2) {
+                newHover = { name: mpEq.name + ' #2', spec: mpEq.micCount + ' omni mics · ' + mpEq.micRange + ' ft range', x: mx, y: my };
             }
         }
-        if (!onTarget) {
-            for (const el of state.structuralElements) {
-                if (hitTestStructuralElement(mx, my, el, rx, ry, rw, rl, ppf, wt)) { onTarget = true; break; }
-            }
-        }
-        if (!onTarget && state.measurements.length > 0) {
-            if (hitTestMeasureDelete(mx, my) !== null) onTarget = 'delete';
-            else if (hitTestMeasureLine(mx, my)) onTarget = 'measure';
-        }
-    }
 
-    canvas.style.cursor = state.measureToolActive ? 'crosshair'
-        : onRotateHandle ? 'crosshair'
-        : onTarget === 'delete' ? 'pointer'
-        : onTarget === 'measure' ? 'grab'
-        : onTarget ? 'grab' : '';
+        const hoverChanged = (hoveredEquipment === null) !== (newHover === null) ||
+            (hoveredEquipment && newHover && (hoveredEquipment.name !== newHover.name ||
+                Math.abs(hoveredEquipment.x - newHover.x) > 2 || Math.abs(hoveredEquipment.y - newHover.y) > 2));
+        hoveredEquipment = newHover;
 
-    // Equipment hover detection for tooltips (generous padding since devices are thin in top-down)
-    let newHover = null;
-    const eq = EQUIPMENT[state.videoBar];
-    const hoverPad = 6; // extra px tolerance for thin devices
-    // Hit test video bar / board
-    if (eq.type === 'bar') {
-        const halfW = (isHoriz ? eqWidthPx / 2 : eqDepthPx / 2) + hoverPad;
-        const halfH = (isHoriz ? eqDepthPx / 2 : eqWidthPx / 2) + hoverPad;
-        if (mx >= mainDeviceX - halfW && mx <= mainDeviceX + halfW &&
-            my >= mainDeviceY - halfH && my <= mainDeviceY + halfH) {
-            newHover = { name: eq.name, spec: eq.cameraFOV + '° FOV', x: mx, y: my };
+        if (hoverChanged) {
+            scheduleRender();
+        } else if (state.showViewAngle && (Math.abs(mousePos.x - _lastViewAngleX) > 2 || Math.abs(mousePos.y - _lastViewAngleY) > 2)) {
+            _lastViewAngleX = mousePos.x; _lastViewAngleY = mousePos.y;
+            scheduleRender();
         }
-    } else if (eq.type === 'board') {
-        const halfW = (isHoriz ? eqWidthPx / 2 : eqDepthPx / 2) + hoverPad;
-        const halfH = (isHoriz ? eqDepthPx / 2 : eqWidthPx / 2) + hoverPad;
-        if (mx >= dispOx - halfW && mx <= dispOx + halfW &&
-            my >= dispY - halfH && my <= dispY + halfH) {
-            newHover = { name: eq.name, spec: eq.cameraFOV + '° FOV', x: mx, y: my };
-        }
-    }
-    // Hit test display
-    if (!newHover) {
-        const dHalfW = (isHoriz ? dispWidthPx / 2 : dispDepthPx / 2) + hoverPad;
-        const dHalfH = (isHoriz ? dispDepthPx / 2 : dispWidthPx / 2) + hoverPad;
-        if (mx >= dispOx - dHalfW && mx <= dispOx + dHalfW &&
-            my >= dispY - dHalfH && my <= dispY + dHalfH) {
-            newHover = { name: state.displaySize + '\u2033 Display', spec: state.displayCount === 2 ? 'Dual' : 'Single', x: mx, y: my };
-        }
-    }
-    // Hit test center devices
-    if (!newHover && state.includeCenter) {
-        const ceq = EQUIPMENT[getCenterEqKey()];
-        const cs = Math.max(12, ceq.width * ppf * 3);
-        if (Math.sqrt((mx - cX) ** 2 + (my - cY) ** 2) <= cs) {
-            newHover = { name: ceq.name, spec: ceq.cameraFOV + '° FOV', x: mx, y: my };
-        }
-        if (!newHover && state.includeDualCenter && Math.sqrt((mx - c2X) ** 2 + (my - c2Y) ** 2) <= cs) {
-            newHover = { name: ceq.name + ' #2', spec: ceq.cameraFOV + '° FOV', x: mx, y: my };
-        }
-    }
-    // Hit test mic pods
-    if (!newHover && state.includeMicPod && state.brand === 'logitech') {
-        const mpEq = getMicPodEq();
-        const mps = Math.max(10, mpEq.width * ppf * 2);
-        if (Math.sqrt((mx - mpX) ** 2 + (my - mpY) ** 2) <= mps / 2) {
-            newHover = { name: mpEq.name, spec: mpEq.micCount + ' omni mics · ' + mpEq.micRange + ' ft range', x: mx, y: my };
-        }
-        if (!newHover && state.includeDualMicPod && Math.sqrt((mx - mp2X) ** 2 + (my - mp2Y) ** 2) <= mps / 2) {
-            newHover = { name: mpEq.name + ' #2', spec: mpEq.micCount + ' omni mics · ' + mpEq.micRange + ' ft range', x: mx, y: my };
-        }
-    }
-
-    const hoverChanged = (hoveredEquipment === null) !== (newHover === null) ||
-        (hoveredEquipment && newHover && (hoveredEquipment.name !== newHover.name ||
-            Math.abs(hoveredEquipment.x - newHover.x) > 2 || Math.abs(hoveredEquipment.y - newHover.y) > 2));
-    hoveredEquipment = newHover;
-
-    if (hoverChanged) {
-        scheduleRender();
-    } else if (state.showViewAngle && (Math.abs(mousePos.x - _lastViewAngleX) > 2 || Math.abs(mousePos.y - _lastViewAngleY) > 2)) {
-        _lastViewAngleX = mousePos.x; _lastViewAngleY = mousePos.y;
-        scheduleRender();
-    }
+    });
 });
 
 /**
@@ -479,12 +513,9 @@ function getPOVDisplayScreenBounds() {
  * Returns per-element height values in inches and screen-projected corners.
  */
 function getElementPOVHeights(el) {
-    const elHeightIn = (el.height || (el.type === 'door' ? DOOR_HEIGHT_DEFAULT : WINDOW_HEIGHT_DEFAULT)) * 12;
-    const elSillIn = el.type === 'window'
-        ? (el.sillHeight != null ? el.sillHeight : WINDOW_SILL_DEFAULT) * 12
-        : 0;
-    const topIn = el.type === 'window' ? elSillIn + elHeightIn : elHeightIn;
-    const botIn = elSillIn;
+    const elHeightIn = (el.height || DOOR_HEIGHT_DEFAULT) * 12;
+    const topIn = elHeightIn;
+    const botIn = 0;
     return { topIn, botIn };
 }
 
@@ -738,108 +769,172 @@ function _applyTableSnap(nx, nd, t) {
 }
 
 // ── Drag state ───────────────────────────────────────────────
-let isDraggingTableId = null;
-let dragTableOffset = null;
-let dragTableGhost = null;
-// Drag feedback state
-let dragBoundaryHit = { north: false, south: false, east: false, west: false };
-let dragTableOverlap = false;
-let dragDistances = null;
-let isDraggingCenter = false;
-let isDraggingCenter2 = false;
-let isDraggingMicPod = false;
-let isDraggingMicPod2 = false;
-let isDraggingDisplay = false;
-let dragDisplayOffsetX = 0;
-let isDraggingDisplayPOV = false;
-let dragDisplayPOVStartX = 0;
-let dragDisplayPOVStartY = 0;
-let dragDisplayPOVStartOffset = 0;
-let dragDisplayPOVStartElev = 0;
-let isDraggingViewerOffset = false;
-let dragViewerOffsetStartX = 0;
-let dragViewerOffsetStartVal = 0;
-let isDraggingPOVYaw = false;
-let dragPOVYawStartX = 0;
-let dragPOVYawStartVal = 0;
-let isDraggingRotate = false;
-let isDraggingRotateTableId = null;
-let isDraggingElement = false;
-let isDraggingElementId = null;
-let dragElementOffset = 0;
-let isDraggingElementPOV = false;
-let isDraggingElementPOVId = null;
-let dragElementPOVStartMouse = 0;
-let dragElementPOVStartPos = 0;
-let isResizingElementPOV = false;
-let resizeElementPOVId = null;
-let resizeElementPOVEdge = null;   // 'left','right','top','bottom'
-let resizeElementPOVStartMouse = 0;
-let resizeElementPOVStartWidth = 0;
-let resizeElementPOVStartHeight = 0;
-let resizeElementPOVStartSill = 0;
-let resizeElementPOVStartPos = 0;
+const DRAG_IDLE = {
+    tableId: null, tableOffset: null, tableGhost: null,
+    boundaryHit: { north: false, south: false, east: false, west: false },
+    tableOverlap: false, distances: null,
+    center: false, center2: false, micPod: false, micPod2: false,
+    display: false, displayOffsetX: 0,
+    displayPOV: false, displayPOVStartX: 0, displayPOVStartY: 0,
+    displayPOVStartOffset: 0, displayPOVStartElev: 0,
+    viewerOffset: false, viewerOffsetStartX: 0, viewerOffsetStartVal: 0,
+    povYaw: false, povYawStartX: 0, povYawStartVal: 0,
+    rotate: false, rotateTableId: null,
+    element: false, elementId: null, elementOffset: 0,
+    elementPOV: false, elementPOVId: null, elementPOVStartMouse: 0, elementPOVStartPos: 0,
+    resizingElementPOV: false, resizeElementPOVId: null, resizeElementPOVEdge: null,
+    resizeElementPOVStartMouse: 0, resizeElementPOVStartWidth: 0,
+    resizeElementPOVStartHeight: 0, resizeElementPOVStartSill: 0, resizeElementPOVStartPos: 0,
+    measurement: false, measureId: null, measureOffsetX: 0, measureOffsetY: 0,
+    panning: false, spaceDown: false,
+    panStartX: 0, panStartY: 0, panStartOffsetX: 0, panStartOffsetY: 0
+};
+let drag = { ...DRAG_IDLE };
 
-// ── Measurement drag state ───────────────────────────────────
-let isDraggingMeasurement = false;
-let draggingMeasureId = null;
-let dragMeasureOffsetX = 0;
-let dragMeasureOffsetY = 0;
 let _selectedMeasureId = null;
-
-// ── Viewport pan state (middle-click or Space+left-drag) ─────
-let isPanning = false;
-let isSpaceDown = false;
-let panStartX = 0;
-let panStartY = 0;
-let panStartOffsetX = 0;
-let panStartOffsetY = 0;
 
 /** Reset all drag flags to idle state */
 function resetDrag() {
-    isPanning = false;
-    isDraggingTableId = null; dragTableOffset = null; dragTableGhost = null;
+    drag = { ...DRAG_IDLE };
     snapGuides = [];
-    dragBoundaryHit = { north: false, south: false, east: false, west: false };
-    dragTableOverlap = false;
-    dragDistances = null;
-    isDraggingCenter = false;
-    isDraggingCenter2 = false;
-    isDraggingMicPod = false;
-    isDraggingMicPod2 = false;
-    isDraggingDisplay = false; dragDisplayOffsetX = 0;
-    isDraggingDisplayPOV = false; dragDisplayPOVStartX = 0; dragDisplayPOVStartY = 0;
-    dragDisplayPOVStartOffset = 0; dragDisplayPOVStartElev = 0;
-    isDraggingViewerOffset = false; dragViewerOffsetStartX = 0; dragViewerOffsetStartVal = 0;
-    isDraggingPOVYaw = false; dragPOVYawStartX = 0; dragPOVYawStartVal = 0;
-    isDraggingRotate = false; isDraggingRotateTableId = null;
-    isDraggingElement = false; isDraggingElementId = null; dragElementOffset = 0;
-    isDraggingElementPOV = false; isDraggingElementPOVId = null;
-    dragElementPOVStartMouse = 0; dragElementPOVStartPos = 0;
-    isResizingElementPOV = false; resizeElementPOVId = null; resizeElementPOVEdge = null;
-    resizeElementPOVStartMouse = 0; resizeElementPOVStartWidth = 0;
-    resizeElementPOVStartHeight = 0; resizeElementPOVStartSill = 0; resizeElementPOVStartPos = 0;
-    isDraggingMeasurement = false; draggingMeasureId = null;
-    dragMeasureOffsetX = 0; dragMeasureOffsetY = 0;
+}
+
+// ── Drag-start helpers ────────────────────────────────────────
+
+function startPan(e) {
+    drag.panning = true;
+    drag.panStartX = e.clientX;
+    drag.panStartY = e.clientY;
+    drag.panStartOffsetX = viewportPanX;
+    drag.panStartOffsetY = viewportPanY;
+    canvas.style.cursor = 'grabbing';
+}
+
+function startMeasurementDrag(mx, my, hitM) {
+    drag.measurement = true;
+    drag.measureId = hitM.id;
+    _selectedMeasureId = hitM.id;
+    const midFtX = (hitM.x1 + hitM.x2) / 2;
+    const midFtY = (hitM.y1 + hitM.y2) / 2;
+    const midPx = roomFtToCanvasPx(midFtX, midFtY);
+    drag.measureOffsetX = mx - midPx.cx;
+    drag.measureOffsetY = my - midPx.cy;
+    canvas.style.cursor = 'grabbing';
+    pushHistory('moved measurement');
+}
+
+function startDisplayDragPOV(mx, my) {
+    drag.displayPOV = true;
+    drag.displayPOVStartX = mx;
+    drag.displayPOVStartY = my;
+    drag.displayPOVStartOffset = state.displayOffsetX;
+    drag.displayPOVStartElev = state.displayElev;
+    canvas.style.cursor = 'grabbing';
+    pushHistory('moved display');
+}
+
+function startElementResizePOV(mx, my, hitEl, edge) {
+    drag.resizingElementPOV = true;
+    drag.resizeElementPOVId = hitEl.id;
+    drag.resizeElementPOVEdge = edge;
+    drag.resizeElementPOVStartWidth = hitEl.width;
+    drag.resizeElementPOVStartHeight = hitEl.height || DOOR_HEIGHT_DEFAULT;
+    drag.resizeElementPOVStartSill = 0;
+    drag.resizeElementPOVStartPos = hitEl.position;
+    drag.resizeElementPOVStartMouse = (edge === 'left' || edge === 'right') ? mx : my;
+    canvas.style.cursor = (edge === 'left' || edge === 'right') ? 'ew-resize' : 'ns-resize';
+    pushHistory('resized element');
+}
+
+function startElementDragPOV(mx, my, hitEl) {
+    drag.elementPOV = true;
+    drag.elementPOVId = hitEl.id;
+    const isSideWall = hitEl.wall !== state.displayWall &&
+        !((state.displayWall === 'north' && hitEl.wall === 'south') ||
+          (state.displayWall === 'south' && hitEl.wall === 'north') ||
+          (state.displayWall === 'east' && hitEl.wall === 'west') ||
+          (state.displayWall === 'west' && hitEl.wall === 'east'));
+    drag.elementPOVStartMouse = isSideWall ? my : mx;
+    drag.elementPOVStartPos = hitEl.position;
+    canvas.style.cursor = 'grabbing';
+    pushHistory('moved element');
+}
+
+function startPovYaw(mx) {
+    drag.povYaw = true;
+    drag.povYawStartX = mx;
+    drag.povYawStartVal = state.povYaw || 0;
+    canvas.style.cursor = 'grabbing';
+    pushHistory('panned view');
+}
+
+function startCenterDrag(which) {
+    if (which === 2) drag.center2 = true;
+    else drag.center = true;
+    canvas.style.cursor = 'grabbing';
+    pushHistory('moved center');
+}
+
+function startMicPodDrag(which) {
+    if (which === 2) drag.micPod2 = true;
+    else drag.micPod = true;
+    canvas.style.cursor = 'grabbing';
+    pushHistory('moved mic pod');
+}
+
+function startDisplayDrag(mx, my, metrics) {
+    const { dispOx, dispY, isHoriz } = metrics;
+    drag.display = true;
+    // For N/S walls drag is horizontal; for E/W walls drag is vertical
+    drag.displayOffsetX = isHoriz ? (mx - dispOx) : (my - dispY);
+    canvas.style.cursor = 'grabbing';
+    pushHistory('moved display');
+}
+
+function startRotateDrag(selT) {
+    drag.rotate = true;
+    drag.rotateTableId = selT.id;
+    canvas.style.cursor = 'crosshair';
+    pushHistory('rotated table');
+}
+
+function startTableDrag(mx, my, metrics, t) {
+    const { ox, ry, wt, ppf } = metrics;
+    if (t.id !== state.selectedTableId) selectTable(t.id);
+    if (!_contextMenuHintShown) { _contextMenuHintShown = true; showToast('Tip: Right-click table for more options'); }
+    drag.tableId = t.id;
+    drag.tableGhost = { x: t.x, dist: t.dist, rotation: t.rotation, shape: t.shape, width: t.width, length: t.length };
+    const tcx = ox + t.x * ppf;
+    const tcy = ry + wt + t.dist * ppf + (t.length * ppf) / 2;
+    drag.tableOffset = { x: mx - tcx, y: my - tcy };
+    canvas.style.cursor = 'grabbing';
+    pushHistory('moved table');
+}
+
+function startElementDrag(mx, my, metrics, el) {
+    const { rx, ry, rw, rl, ppf, wt } = metrics;
+    drag.element = true;
+    drag.elementId = el.id;
+    selectElement(el.id);
+    const { x, y, isHorizontal } = getElementWallCoords(el, rx, ry, rw, rl, ppf, wt);
+    // Store offset from mouse to element start position
+    drag.elementOffset = isHorizontal ? (mx - x) : (my - y);
+    canvas.style.cursor = 'grabbing';
+    pushHistory('moved element');
 }
 
 // ── Mouse down: start drag ───────────────────────────────────
 canvas.addEventListener('mousedown', e => {
-    // Viewport pan: middle-click or Space+left-click (top-down only).
-    if (state.viewMode === 'top' && (e.button === 1 || (e.button === 0 && isSpaceDown))) {
+    // Viewport pan: middle-click or Space+left-click (top-down only)
+    if (state.viewMode === 'top' && (e.button === 1 || (e.button === 0 && drag.spaceDown))) {
         e.preventDefault();
-        isPanning = true;
-        panStartX = e.clientX;
-        panStartY = e.clientY;
-        panStartOffsetX = viewportPanX;
-        panStartOffsetY = viewportPanY;
-        canvas.style.cursor = 'grabbing';
+        startPan(e);
         return;
     }
 
     // Measurement tool interactions (top-down only)
     if (state.viewMode === 'top' && e.button === 0) {
-        const { mx, my, ppf } = getDragMetrics(e);
+        const { mx, my } = getDragMetrics(e);
 
         // Check delete button click on any measurement (even when tool not active)
         const delId = hitTestMeasureDelete(mx, my);
@@ -868,21 +963,8 @@ canvas.addEventListener('mousedown', e => {
             return;
         }
 
-        // Check if clicking on a measurement line to drag it
         const hitM = hitTestMeasureLine(mx, my);
-        if (hitM) {
-            isDraggingMeasurement = true;
-            draggingMeasureId = hitM.id;
-            _selectedMeasureId = hitM.id;
-            const midFtX = (hitM.x1 + hitM.x2) / 2;
-            const midFtY = (hitM.y1 + hitM.y2) / 2;
-            const midPx = roomFtToCanvasPx(midFtX, midFtY);
-            dragMeasureOffsetX = mx - midPx.cx;
-            dragMeasureOffsetY = my - midPx.cy;
-            canvas.style.cursor = 'grabbing';
-            pushHistory('moved measurement');
-            return;
-        }
+        if (hitM) { startMeasurementDrag(mx, my, hitM); return; }
     }
 
     // POV mode: display drag, structural element drag, or viewer pan
@@ -892,75 +974,46 @@ canvas.addEventListener('mousedown', e => {
         const my = e.clientY - rect.top;
         const b = getPOVDisplayScreenBounds();
         if (mx >= b.left && mx <= b.right && my >= b.top && my <= b.bot) {
-            isDraggingDisplayPOV = true;
-            dragDisplayPOVStartX = mx;
-            dragDisplayPOVStartY = my;
-            dragDisplayPOVStartOffset = state.displayOffsetX;
-            dragDisplayPOVStartElev = state.displayElev;
-            canvas.style.cursor = 'grabbing';
-            pushHistory('moved display');
+            startDisplayDragPOV(mx, my);
         } else {
             const hit = hitTestStructuralElementPOV(mx, my);
             if (hit) {
-                const hitEl = hit.el;
-                const edge = hit.edge;
-                selectElement(hitEl.id);
-
-                if (edge) {
-                    // Edge drag → resize
-                    isResizingElementPOV = true;
-                    resizeElementPOVId = hitEl.id;
-                    resizeElementPOVEdge = edge;
-                    resizeElementPOVStartWidth = hitEl.width;
-                    resizeElementPOVStartHeight = hitEl.height || (hitEl.type === 'door' ? DOOR_HEIGHT_DEFAULT : WINDOW_HEIGHT_DEFAULT);
-                    resizeElementPOVStartSill = hitEl.type === 'window' ? (hitEl.sillHeight != null ? hitEl.sillHeight : WINDOW_SILL_DEFAULT) : 0;
-                    resizeElementPOVStartPos = hitEl.position;
-                    resizeElementPOVStartMouse = (edge === 'left' || edge === 'right') ? mx : my;
-                    canvas.style.cursor = (edge === 'left' || edge === 'right') ? 'ew-resize' : 'ns-resize';
-                    pushHistory('resized element');
-                } else {
-                    // Body drag → move position
-                    isDraggingElementPOV = true;
-                    isDraggingElementPOVId = hitEl.id;
-                    const isSideWall = hitEl.wall !== state.displayWall &&
-                        !((state.displayWall === 'north' && hitEl.wall === 'south') ||
-                          (state.displayWall === 'south' && hitEl.wall === 'north') ||
-                          (state.displayWall === 'east' && hitEl.wall === 'west') ||
-                          (state.displayWall === 'west' && hitEl.wall === 'east'));
-                    dragElementPOVStartMouse = isSideWall ? my : mx;
-                    dragElementPOVStartPos = hitEl.position;
-                    canvas.style.cursor = 'grabbing';
-                    pushHistory('moved element');
-                }
+                selectElement(hit.el.id);
+                if (hit.edge) startElementResizePOV(mx, my, hit.el, hit.edge);
+                else startElementDragPOV(mx, my, hit.el);
             } else {
-                isDraggingPOVYaw = true;
-                dragPOVYawStartX = mx;
-                dragPOVYawStartVal = state.povYaw || 0;
-                canvas.style.cursor = 'grabbing';
-                pushHistory('panned view');
+                startPovYaw(mx);
             }
         }
         return;
     }
 
     if (state.viewMode !== 'top') return;
-    const { mx, my, ppf, ox, ry, wt, cX, cY, c2X, c2Y, dispOx, dispY, dispWidthPx, dispDepthPx, eqWidthPx, eqDepthPx, mainDeviceX, mainDeviceY, isHoriz } = getDragMetrics(e);
+    const metrics = getDragMetrics(e);
+    const { mx, my, ppf, ox, ry, wt, cX, cY, c2X, c2Y, mpX, mpY, mp2X, mp2Y,
+            dispOx, dispY, dispWidthPx, dispDepthPx, eqWidthPx, eqDepthPx, mainDeviceX, mainDeviceY, isHoriz } = metrics;
+
+    // Context-menu "..." button hit-test (before other drag targets)
+    if (_ctxBtnPos) {
+        const dx = mx - _ctxBtnPos.x, dy = my - _ctxBtnPos.y;
+        if (dx * dx + dy * dy <= _ctxBtnPos.r * _ctxBtnPos.r) {
+            _ctxTargetTableId = state.selectedTableId;
+            const deleteBtn = _ctxMenu.querySelector('[data-action="ctx-delete"]');
+            if (deleteBtn) deleteBtn.disabled = state.tables.length <= 1;
+            _showMenuAt(_ctxMenu, e.clientX, e.clientY);
+            return;
+        }
+    }
 
     // Center device(s) take priority
     if (state.includeCenter) {
         const ceq = EQUIPMENT[getCenterEqKey()];
         const cs = Math.max(12, ceq.width * ppf * 3);
         if (state.includeDualCenter && Math.sqrt((mx - c2X) ** 2 + (my - c2Y) ** 2) <= cs) {
-            isDraggingCenter2 = true;
-            canvas.style.cursor = 'grabbing';
-            pushHistory('moved center');
-            return;
+            startCenterDrag(2); return;
         }
         if (Math.sqrt((mx - cX) ** 2 + (my - cY) ** 2) <= cs) {
-            isDraggingCenter = true;
-            canvas.style.cursor = 'grabbing';
-            pushHistory('moved center');
-            return;
+            startCenterDrag(1); return;
         }
     }
 
@@ -968,70 +1021,37 @@ canvas.addEventListener('mousedown', e => {
     if (state.includeMicPod && state.brand === 'logitech') {
         const mpEq = getMicPodEq();
         const mps = Math.max(10, mpEq.width * ppf * 2);
-        const { mpX, mpY, mp2X, mp2Y } = getDragMetrics(e);
         if (state.includeDualMicPod && Math.sqrt((mx - mp2X) ** 2 + (my - mp2Y) ** 2) <= mps / 2) {
-            isDraggingMicPod2 = true;
-            canvas.style.cursor = 'grabbing';
-            pushHistory('moved mic pod');
-            return;
+            startMicPodDrag(2); return;
         }
         if (Math.sqrt((mx - mpX) ** 2 + (my - mpY) ** 2) <= mps / 2) {
-            isDraggingMicPod = true;
-            canvas.style.cursor = 'grabbing';
-            pushHistory('moved mic pod');
-            return;
+            startMicPodDrag(1); return;
         }
     }
 
     // Display / video-bar lateral drag
     if (isPointOnDisplay(mx, my, dispOx, dispY, dispWidthPx, dispDepthPx, eqWidthPx, eqDepthPx, mainDeviceX, mainDeviceY, isHoriz)) {
-        isDraggingDisplay = true;
-        // For N/S walls drag is horizontal; for E/W walls drag is vertical
-        dragDisplayOffsetX = isHoriz ? (mx - dispOx) : (my - dispY);
-        canvas.style.cursor = 'grabbing';
-        pushHistory('moved display');
-        return;
+        startDisplayDrag(mx, my, metrics); return;
     }
 
     // Rotation handle (selected table, checked before table body to prevent false drags)
     const selT = getSelectedTable();
     if (selT && isPointOnRotateHandle(mx, my, selT, ox, ry, wt, ppf)) {
-        isDraggingRotate = true;
-        isDraggingRotateTableId = selT.id;
-        canvas.style.cursor = 'crosshair';
-        pushHistory('rotated table');
-        return;
+        startRotateDrag(selT); return;
     }
 
     // Check tables in reverse order (topmost rendered last = visually on top)
     for (let i = state.tables.length - 1; i >= 0; i--) {
         const t = state.tables[i];
         if (isPointInTableHitbox(mx, my, t, ox, ry, wt, ppf)) {
-            if (t.id !== state.selectedTableId) selectTable(t.id);
-            isDraggingTableId = t.id;
-            dragTableGhost = { x: t.x, dist: t.dist, rotation: t.rotation, shape: t.shape, width: t.width, length: t.length };
-            const tcx = ox + t.x * ppf;
-            const tcy = ry + wt + t.dist * ppf + (t.length * ppf) / 2;
-            dragTableOffset = { x: mx - tcx, y: my - tcy };
-            canvas.style.cursor = 'grabbing';
-            pushHistory('moved table');
-            return;
+            startTableDrag(mx, my, metrics, t); return;
         }
     }
 
-    // Check structural elements (doors/windows) for drag
+    // Check structural elements (doors) for drag
     for (const el of state.structuralElements) {
-        const { rw, rl, rx } = getDragMetrics(e);
-        if (hitTestStructuralElement(mx, my, el, rx, ry, rw, rl, ppf, wt)) {
-            isDraggingElement = true;
-            isDraggingElementId = el.id;
-            selectElement(el.id);
-            const { x, y, isHorizontal } = getElementWallCoords(el, rx, ry, rw, rl, ppf, wt);
-            // Store offset from mouse to element start position
-            dragElementOffset = isHorizontal ? (mx - x) : (my - y);
-            canvas.style.cursor = 'grabbing';
-            pushHistory('moved element');
-            return;
+        if (hitTestStructuralElement(mx, my, el, metrics.rx, ry, metrics.rw, metrics.rl, ppf, wt)) {
+            startElementDrag(mx, my, metrics, el); return;
         }
     }
 });
@@ -1040,9 +1060,9 @@ canvas.addEventListener('mousedown', e => {
 canvas.addEventListener('mousemove', e => {
     // Viewport pan (middle-click or Space+drag): update CSS transform directly,
     // no canvas re-render needed.
-    if (isPanning) {
-        viewportPanX = panStartOffsetX + (e.clientX - panStartX);
-        viewportPanY = panStartOffsetY + (e.clientY - panStartY);
+    if (drag.panning) {
+        viewportPanX = drag.panStartOffsetX + (e.clientX - drag.panStartX);
+        viewportPanY = drag.panStartOffsetY + (e.clientY - drag.panStartY);
         markViewportDirty();
         applyViewportTransform();
         return;
@@ -1057,13 +1077,13 @@ canvas.addEventListener('mousemove', e => {
     }
 
     // Measurement drag
-    if (isDraggingMeasurement && draggingMeasureId !== null) {
+    if (drag.measurement && drag.measureId !== null) {
         const { mx, my, ppf } = getDragMetrics(e);
-        const m = state.measurements.find(ms => ms.id === draggingMeasureId);
+        const m = state.measurements.find(ms => ms.id === drag.measureId);
         if (m) {
             const midFtX = (m.x1 + m.x2) / 2;
             const midFtY = (m.y1 + m.y2) / 2;
-            const newMidPx = { cx: mx - dragMeasureOffsetX, cy: my - dragMeasureOffsetY };
+            const newMidPx = { cx: mx - drag.measureOffsetX, cy: my - drag.measureOffsetY };
             const newMidFt = canvasPxToRoomFt(newMidPx.cx, newMidPx.cy);
             const deltaX = newMidFt.x - midFtX;
             const deltaY = newMidFt.y - midFtY;
@@ -1075,14 +1095,14 @@ canvas.addEventListener('mousemove', e => {
     }
 
     // POV display drag is handled independently
-    if (isDraggingDisplayPOV) {
+    if (drag.displayPOV) {
         const rect = canvas.getBoundingClientRect();
         const mx = e.clientX - rect.left;
         const my = e.clientY - rect.top;
         const { s } = getPOVDisplayScreenBounds();
 
         // Horizontal: update displayOffsetX
-        let nx = dragDisplayPOVStartOffset + (mx - dragDisplayPOVStartX) / s;
+        let nx = drag.displayPOVStartOffset + (mx - drag.displayPOVStartX) / s;
         const displayWidthFt = state.displaySize * 0.8715 / 12;
         const isNS_d = (state.displayWall === 'north' || state.displayWall === 'south');
         const wallLen_d = isNS_d ? state.roomWidth : state.roomLength;
@@ -1094,7 +1114,7 @@ canvas.addEventListener('mousemove', e => {
         updateSliderTrack(DOM['display-offset-x']);
 
         // Vertical: update displayElev (screen Y increases downward, world Y increases upward)
-        let ne = Math.round(dragDisplayPOVStartElev - (my - dragDisplayPOVStartY) * 12 / s);
+        let ne = Math.round(drag.displayPOVStartElev - (my - drag.displayPOVStartY) * 12 / s);
         ne = Math.max(+DOM['display-elev'].min, Math.min(+DOM['display-elev'].max, ne));
         state.displayElev = ne;
         DOM['display-elev'].value = ne;
@@ -1105,12 +1125,12 @@ canvas.addEventListener('mousemove', e => {
         return;
     }
 
-    if (isDraggingViewerOffset) {
+    if (drag.viewerOffset) {
         const rect = canvas.getBoundingClientRect();
         const mx = e.clientX - rect.left;
         const s = 1000 / Math.max(1, state.viewerDist);
         // Drag right → content moves right → viewer offset decreases (camera pans left)
-        let nv = dragViewerOffsetStartVal - (mx - dragViewerOffsetStartX) / s;
+        let nv = drag.viewerOffsetStartVal - (mx - drag.viewerOffsetStartX) / s;
         const minOff = parseFloat(DOM['viewer-offset'].min);
         const maxOff = parseFloat(DOM['viewer-offset'].max);
         nv = Math.round(Math.max(minOff, Math.min(maxOff, nv)) * 2) / 2;
@@ -1122,11 +1142,11 @@ canvas.addEventListener('mousemove', e => {
         return;
     }
 
-    if (isDraggingPOVYaw) {
+    if (drag.povYaw) {
         const rect = canvas.getBoundingClientRect();
         const mx = e.clientX - rect.left;
         // Drag sensitivity: ~0.3 deg per pixel
-        let nv = dragPOVYawStartVal + (mx - dragPOVYawStartX) * 0.3;
+        let nv = drag.povYawStartVal + (mx - drag.povYawStartX) * 0.3;
         // Clamp to slider range (camera mode restricts to camera FOV, audience allows full ±180)
         const slider = DOM['pov-yaw'];
         const limit = slider ? parseFloat(slider.max) : 180;
@@ -1149,8 +1169,8 @@ canvas.addEventListener('mousemove', e => {
         return;
     }
 
-    if (isDraggingElementPOV) {
-        const el = state.structuralElements.find(e => e.id === isDraggingElementPOVId);
+    if (drag.elementPOV) {
+        const el = state.structuralElements.find(e => e.id === drag.elementPOVId);
         if (el) {
             const rect = canvas.getBoundingClientRect();
             const mx = e.clientX - rect.left;
@@ -1177,7 +1197,7 @@ canvas.addEventListener('mousemove', e => {
             if (isSideWall) {
                 // Side wall: vertical mouse movement maps to position along wall
                 // But the scale changes with depth, so use approximate scale
-                delta = (my - dragElementPOVStartMouse) / (s / 12) / 12;
+                delta = (my - drag.elementPOVStartMouse) / (s / 12) / 12;
                 // Need to account for wall orientation
                 let invert = false;
                 if (dw === 'north') invert = el.wall !== 'west';
@@ -1187,7 +1207,7 @@ canvas.addEventListener('mousemove', e => {
                 if (invert) delta = -delta;
             } else {
                 // Front/back wall: horizontal mouse movement maps to position
-                delta = (mx - dragElementPOVStartMouse) / s;
+                delta = (mx - drag.elementPOVStartMouse) / s;
                 // Determine if position direction matches screen direction
                 let invert = false;
                 if (dw === 'south' || dw === 'west') invert = true;
@@ -1199,7 +1219,7 @@ canvas.addEventListener('mousemove', e => {
                 if (invert) delta = -delta;
             }
 
-            let newPos = Math.round((dragElementPOVStartPos + delta) * 4) / 4;
+            let newPos = Math.round((drag.elementPOVStartPos + delta) * 4) / 4;
             newPos = Math.max(0, Math.min(wallLen - el.width, newPos));
             el.position = newPos;
 
@@ -1213,8 +1233,8 @@ canvas.addEventListener('mousemove', e => {
         return;
     }
 
-    if (isResizingElementPOV) {
-        const el = state.structuralElements.find(e => e.id === resizeElementPOVId);
+    if (drag.resizingElementPOV) {
+        const el = state.structuralElements.find(e => e.id === drag.resizeElementPOVId);
         if (el) {
             const rect = canvas.getBoundingClientRect();
             const mx = e.clientX - rect.left;
@@ -1237,13 +1257,13 @@ canvas.addEventListener('mousemove', e => {
             else elZ = el.position;
 
             const s = 1000 / Math.max(0.5, vd - elZ);
-            const edge = resizeElementPOVEdge;
+            const edge = drag.resizeElementPOVEdge;
 
             if (edge === 'left' || edge === 'right') {
                 // Width resize — always screen-based:
                 //   drag right edge right (positive pixDelta) → wider
                 //   drag left edge left  (negative pixDelta) → wider
-                const pixDelta = mx - resizeElementPOVStartMouse;
+                const pixDelta = mx - drag.resizeElementPOVStartMouse;
                 const deltaFt = pixDelta / s;
 
                 // On inverted walls (south/west display, or back wall),
@@ -1256,18 +1276,18 @@ canvas.addEventListener('mousemove', e => {
                 let newWidth, newPos;
                 if (edge === 'right') {
                     // Right screen edge dragged: width always grows with positive deltaFt
-                    newWidth = resizeElementPOVStartWidth + deltaFt;
+                    newWidth = drag.resizeElementPOVStartWidth + deltaFt;
                     // On inverted walls, right screen edge = position edge, so position must adjust
                     newPos = invert
-                        ? resizeElementPOVStartPos - deltaFt
-                        : resizeElementPOVStartPos;
+                        ? drag.resizeElementPOVStartPos - deltaFt
+                        : drag.resizeElementPOVStartPos;
                 } else {
                     // Left screen edge dragged: width grows with negative deltaFt
-                    newWidth = resizeElementPOVStartWidth - deltaFt;
+                    newWidth = drag.resizeElementPOVStartWidth - deltaFt;
                     // On normal walls, left screen edge = position edge, so position must adjust
                     newPos = invert
-                        ? resizeElementPOVStartPos
-                        : resizeElementPOVStartPos + deltaFt;
+                        ? drag.resizeElementPOVStartPos
+                        : drag.resizeElementPOVStartPos + deltaFt;
                 }
 
                 newWidth = Math.round(newWidth * 4) / 4;
@@ -1280,25 +1300,18 @@ canvas.addEventListener('mousemove', e => {
                 // Height resize (top/bottom) — screen-based:
                 //   drag top edge up   (negative pixDelta) → taller
                 //   drag bottom edge down (positive pixDelta) → sill lowers / door shorter
-                const pixDelta = my - resizeElementPOVStartMouse;
+                const pixDelta = my - drag.resizeElementPOVStartMouse;
                 const deltaFt = -pixDelta * 12 / s / 12; // screen Y inverted vs world Y
 
                 if (edge === 'top') {
-                    let newHeight = Math.round((resizeElementPOVStartHeight + deltaFt) * 4) / 4;
+                    let newHeight = Math.round((drag.resizeElementPOVStartHeight + deltaFt) * 4) / 4;
                     newHeight = Math.max(2, Math.min(10, newHeight));
                     el.height = newHeight;
                 } else {
-                    // Bottom edge: for windows adjust sill, for doors adjust height
-                    if (el.type === 'window') {
-                        // Drag down = negative deltaFt = sill decreases (window bottom lowers)
-                        let newSill = Math.round((resizeElementPOVStartSill + deltaFt) * 4) / 4;
-                        newSill = Math.max(0, Math.min(8, newSill));
-                        el.sillHeight = newSill;
-                    } else {
-                        let newHeight = Math.round((resizeElementPOVStartHeight + deltaFt) * 4) / 4;
-                        newHeight = Math.max(2, Math.min(10, newHeight));
-                        el.height = newHeight;
-                    }
+                    // Bottom edge: adjust height
+                    let newHeight = Math.round((drag.resizeElementPOVStartHeight + deltaFt) * 4) / 4;
+                    newHeight = Math.max(2, Math.min(10, newHeight));
+                    el.height = newHeight;
                 }
             }
 
@@ -1311,14 +1324,14 @@ canvas.addEventListener('mousemove', e => {
         return;
     }
 
-    if (isDraggingTableId === null && !isDraggingCenter && !isDraggingCenter2 && !isDraggingMicPod && !isDraggingMicPod2 && !isDraggingDisplay && !isDraggingRotate && !isDraggingElement) return;
+    if (drag.tableId === null && !drag.center && !drag.center2 && !drag.micPod && !drag.micPod2 && !drag.display && !drag.rotate && !drag.element) return;
     const { mx, my, ppf, ox, oy, rw, rl, rx, ry, wt, tableX_px, ty2 } = getDragMetrics(e);
 
-    if (isDraggingTableId !== null) {
-        const t = state.tables.find(tbl => tbl.id === isDraggingTableId);
+    if (drag.tableId !== null) {
+        const t = state.tables.find(tbl => tbl.id === drag.tableId);
         if (t) {
-            const newCX = mx - dragTableOffset.x;
-            const newCY = my - dragTableOffset.y;
+            const newCX = mx - drag.tableOffset.x;
+            const newCY = my - drag.tableOffset.y;
 
             let nd = (newCY - ry - wt) / ppf - t.length / 2;
             let nx = (newCX - ox) / ppf;
@@ -1331,7 +1344,7 @@ canvas.addEventListener('mousemove', e => {
 
             // Detect wall boundary hits (before clamping)
             const rHW_b = state.roomWidth / 2;
-            dragBoundaryHit = {
+            drag.boundaryHit = {
                 north: nd < 0,
                 south: nd + t.length > state.roomLength,
                 west: nx < -(rHW_b - t.width / 2),
@@ -1341,11 +1354,19 @@ canvas.addEventListener('mousemove', e => {
             nd = Math.round(Math.max(0, Math.min(state.roomLength - t.length, nd)) * 2) / 2;
             nx = Math.round(Math.max(-(state.roomWidth / 2 - t.width / 2), Math.min(state.roomWidth / 2 - t.width / 2, nx)) * 2) / 2;
 
-            t.dist = nd; t.x = nx;
+            // Update table position — use setTableProp for selected table to keep flat state in sync
+            if (t.id === state.selectedTableId) {
+                setTableProp('tableDist', nd); setTableProp('tableX', nx);
+                DOM['table-dist'].value = nd; DOM['val-table-dist'].textContent = formatFtIn(nd);
+                DOM['table-x'].value = nx; DOM['val-table-x'].textContent = formatFtIn(nx);
+                updateSliderTrack(DOM['table-dist']); updateSliderTrack(DOM['table-x']);
+            } else {
+                t.dist = nd; t.x = nx;
+            }
 
             // Check for overlap with other tables (rotated AABB test)
             const rHW = state.roomWidth / 2;
-            dragTableOverlap = false;
+            drag.tableOverlap = false;
             const a1 = t.rotation * Math.PI / 180;
             const rw1h = (Math.abs(Math.cos(a1)) * t.width + Math.abs(Math.sin(a1)) * t.length) / 2;
             const rl1h = (Math.abs(Math.sin(a1)) * t.width + Math.abs(Math.cos(a1)) * t.length) / 2;
@@ -1357,30 +1378,22 @@ canvas.addEventListener('mousemove', e => {
                 const rl2h = (Math.abs(Math.sin(a2)) * o.width + Math.abs(Math.cos(a2)) * o.length) / 2;
                 const cx2 = rHW + o.x, cy2 = o.dist + o.length / 2;
                 if (Math.abs(cx1 - cx2) < rw1h + rw2h && Math.abs(cy1 - cy2) < rl1h + rl2h) {
-                    dragTableOverlap = true;
+                    drag.tableOverlap = true;
                     break;
                 }
             }
 
             // Compute distances from table edges to room walls
-            dragDistances = {
+            drag.distances = {
                 north: t.dist,
                 south: state.roomLength - t.dist - t.length,
                 west: rHW + t.x - t.width / 2,
                 east: rHW - t.x - t.width / 2,
                 displayWall: state.displayWall
             };
-
-            // Keep flat state in sync for the selected table
-            if (t.id === state.selectedTableId) {
-                state.tableDist = nd; state.tableX = nx;
-                DOM['table-dist'].value = nd; DOM['val-table-dist'].textContent = formatFtIn(nd);
-                DOM['table-x'].value = nx; DOM['val-table-x'].textContent = formatFtIn(nx);
-                updateSliderTrack(DOM['table-dist']); updateSliderTrack(DOM['table-x']);
-            }
             scheduleRender();
         }
-    } else if (isDraggingCenter) {
+    } else if (drag.center) {
         const selT = getSelectedTable();
         let nx = (mx - tableX_px) / ppf;
         let ny = (my - ty2) / ppf;
@@ -1388,7 +1401,7 @@ canvas.addEventListener('mousemove', e => {
         ny = Math.max(-selT.length / 2, Math.min(ny, selT.length / 2));
         state.centerPos = { x: nx, y: ny };
         scheduleRender();
-    } else if (isDraggingCenter2) {
+    } else if (drag.center2) {
         const selT = getSelectedTable();
         let nx = (mx - tableX_px) / ppf;
         let ny = (my - ty2) / ppf;
@@ -1396,7 +1409,7 @@ canvas.addEventListener('mousemove', e => {
         ny = Math.max(-selT.length / 2, Math.min(ny, selT.length / 2));
         state.center2Pos = { x: nx, y: ny };
         scheduleRender();
-    } else if (isDraggingMicPod) {
+    } else if (drag.micPod) {
         const selT = getSelectedTable();
         let nx = (mx - tableX_px) / ppf;
         let ny = (my - ty2) / ppf;
@@ -1404,7 +1417,7 @@ canvas.addEventListener('mousemove', e => {
         ny = Math.max(-selT.length / 2, Math.min(ny, selT.length / 2));
         state.micPodPos = { x: nx, y: ny };
         scheduleRender();
-    } else if (isDraggingMicPod2) {
+    } else if (drag.micPod2) {
         const selT = getSelectedTable();
         let nx = (mx - tableX_px) / ppf;
         let ny = (my - ty2) / ppf;
@@ -1412,10 +1425,10 @@ canvas.addEventListener('mousemove', e => {
         ny = Math.max(-selT.length / 2, Math.min(ny, selT.length / 2));
         state.micPod2Pos = { x: nx, y: ny };
         scheduleRender();
-    } else if (isDraggingDisplay) {
+    } else if (drag.display) {
         const dw = state.displayWall;
         const isH = (dw === 'north' || dw === 'south');
-        const newDispPos = isH ? (mx - dragDisplayOffsetX) : (my - dragDisplayOffsetX);
+        const newDispPos = isH ? (mx - drag.displayOffsetX) : (my - drag.displayOffsetX);
         const origin = isH ? ox : oy;
         let nx = (newDispPos - origin) / ppf;
         const displayWidthFt = state.displaySize * 0.8715 / 12;
@@ -1427,34 +1440,35 @@ canvas.addEventListener('mousemove', e => {
         DOM['val-display-offset-x'].textContent = formatFtIn(nx);
         updateSliderTrack(DOM['display-offset-x']);
         scheduleRender();
-    } else if (isDraggingRotate) {
-        const t = state.tables.find(tbl => tbl.id === isDraggingRotateTableId);
+    } else if (drag.rotate) {
+        const t = state.tables.find(tbl => tbl.id === drag.rotateTableId);
         if (t) {
             const tcx = ox + t.x * ppf;
             const tcy = ry + wt + t.dist * ppf + (t.length * ppf) / 2;
             const rawDeg = Math.atan2(mx - tcx, -(my - tcy)) * 180 / Math.PI;
             const normalized = ((rawDeg % 360) + 360) % 360;
             const snapped = Math.round(normalized / 10) * 10 % 360;
-            t.rotation = snapped;
             if (t.id === state.selectedTableId) {
-                state.tableRotation = snapped;
+                setTableProp('tableRotation', snapped);
                 DOM['table-rotation'].value = snapped;
                 DOM['val-table-rotation'].textContent = `${snapped}°`;
                 updateSliderTrack(DOM['table-rotation']);
+            } else {
+                t.rotation = snapped;
             }
             scheduleRender();
         }
-    } else if (isDraggingElement) {
-        const el = state.structuralElements.find(e => e.id === isDraggingElementId);
+    } else if (drag.element) {
+        const el = state.structuralElements.find(e => e.id === drag.elementId);
         if (el) {
             const isHoriz = (el.wall === 'north' || el.wall === 'south');
             const wallLen = getWallLength(el.wall);
             // Convert mouse position to wall-local position
             let newPos;
             if (isHoriz) {
-                newPos = (mx - dragElementOffset - rx) / ppf;
+                newPos = (mx - drag.elementOffset - rx) / ppf;
             } else {
-                newPos = (my - dragElementOffset - ry) / ppf;
+                newPos = (my - drag.elementOffset - ry) / ppf;
             }
             newPos = Math.round(Math.max(0, Math.min(wallLen - el.width, newPos)) * 4) / 4;
             el.position = newPos;
@@ -1472,7 +1486,7 @@ canvas.addEventListener('mousemove', e => {
 // ── Mouse up / leave: end drag ───────────────────────────────
 canvas.addEventListener('mouseup', () => {
     resetDrag();
-    canvas.style.cursor = isSpaceDown ? 'grab' : '';
+    canvas.style.cursor = drag.spaceDown ? 'grab' : '';
     serializeToHash();
 });
 
@@ -1529,16 +1543,16 @@ document.addEventListener('keydown', e => {
             !document.activeElement?.matches('input, textarea, select')) {
         if (state.viewMode === 'top') {
             e.preventDefault();
-            isSpaceDown = true;
-            if (!isPanning) canvas.style.cursor = 'grab';
+            drag.spaceDown = true;
+            if (!drag.panning) canvas.style.cursor = 'grab';
         }
     }
 });
 
 document.addEventListener('keyup', e => {
     if (e.code === 'Space') {
-        isSpaceDown = false;
-        isPanning = false;
+        drag.spaceDown = false;
+        drag.panning = false;
         if (state.viewMode === 'top') canvas.style.cursor = '';
     }
 });
@@ -1666,33 +1680,37 @@ _ctxMenu.addEventListener('click', e => {
     if (action === 'ctx-duplicate' && t) {
         duplicateTable(t.id);
     } else if (action === 'ctx-rotate' && t) {
-        t.rotation = (t.rotation + 90) % 360;
+        const newRotation = (t.rotation + 90) % 360;
         if (t.id === state.selectedTableId) {
-            state.tableRotation = t.rotation;
-            DOM['table-rotation'].value = t.rotation;
-            DOM['val-table-rotation'].textContent = `${t.rotation}°`;
-            updateSliderTrack(DOM['table-rotation']);
+            setTableProp('tableRotation', newRotation);
+        } else {
+            t.rotation = newRotation;
         }
+        DOM['table-rotation'].value = newRotation;
+        DOM['val-table-rotation'].textContent = `${newRotation}°`;
+        updateSliderTrack(DOM['table-rotation']);
         pushHistory('rotated table');
         scheduleRender();
     } else if (action === 'ctx-reset-rotation' && t) {
-        t.rotation = 0;
         if (t.id === state.selectedTableId) {
-            state.tableRotation = 0;
-            DOM['table-rotation'].value = 0;
-            DOM['val-table-rotation'].textContent = '0°';
-            updateSliderTrack(DOM['table-rotation']);
+            setTableProp('tableRotation', 0);
+        } else {
+            t.rotation = 0;
         }
+        DOM['table-rotation'].value = 0;
+        DOM['val-table-rotation'].textContent = '0°';
+        updateSliderTrack(DOM['table-rotation']);
         pushHistory('reset table rotation');
         scheduleRender();
     } else if (action === 'ctx-center' && t) {
-        t.x = 0;
         if (t.id === state.selectedTableId) {
-            state.tableX = 0;
-            DOM['table-x'].value = 0;
-            DOM['val-table-x'].textContent = formatFtIn(0);
-            updateSliderTrack(DOM['table-x']);
+            setTableProp('tableX', 0);
+        } else {
+            t.x = 0;
         }
+        DOM['table-x'].value = 0;
+        DOM['val-table-x'].textContent = formatFtIn(0);
+        updateSliderTrack(DOM['table-x']);
         pushHistory('centered table');
         scheduleRender();
     } else if (action === 'ctx-bring-front' && t) {

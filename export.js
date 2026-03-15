@@ -1,6 +1,9 @@
 // ── Download / Export / Import ────────────────────────────────
 
 function downloadLayout() {
+    const btn = DOM['download-btn'] || document.getElementById('download-btn');
+    if (btn) { btn.classList.add('btn-loading'); btn.disabled = true; }
+    try {
     // Build an offscreen canvas at full physical resolution
     const exportCanvas = document.createElement('canvas');
     exportCanvas.width = canvas.width;
@@ -22,10 +25,24 @@ function downloadLayout() {
     l.download = `AV-Room-Layout${nameSlug}-${timestamp}.png`;
     l.href = exportCanvas.toDataURL('image/png');
     l.click();
+    } catch (err) {
+        console.error('PNG export failed:', err);
+        showToast('PNG export failed: ' + err.message, 'error');
+    } finally {
+        if (btn) { btn.classList.remove('btn-loading'); btn.disabled = false; }
+    }
 }
 
 function downloadPDF() {
+    const btn = DOM['download-pdf-btn'] || document.getElementById('download-pdf-btn');
+    if (btn) { btn.classList.add('btn-loading'); btn.disabled = true; }
     try {
+    // Check jsPDF availability
+    if (!window.jspdf) {
+        showToast('PDF library failed to load. Check your internet connection and refresh.', 'error');
+        return;
+    }
+
     // 1. Build composite canvas (same pattern as downloadLayout)
     const exportCanvas = document.createElement('canvas');
     exportCanvas.width = canvas.width;
@@ -37,12 +54,6 @@ function downloadPDF() {
     exportCtx.drawImage(fgCanvas, 0, 0);
 
     const imgData = exportCanvas.toDataURL('image/jpeg', 0.92);
-
-    // 2. Create landscape A4 PDF
-    if (!window.jspdf) {
-        showToast('PDF library not loaded. Check your internet connection and try again.', 'error');
-        return;
-    }
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF('l', 'mm', 'a4');
 
@@ -52,7 +63,7 @@ function downloadPDF() {
     const margin = 10;
 
     // 3. Embed image scaled to fit with margins, leaving room below for text
-    const textAreaH = 52; // mm reserved for summary text at bottom
+    const textAreaH = 72; // mm reserved for summary text at bottom
     const imgAreaH = pageH - margin * 2 - textAreaH;
     const imgAreaW = pageW - margin * 2;
 
@@ -101,6 +112,15 @@ function downloadPDF() {
     doc.text(`Display:  ${dispStr}`, textX, textY); textY += lineH;
     doc.text(`Companion Devices:  ${companionStr}`, textX, textY); textY += lineH;
     doc.text(`Total Seating Capacity:  ${capacityStr}`, textX, textY); textY += lineH;
+
+    // Environment summary
+    const wallMatStr = Object.entries(state.wallMaterials)
+        .map(([w, m]) => `${w[0].toUpperCase()}: ${m.replace(/-/g, ' ')}`)
+        .join(', ');
+    doc.text(`Wall Materials:  ${wallMatStr}`, textX, textY); textY += lineH;
+    doc.text(`Surfaces:  ${state.ceilingType.replace(/-/g, ' ')} ceiling, ${state.floorMaterial} floor`, textX, textY); textY += lineH;
+    const rt60 = calcRT60().toFixed(1);
+    doc.text(`Est. RT60:  ${rt60}s  |  Lighting:  ${state.lightingType.replace(/-/g, ' ')}  |  HVAC Noise:  ${state.hvacNoise}`, textX, textY); textY += lineH;
     doc.text(`Date:  ${timestamp}`, textX, textY);
 
     // 5. Save
@@ -110,6 +130,8 @@ function downloadPDF() {
     } catch (err) {
         console.error('PDF export failed:', err);
         showToast('PDF export failed: ' + err.message, 'error');
+    } finally {
+        if (btn) { btn.classList.remove('btn-loading'); btn.disabled = false; }
     }
 }
 
@@ -147,9 +169,12 @@ function importConfig(event) {
                 return;
             }
             _suppressHistory = true;
-            Object.assign(state, snap);
+            for (const k of Object.keys(state)) { if (k in snap) state[k] = snap[k]; }
             if (snap.centerPos) state.centerPos = snap.centerPos;
             if (snap.center2Pos) state.center2Pos = snap.center2Pos;
+            if (state.structuralElements) {
+                state.structuralElements.forEach(el => validateStructuralElement(el));
+            }
             _suppressHistory = false;
             syncUIFromState();
             pushHistory('imported config');

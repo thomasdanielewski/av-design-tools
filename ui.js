@@ -54,7 +54,7 @@ function setBrand(brand) {
     updateCenterModeOptions();
 
     if (!_suppressHistory) pushHistory('changed brand');
-    render();
+    scheduleRender();
 }
 
 /** Set the number of displays (1 or 2) */
@@ -68,12 +68,12 @@ function setDisplayCount(n) {
             b.setAttribute('aria-pressed', isActive);
         });
     if (!_suppressHistory) pushHistory('changed display count');
-    render();
+    scheduleRender();
 }
 
 /** Set the display wall (north / south / east / west) */
 function setDisplayWall(w) {
-    if (animating) return;
+    if (isAnimating()) return;
     const oldWall = state.displayWall;
 
     state.displayWall = w;
@@ -131,12 +131,12 @@ function setMountPos(p) {
             b.setAttribute('aria-pressed', isActive);
         });
     if (!_suppressHistory) pushHistory('changed mount position');
-    render();
+    scheduleRender();
 }
 
 /** Switch between top-down and first-person POV */
 function setViewMode(m) {
-    if (animating) return;
+    if (isAnimating()) return;
 
     const changed = state.viewMode !== m;
     state.viewMode = m;
@@ -216,7 +216,7 @@ function setViewMode(m) {
 
 /** Set viewer posture (seated / standing) */
 function setPosture(p) {
-    if (animating) return;
+    if (isAnimating()) return;
     const oldEye = state.posture === 'seated' ? 48 : 65;
     state.posture = p;
     const newEye = p === 'seated' ? 48 : 65;
@@ -289,7 +289,7 @@ function setPovPerspective(p) {
     applyPovYawConstraint();
 
     if (!_suppressHistory) pushHistory('changed POV perspective');
-    render();
+    scheduleRender();
 }
 
 /** Set the unit system (imperial / metric) */
@@ -340,6 +340,12 @@ function expandGroup(el) {
         body.style.maxHeight = 'none';
         body.style.overflow = 'visible';
         body.removeEventListener('transitionend', handler);
+        setTimeout(() => {
+            const container = el.closest('.sidebar-content');
+            if (container && el.getBoundingClientRect().bottom > container.getBoundingClientRect().bottom) {
+                el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
+        }, 100);
     });
 }
 
@@ -353,6 +359,8 @@ function initGroups() {
     document.querySelectorAll('.control-group[aria-expanded]').forEach(el => {
         const body = el.querySelector('.control-group-body');
         if (!body) return;
+        // Suppress transitions so the initial state is instant (no flash on load).
+        body.style.transition = 'none';
         if (el.getAttribute('aria-expanded') === 'true') {
             body.style.maxHeight = 'none';
             body.style.opacity = '1';
@@ -364,6 +372,10 @@ function initGroups() {
             body.style.pointerEvents = 'none';
             el.style.paddingBottom = '0';
         }
+        // Force a synchronous reflow so the browser commits the state above,
+        // then immediately re-enable transitions for future interactions.
+        void body.offsetHeight;
+        body.style.transition = '';
     });
 }
 
@@ -398,6 +410,9 @@ function applyPreset(len, wid, targetBtn) {
 
 function toggleOverlay() {
     DOM['info-overlay'].classList.toggle('minimized');
+    const isMinimized = DOM['info-overlay'].classList.contains('minimized');
+    const tab = document.querySelector('.info-specs-tab');
+    if (tab) tab.textContent = isMinimized ? 'Specs \u25b8' : 'Specs \u25c2';
 }
 
 /** Toggle camera/mic overlay from the legend chips */

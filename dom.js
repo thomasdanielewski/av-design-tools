@@ -46,7 +46,7 @@ function cacheDOMRefs() {
         'mic-warning', 'mic-warning-btn', 'mic-warning-text',
         'micpod-placement-warning', 'micpod-placement-warning-text',
         'room-warning', 'room-warning-text',
-        'seating-density', 'seat-capacity-input', 'header-capacity',
+        'seating-density', 'seat-capacity-input', 'header-capacity', 'header-rt60',
         'header-room', 'header-device', 'mount-row', 'info-overlay',
         'info-content', 'info-title', 'undo-btn', 'redo-btn', 'share-btn',
         'legend-camera', 'legend-mic', 'download-btn', 'export-btn',
@@ -55,17 +55,21 @@ function cacheDOMRefs() {
         'val-table-height', 'val-table-dist', 'val-table-rotation', 'val-table-x',
         'val-display-size', 'val-display-elev', 'val-display-offset-x',
         'val-viewer-dist', 'val-viewer-offset', 'pov-yaw', 'val-pov-yaw',
-        'add-door-btn', 'add-window-btn', 'remove-element-btn',
+        'add-door-btn', 'remove-element-btn',
         'element-list', 'structural-controls',
         'element-wall', 'element-position', 'element-width',
-        'element-height', 'element-sill',
-        'element-height-row', 'element-sill-row',
+        'element-height',
+        'element-height-row',
         'val-element-position', 'val-element-width',
-        'val-element-height', 'val-element-sill',
+        'val-element-height',
         'swing-flip-row', 'flip-swing-btn',
         'unit-toggle', 'room-name',
         'measure-btn',
-        'pov-perspective-toggle'
+        'pov-perspective-toggle',
+        'wall-mat-north', 'wall-mat-south', 'wall-mat-east', 'wall-mat-west',
+        'ceiling-type', 'floor-material', 'lighting-type', 'hvac-noise',
+        'show-environment',
+        'env-advisory', 'env-advisory-text'
     ];
     ids.forEach(id => { DOM[id] = document.getElementById(id); });
 }

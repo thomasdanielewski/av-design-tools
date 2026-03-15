@@ -26,7 +26,14 @@ const state = {
     units: 'imperial',
     measurements: [],
     measureToolActive: false,
-    roomName: ''
+    roomName: '',
+    // Room environment
+    wallMaterials: { north: 'drywall', south: 'drywall', east: 'drywall', west: 'drywall' },
+    ceilingType: 'drop-tile',
+    floorMaterial: 'carpet',
+    lightingType: 'led',
+    hvacNoise: 'low',
+    showEnvironment: false
 };
 
 // ── Undo / Redo ──────────────────────────────────────────────
@@ -86,6 +93,20 @@ function updateUndoRedoBtns() {
     if (badge) {
         badge.textContent = history.length > 1 ? `${historyIndex + 1}/${history.length}` : '';
     }
+    renderHistoryPanel();
+}
+
+function renderHistoryPanel() {
+    const list = document.getElementById('history-list');
+    if (!list) return;
+    list.innerHTML = '';
+    for (let i = 0; i < history.length; i++) {
+        const li = document.createElement('li');
+        li.textContent = history[i].desc || `State ${i + 1}`;
+        li.dataset.index = i;
+        if (i === historyIndex) li.classList.add('current');
+        list.appendChild(li);
+    }
 }
 
 function applyHistorySnapshot(entry) {
@@ -93,6 +114,8 @@ function applyHistorySnapshot(entry) {
     Object.assign(state, entry.snap);
     syncUIFromState();
     _suppressHistory = false;
+    clearTimeout(_historyDebounceTimer);
+    invalidateThemeCache();
     render();
     updateUndoRedoBtns();
 }
@@ -137,7 +160,29 @@ const VALID_BRANDS = new Set(['neat', 'logitech']);
 
 // ── URL Hash Serialization ───────────────────────────────────
 
+function sanitizeStateForSerialization() {
+    const NUMERIC_DEFAULTS = {
+        roomLength: 20, roomWidth: 15, ceilingHeight: 9,
+        tableLength: 8, tableWidth: 4, tableDist: 4,
+        tableHeight: 30, tableX: 0, tableRotation: 0,
+        displayCount: 1, displaySize: 65, displayElev: 54, displayOffsetX: 0,
+        viewerDist: 12, viewerOffset: 0, povYaw: 0,
+    };
+    for (const [sk, def] of Object.entries(NUMERIC_DEFAULTS)) {
+        let v = state[sk];
+        if (v == null || (typeof v === 'number' && isNaN(v))) v = def;
+        const range = VALID_RANGES[sk];
+        if (range) v = Math.max(range.min, Math.min(range.max, v));
+        state[sk] = v;
+    }
+    for (const pos of [state.centerPos, state.center2Pos, state.micPodPos, state.micPod2Pos]) {
+        if (pos.x == null || isNaN(pos.x)) pos.x = 0;
+        if (pos.y == null || isNaN(pos.y)) pos.y = 0;
+    }
+}
+
 function serializeToHash() {
+    sanitizeStateForSerialization();
     const params = new URLSearchParams();
     for (const [k, sk] of Object.entries(HASH_KEYS)) {
         if (sk === 'centerPosX') { params.set(k, state.centerPos.x.toFixed(2)); continue; }
@@ -148,6 +193,12 @@ function serializeToHash() {
         if (sk === 'micPodPosY') { params.set(k, state.micPodPos.y.toFixed(2)); continue; }
         if (sk === 'micPod2PosX') { params.set(k, state.micPod2Pos.x.toFixed(2)); continue; }
         if (sk === 'micPod2PosY') { params.set(k, state.micPod2Pos.y.toFixed(2)); continue; }
+        if (sk === 'wallMatNorth') { params.set(k, state.wallMaterials.north); continue; }
+        if (sk === 'wallMatSouth') { params.set(k, state.wallMaterials.south); continue; }
+        if (sk === 'wallMatEast')  { params.set(k, state.wallMaterials.east); continue; }
+        if (sk === 'wallMatWest')  { params.set(k, state.wallMaterials.west); continue; }
+        if (sk === 'measurements') continue; // handled separately below
+        if (sk === 'roomName') { if (state.roomName) params.set(k, encodeURIComponent(state.roomName)); continue; }
         const v = state[sk];
         if (typeof v === 'boolean') params.set(k, v ? '1' : '0');
         else params.set(k, v);
@@ -159,13 +210,19 @@ function serializeToHash() {
     if (state.structuralElements && state.structuralElements.length > 0) {
         params.set('se', JSON.stringify(state.structuralElements));
     }
-    // Serialize measurements
+    // Serialize measurements as compact pipe-separated tuples
     if (state.measurements && state.measurements.length > 0) {
-        params.set('ms', JSON.stringify(state.measurements));
+        params.set('ms', state.measurements.map(m =>
+            [m.x1, m.y1, m.x2, m.y2].map(v => v.toFixed(2)).join(',')
+        ).join('|'));
+    }
+    const hashStr = params.toString();
+    if (('#' + hashStr).length > 2000) {
+        console.warn('[av-design-tools] URL hash exceeds 2000 chars (' + ('#' + hashStr).length + '). Share links may not work in all browsers.');
     }
     history.replaceState
-        ? window.history.replaceState(null, '', '#' + params.toString())
-        : (window.location.hash = params.toString());
+        ? window.history.replaceState(null, '', '#' + hashStr)
+        : (window.location.hash = hashStr);
 }
 
 function loadFromHash() {
@@ -184,6 +241,16 @@ function loadFromHash() {
             if (sk === 'micPodPosY') { state.micPodPos.y = parseFloat(raw); continue; }
             if (sk === 'micPod2PosX') { state.micPod2Pos.x = parseFloat(raw); continue; }
             if (sk === 'micPod2PosY') { state.micPod2Pos.y = parseFloat(raw); continue; }
+            if (sk === 'wallMatNorth') { if (VALID_WALL_MATERIALS.has(raw)) state.wallMaterials.north = raw; continue; }
+            if (sk === 'wallMatSouth') { if (VALID_WALL_MATERIALS.has(raw)) state.wallMaterials.south = raw; continue; }
+            if (sk === 'wallMatEast')  { if (VALID_WALL_MATERIALS.has(raw)) state.wallMaterials.east = raw; continue; }
+            if (sk === 'wallMatWest')  { if (VALID_WALL_MATERIALS.has(raw)) state.wallMaterials.west = raw; continue; }
+            if (sk === 'measurements') continue; // handled separately below
+            if (sk === 'ceilingType')       { if (VALID_CEILING_TYPES.has(raw)) state[sk] = raw; continue; }
+            if (sk === 'floorMaterial')     { if (VALID_FLOOR_MATERIALS.has(raw)) state[sk] = raw; continue; }
+            if (sk === 'lightingType')      { if (VALID_LIGHTING_TYPES.has(raw)) state[sk] = raw; continue; }
+            if (sk === 'hvacNoise')         { if (VALID_HVAC_NOISE.has(raw)) state[sk] = raw; continue; }
+            if (sk === 'roomName') { state.roomName = decodeURIComponent(raw); if (DOM['room-name']) DOM['room-name'].value = state.roomName; continue; }
             if (typeof state[sk] === 'boolean') { state[sk] = raw === '1'; continue; }
             if (typeof state[sk] === 'number') {
                 const range = VALID_RANGES[sk];
@@ -197,7 +264,7 @@ function loadFromHash() {
         }
         // Load tables array (or build from legacy flat state)
         if (params.has('tb')) {
-            try { state.tables = JSON.parse(params.get('tb')); } catch (_) {}
+            try { const parsed = JSON.parse(params.get('tb')); if (Array.isArray(parsed)) state.tables = parsed; } catch (_) {}
         } else {
             state.tables = [{ id: 1, shape: state.tableShape, length: state.tableLength,
                 width: state.tableWidth, x: state.tableX, dist: state.tableDist,
@@ -206,11 +273,27 @@ function loadFromHash() {
         if (params.has('stid')) state.selectedTableId = parseInt(params.get('stid')) || 1;
         // Load structural elements
         if (params.has('se')) {
-            try { state.structuralElements = JSON.parse(params.get('se')); } catch (_) {}
+            try {
+                state.structuralElements = JSON.parse(params.get('se'));
+                state.structuralElements.forEach(el => validateStructuralElement(el));
+            } catch (_) {}
         }
-        // Load measurements
+        // Load measurements from compact pipe-separated tuples
         if (params.has('ms')) {
-            try { state.measurements = JSON.parse(params.get('ms')); } catch (_) {}
+            try {
+                const raw = params.get('ms');
+                // Support both compact format (x1,y1,x2,y2|...) and legacy JSON
+                if (raw.startsWith('[')) {
+                    state.measurements = JSON.parse(raw);
+                } else {
+                    let nextId = 1;
+                    state.measurements = raw.split('|').map(tuple => {
+                        const [x1, y1, x2, y2] = tuple.split(',').map(Number);
+                        return { id: nextId++, x1, y1, x2, y2 };
+                    }).filter(m => !isNaN(m.x1) && !isNaN(m.y1) && !isNaN(m.x2) && !isNaN(m.y2));
+                }
+                syncMeasureNextId();
+            } catch (_) {}
         }
         // Ensure selectedTableId points to an existing table
         if (!state.tables.find(t => t.id === state.selectedTableId)) state.selectedTableId = state.tables[0].id;
@@ -232,6 +315,45 @@ function copyShareLink() {
     });
 }
 
+// ── Declarative UI Bindings ──────────────────────────────────
+// Each entry maps a state key to a DOM element for automatic sync.
+// Adding a new slider/select/checkbox only requires one entry here.
+
+const UI_BINDINGS = [
+    // Sliders: { type: 'slider', key, dom, val, unit }
+    { type: 'slider', key: 'roomLength',      dom: 'room-length',       val: 'val-room-length',       unit: 'ft'  },
+    { type: 'slider', key: 'roomWidth',        dom: 'room-width',        val: 'val-room-width',        unit: 'ft'  },
+    { type: 'slider', key: 'ceilingHeight',    dom: 'room-ceiling-height', val: 'val-room-ceiling-height', unit: 'ft' },
+    { type: 'slider', key: 'tableLength',      dom: 'table-length',      val: 'val-table-length',      unit: 'ft'  },
+    { type: 'slider', key: 'tableWidth',       dom: 'table-width',       val: 'val-table-width',       unit: 'ft'  },
+    { type: 'slider', key: 'tableHeight',      dom: 'table-height',      val: 'val-table-height',      unit: 'in'  },
+    { type: 'slider', key: 'tableDist',        dom: 'table-dist',        val: 'val-table-dist',        unit: 'ft'  },
+    { type: 'slider', key: 'tableRotation',    dom: 'table-rotation',    val: 'val-table-rotation',    unit: 'deg' },
+    { type: 'slider', key: 'tableX',           dom: 'table-x',           val: 'val-table-x',           unit: 'ft'  },
+    { type: 'slider', key: 'displaySize',      dom: 'display-size',      val: 'val-display-size',      unit: 'in'  },
+    { type: 'slider', key: 'displayElev',      dom: 'display-elev',      val: 'val-display-elev',      unit: 'in'  },
+    { type: 'slider', key: 'displayOffsetX',   dom: 'display-offset-x',  val: 'val-display-offset-x',  unit: 'ft'  },
+    { type: 'slider', key: 'viewerDist',       dom: 'viewer-dist',       val: 'val-viewer-dist',       unit: 'ft'  },
+    { type: 'slider', key: 'viewerOffset',     dom: 'viewer-offset',     val: 'val-viewer-offset',     unit: 'ft'  },
+    { type: 'slider', key: 'povYaw',           dom: 'pov-yaw',           val: 'val-pov-yaw',           unit: 'deg' },
+    // Selects: { type: 'select', key, dom }
+    { type: 'select', key: 'tableShape',       dom: 'table-shape'       },
+    { type: 'select', key: 'seatingDensity',   dom: 'seating-density'   },
+    { type: 'select', key: 'ceilingType',      dom: 'ceiling-type'      },
+    { type: 'select', key: 'floorMaterial',    dom: 'floor-material'    },
+    { type: 'select', key: 'lightingType',     dom: 'lighting-type'     },
+    { type: 'select', key: 'hvacNoise',        dom: 'hvac-noise'        },
+    // Checkboxes: { type: 'checkbox', key, dom }
+    { type: 'checkbox', key: 'showCamera',     dom: 'show-camera'       },
+    { type: 'checkbox', key: 'showMic',        dom: 'show-mic'          },
+    { type: 'checkbox', key: 'showGrid',       dom: 'show-grid'         },
+    { type: 'checkbox', key: 'showViewAngle',  dom: 'show-view-angle'   },
+    { type: 'checkbox', key: 'showSnap',       dom: 'show-snap'         },
+    { type: 'checkbox', key: 'showEnvironment', dom: 'show-environment' },
+    // Text inputs: { type: 'text', key, dom }
+    { type: 'text',   key: 'roomName',         dom: 'room-name'         },
+];
+
 // ── Sync UI Controls from State ──────────────────────────────
 // Used after undo/redo or config import to push state → DOM.
 
@@ -243,75 +365,48 @@ function syncUIFromState() {
     // Align circle slider ranges before setting values
     syncCircleSliderRanges();
 
-    // Sliders + value badges
-    const sliderMap = {
-        'room-length': ['roomLength', 'val-room-length', 'ft'],
-        'room-width': ['roomWidth', 'val-room-width', 'ft'],
-        'room-ceiling-height': ['ceilingHeight', 'val-room-ceiling-height', 'ft'],
-        'table-length': ['tableLength', 'val-table-length', 'ft'],
-        'table-width': ['tableWidth', 'val-table-width', 'ft'],
-        'table-height': ['tableHeight', 'val-table-height', 'in'],
-        'table-dist': ['tableDist', 'val-table-dist', 'ft'],
-        'table-rotation': ['tableRotation', 'val-table-rotation', 'deg'],
-        'table-x': ['tableX', 'val-table-x', 'ft'],
-        'display-size': ['displaySize', 'val-display-size', 'in'],
-        'display-elev': ['displayElev', 'val-display-elev', 'in'],
-        'display-offset-x': ['displayOffsetX', 'val-display-offset-x', 'ft'],
-        'viewer-dist': ['viewerDist', 'val-viewer-dist', 'ft'],
-        'viewer-offset': ['viewerOffset', 'val-viewer-offset', 'ft'],
-        'pov-yaw': ['povYaw', 'val-pov-yaw', 'deg'],
-    };
-    for (const [id, [sk, vid, unit]] of Object.entries(sliderMap)) {
-        const el = DOM[id];
-        if (el) el.value = state[sk];
-        const ve = DOM[vid];
-        if (ve) ve.textContent = formatValue(state[sk], unit);
+    // Declarative bindings — sliders, selects, checkboxes, text inputs
+    for (const b of UI_BINDINGS) {
+        const el = DOM[b.dom]; if (!el) continue;
+        if (b.type === 'slider') {
+            el.value = state[b.key]; updateSliderTrack(el);
+            if (b.val && DOM[b.val]) DOM[b.val].textContent = formatValue(state[b.key], b.unit);
+        } else if (b.type === 'select') {
+            el.value = state[b.key];
+        } else if (b.type === 'checkbox') {
+            el.checked = state[b.key];
+        } else if (b.type === 'text') {
+            el.value = state[b.key] || '';
+        }
     }
 
-    // Table shape
-    const ts = DOM['table-shape'];
-    if (ts) ts.value = state.tableShape;
+    // ── Special-case UI sync (one-off updates that don't fit the pattern) ──
 
-    // Seating density
-    const sd = DOM['seating-density'];
-    if (sd) sd.value = state.seatingDensity;
-
-    // Re-render table list
     renderTableList();
 
-    // Brand + video bar
     setBrand(state.brand);
     const vbSel = DOM['video-bar'];
     if (vbSel && EQUIPMENT[state.videoBar]) vbSel.value = state.videoBar;
 
-    // Mount position
     setMountPos(state.mountPos);
 
-    // Center mode select
     updateCenterModeOptions();
-    const cmVal = state.includeDualCenter ? 'dual' : (state.includeCenter ? 'single' : 'none');
-    DOM['center-mode'].value = cmVal;
+    DOM['center-mode'].value = state.includeDualCenter ? 'dual' : (state.includeCenter ? 'single' : 'none');
 
-    // Checkboxes
-    // Mic pod mode select
-    const mpVal = state.includeDualMicPod ? 'dual' : (state.includeMicPod ? 'single' : 'none');
-    if (DOM['micpod-mode']) DOM['micpod-mode'].value = mpVal;
-    DOM['show-camera'].checked = state.showCamera;
-    DOM['show-mic'].checked = state.showMic;
-    DOM['show-grid'].checked = state.showGrid;
-    DOM['show-view-angle'].checked = state.showViewAngle;
-    if (DOM['show-snap']) DOM['show-snap'].checked = state.showSnap;
-    if (DOM['room-name']) DOM['room-name'].value = state.roomName || '';
+    if (DOM['micpod-mode']) DOM['micpod-mode'].value = state.includeDualMicPod ? 'dual' : (state.includeMicPod ? 'single' : 'none');
 
-    // Display count, wall, posture, view mode, perspective
     setDisplayCount(state.displayCount);
     setDisplayWall(state.displayWall);
     setPosture(state.posture);
     setViewMode(state.viewMode);
     setPovPerspective(state.povPerspective);
 
-    // Structural elements
     syncStructuralUI();
+
+    // Wall materials (nested state)
+    ['north','south','east','west'].forEach(w => {
+        if (DOM['wall-mat-' + w]) DOM['wall-mat-' + w].value = state.wallMaterials[w];
+    });
 
     // Unit toggle
     DOM['unit-toggle']
