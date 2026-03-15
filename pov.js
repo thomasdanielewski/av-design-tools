@@ -388,7 +388,7 @@ function renderPOVCeiling(p) {
 
     // Ceiling light panels (LED troffers) — 1ft × 2ft rectangles on 4ft grid
     const panelFill  = isDark ? 'rgba(255,255,240,0.15)' : 'rgba(255,255,220,0.15)';
-    const glowColor  = isDark ? 'rgba(255,250,210,0.18)' : 'rgba(255,240,180,0.14)';
+    const glowColor  = isDark ? 'rgba(255,250,210,0.06)' : 'rgba(255,240,180,0.05)';
     ctx.save();
     const lightSp = 4;
     const lx0 = Math.ceil(-p.rHW / lightSp) * lightSp;
@@ -582,7 +582,7 @@ function renderPOVSeating(p) {
     if (state.seatingDensity === 'none') return;
 
     const isDark = p.isDark;
-    const seatStroke = 'none';
+    const seatStrokeW = 0.8;
     const SEATED_EYE = 48;
     const HEAD_W_IN = 4.5;   // horizontal half-width of head oval
     const HEAD_H_IN = 5.8;   // vertical half-height (taller than wide)
@@ -621,7 +621,7 @@ function renderPOVSeating(p) {
             const depthPast = Math.max(0, wz - p.vd);
             const maxDepth = Math.max(1, p.roomDepth - p.vd);
             const fogT = Math.min(1, depthPast / maxDepth);
-            const seatAlpha = (0.15 * (1 - fogT * FOG_STRENGTH)).toFixed(3);
+            const seatAlpha = (0.55 * (1 - fogT * FOG_STRENGTH)).toFixed(3);
 
             // Seat-status tint: green=covered, amber=out-of-range, red=blind spot/obstructed
             let r, g, b;
@@ -636,9 +636,11 @@ function renderPOVSeating(p) {
                 }
             } else {
                 // Neutral: desaturated bg-base for dark mode, warm gray for light mode
-                r = isDark ? 32 : 208; g = isDark ? 34 : 203; b = isDark ? 42 : 196;
+                r = isDark ? 160 : 80; g = isDark ? 165 : 78; b = isDark ? 180 : 90;
             }
             const seatFill = `rgba(${r},${g},${b},${seatAlpha})`;
+            const seatStrokeAlpha = Math.min(0.6, seatAlpha * 1.3).toFixed(3);
+            const seatStroke = `rgba(${r},${g},${b},${seatStrokeAlpha})`;
 
             function pt(heightIn, lateralFt) {
                 return {
@@ -680,7 +682,7 @@ function renderPOVSeating(p) {
             const bodyVerts = [];
             for (const [y, hw] of bodyProfile) bodyVerts.push(pt(y, hw));
             for (let i = bodyProfile.length - 1; i >= 0; i--) bodyVerts.push(pt(bodyProfile[i][0], -bodyProfile[i][1]));
-            drawPoly(bodyVerts, seatFill, seatStroke, 0);
+            drawPoly(bodyVerts, seatFill, seatStroke, seatStrokeW);
 
             // Head: oval (HEAD_H_IN tall × HEAD_W_IN wide), 12 points
             const headVerts = [];
@@ -691,7 +693,7 @@ function renderPOVSeating(p) {
                     (HEAD_W_IN * Math.cos(a)) / 12
                 ));
             }
-            drawPoly(headVerts, seatFill, seatStroke, 0);
+            drawPoly(headVerts, seatFill, seatStroke, seatStrokeW);
         });
     });
 }

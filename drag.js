@@ -835,12 +835,16 @@ const DRAG_IDLE = {
     annotationCreate: false, annotationCreateType: null,
     panning: false, spaceDown: false,
     panStartX: 0, panStartY: 0, panStartOffsetX: 0, panStartOffsetY: 0,
-    multiOriginals: null
+    multiOriginals: null,
+    multiAnnotationOriginals: null
 };
 let drag = { ...DRAG_IDLE };
 
 /** Multi-selection: set of table IDs highlighted via Shift+Click for group movement */
 let multiSelectedIds = new Set();
+
+/** Multi-selection: set of annotation IDs highlighted via Shift+Click for group movement */
+let multiSelectedAnnotationIds = new Set();
 
 let _selectedMeasureId = null;
 
@@ -1176,6 +1180,67 @@ canvas.addEventListener('mousedown', e => {
         // Not in annotation tool mode — check for selection/drag
         const hitA = hitTestAnnotation(mx, my);
         if (hitA) {
+            // Shift+click: toggle multi-selection without starting a drag
+            if (e.shiftKey) {
+                if (multiSelectedAnnotationIds.has(hitA.id)) {
+                    multiSelectedAnnotationIds.delete(hitA.id);
+                } else {
+                    multiSelectedAnnotationIds.add(hitA.id);
+                }
+                state.selectedAnnotationId = hitA.id;
+                syncAnnotationListUI();
+                syncAnnotationPropsUI();
+                scheduleRender();
+                return;
+            }
+
+            // Normal click on a multi-selected annotation: start group drag
+            if (multiSelectedAnnotationIds.size > 0 && multiSelectedAnnotationIds.has(hitA.id)) {
+                state.selectedAnnotationId = hitA.id;
+                syncAnnotationListUI();
+                syncAnnotationPropsUI();
+                drag.annotation = true;
+                drag.annotationId = hitA.id;
+                // Store original positions for all multi-selected annotations
+                drag.multiAnnotationOriginals = {};
+                for (const id of multiSelectedAnnotationIds) {
+                    const ann = state.annotations.find(a => a.id === id);
+                    if (!ann) continue;
+                    if (ann.type === 'freehand' && ann.points) {
+                        drag.multiAnnotationOriginals[id] = { points: ann.points.map(p => ({ x: p.x, y: p.y })) };
+                    } else if (ann.type === 'line' || ann.type === 'arrow') {
+                        drag.multiAnnotationOriginals[id] = { x: ann.x, y: ann.y, x2: ann.x2, y2: ann.y2 };
+                    } else {
+                        drag.multiAnnotationOriginals[id] = { x: ann.x, y: ann.y };
+                    }
+                }
+                // Compute drag offset from the clicked annotation
+                if (hitA.type === 'freehand' && hitA.points) {
+                    let cx = 0, cy = 0;
+                    for (const pt of hitA.points) { cx += pt.x; cy += pt.y; }
+                    cx /= hitA.points.length; cy /= hitA.points.length;
+                    const centPx = roomFtToCanvasPx(cx, cy);
+                    drag.annotationOffsetX = mx - centPx.cx;
+                    drag.annotationOffsetY = my - centPx.cy;
+                } else if (hitA.type === 'line' || hitA.type === 'arrow') {
+                    const midX = (hitA.x + hitA.x2) / 2;
+                    const midY = (hitA.y + hitA.y2) / 2;
+                    const midPx = roomFtToCanvasPx(midX, midY);
+                    drag.annotationOffsetX = mx - midPx.cx;
+                    drag.annotationOffsetY = my - midPx.cy;
+                } else {
+                    const p = roomFtToCanvasPx(hitA.x, hitA.y);
+                    drag.annotationOffsetX = mx - p.cx;
+                    drag.annotationOffsetY = my - p.cy;
+                }
+                canvas.style.cursor = 'grabbing';
+                pushHistory('moved annotations');
+                scheduleRender();
+                return;
+            }
+
+            // Normal click on non-multi-selected annotation: clear multi-selection, single drag
+            multiSelectedAnnotationIds.clear();
             state.selectedAnnotationId = hitA.id;
             syncAnnotationListUI();
             syncAnnotationPropsUI();
@@ -1296,10 +1361,10 @@ canvas.addEventListener('mousedown', e => {
     }
 
     // Clicked on empty space — clear multi-selection
-    if (multiSelectedIds.size > 0) {
-        multiSelectedIds.clear();
-        scheduleRender();
-    }
+    let cleared = false;
+    if (multiSelectedIds.size > 0) { multiSelectedIds.clear(); cleared = true; }
+    if (multiSelectedAnnotationIds.size > 0) { multiSelectedAnnotationIds.clear(); cleared = true; }
+    if (cleared) scheduleRender();
 });
 
 // ── Mouse move: update position while dragging ───────────────
@@ -1478,31 +1543,65 @@ canvas.addEventListener('mousemove', e => {
         const { mx, my } = getDragMetrics(e);
         const a = state.annotations.find(ann => ann.id === drag.annotationId);
         if (a) {
+            const newPosPx = { cx: mx - drag.annotationOffsetX, cy: my - drag.annotationOffsetY };
+            const newPosFt = canvasPxToRoomFt(newPosPx.cx, newPosPx.cy);
+
+            // Move the dragged annotation and compute cumulative delta from its original position
+            let cumulDeltaX = 0, cumulDeltaY = 0;
+            const primaryOrig = drag.multiAnnotationOriginals ? drag.multiAnnotationOriginals[drag.annotationId] : null;
+
             if (a.type === 'freehand' && a.points) {
-                // Move all points by delta from centroid
                 let cx = 0, cy = 0;
                 for (const pt of a.points) { cx += pt.x; cy += pt.y; }
                 cx /= a.points.length; cy /= a.points.length;
-                const centPx = roomFtToCanvasPx(cx, cy);
-                const newPx = { cx: mx - drag.annotationOffsetX, cy: my - drag.annotationOffsetY };
-                const newFt = canvasPxToRoomFt(newPx.cx, newPx.cy);
-                const deltaX = newFt.x - cx;
-                const deltaY = newFt.y - cy;
-                for (const pt of a.points) { pt.x += deltaX; pt.y += deltaY; }
+                const dx = newPosFt.x - cx, dy = newPosFt.y - cy;
+                for (const pt of a.points) { pt.x += dx; pt.y += dy; }
+                if (primaryOrig && primaryOrig.points) {
+                    let origCx = 0, origCy = 0;
+                    for (const pt of primaryOrig.points) { origCx += pt.x; origCy += pt.y; }
+                    origCx /= primaryOrig.points.length; origCy /= primaryOrig.points.length;
+                    cumulDeltaX = newPosFt.x - origCx;
+                    cumulDeltaY = newPosFt.y - origCy;
+                }
             } else if (a.type === 'line' || a.type === 'arrow') {
-                const midX = (a.x + a.x2) / 2;
-                const midY = (a.y + a.y2) / 2;
-                const newMidPx = { cx: mx - drag.annotationOffsetX, cy: my - drag.annotationOffsetY };
-                const newMidFt = canvasPxToRoomFt(newMidPx.cx, newMidPx.cy);
-                const deltaX = newMidFt.x - midX;
-                const deltaY = newMidFt.y - midY;
-                a.x += deltaX; a.y += deltaY;
-                a.x2 += deltaX; a.y2 += deltaY;
+                const midX = (a.x + a.x2) / 2, midY = (a.y + a.y2) / 2;
+                const dx = newPosFt.x - midX, dy = newPosFt.y - midY;
+                a.x += dx; a.y += dy; a.x2 += dx; a.y2 += dy;
+                if (primaryOrig && primaryOrig.x2 !== undefined) {
+                    const origMidX = (primaryOrig.x + primaryOrig.x2) / 2;
+                    const origMidY = (primaryOrig.y + primaryOrig.y2) / 2;
+                    cumulDeltaX = newPosFt.x - origMidX;
+                    cumulDeltaY = newPosFt.y - origMidY;
+                }
             } else {
-                const newPx = { cx: mx - drag.annotationOffsetX, cy: my - drag.annotationOffsetY };
-                const newFt = canvasPxToRoomFt(newPx.cx, newPx.cy);
-                a.x = newFt.x;
-                a.y = newFt.y;
+                if (primaryOrig) {
+                    cumulDeltaX = newPosFt.x - primaryOrig.x;
+                    cumulDeltaY = newPosFt.y - primaryOrig.y;
+                }
+                a.x = newPosFt.x;
+                a.y = newPosFt.y;
+            }
+
+            // Move all other multi-selected annotations by the cumulative delta from originals
+            if (drag.multiAnnotationOriginals && multiSelectedAnnotationIds.size > 0) {
+                for (const id of multiSelectedAnnotationIds) {
+                    if (id === drag.annotationId) continue;
+                    const other = state.annotations.find(ann => ann.id === id);
+                    const orig = drag.multiAnnotationOriginals[id];
+                    if (!other || !orig) continue;
+                    if (other.type === 'freehand' && other.points && orig.points) {
+                        for (let i = 0; i < other.points.length && i < orig.points.length; i++) {
+                            other.points[i].x = orig.points[i].x + cumulDeltaX;
+                            other.points[i].y = orig.points[i].y + cumulDeltaY;
+                        }
+                    } else if ((other.type === 'line' || other.type === 'arrow') && orig.x2 !== undefined) {
+                        other.x = orig.x + cumulDeltaX; other.y = orig.y + cumulDeltaY;
+                        other.x2 = orig.x2 + cumulDeltaX; other.y2 = orig.y2 + cumulDeltaY;
+                    } else {
+                        other.x = orig.x + cumulDeltaX;
+                        other.y = orig.y + cumulDeltaY;
+                    }
+                }
             }
             scheduleRender();
         }

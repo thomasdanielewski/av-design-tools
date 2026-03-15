@@ -2400,6 +2400,7 @@ function drawAnnotations(drawCtx, ppf) {
     for (const a of state.annotations) {
         const col = ANNOTATION_COLORS[a.color || 'blue'];
         const isSelected = a.id === state.selectedAnnotationId;
+        const isMultiSelected = multiSelectedAnnotationIds.has(a.id);
         const lineW = Math.max(1.5, ppf * 0.04);
 
         drawCtx.save();
@@ -2424,6 +2425,8 @@ function drawAnnotations(drawCtx, ppf) {
             if (isSelected) {
                 _drawAnnotationSelectionRing(drawCtx, p.cx, p.cy, w, h);
                 _drawAnnotationDimensions(drawCtx, p.cx, p.cy, w, h, a.w, a.h, col);
+            } else if (isMultiSelected) {
+                _drawAnnotationMultiSelectRing(drawCtx, p.cx, p.cy, w, h);
             }
         }
 
@@ -2454,6 +2457,8 @@ function drawAnnotations(drawCtx, ppf) {
             if (isSelected) {
                 _drawAnnotationSelectionRing(drawCtx, p.cx, p.cy, w, h);
                 _drawAnnotationDimensions(drawCtx, p.cx, p.cy, w, h, a.w, a.h, col);
+            } else if (isMultiSelected) {
+                _drawAnnotationMultiSelectRing(drawCtx, p.cx, p.cy, w, h);
             }
         }
 
@@ -2474,6 +2479,7 @@ function drawAnnotations(drawCtx, ppf) {
             drawCtx.setLineDash([4, 3]);
             drawCtx.stroke();
             if (isSelected) _drawAnnotationSelectionRing(drawCtx, cp.cx - rx, cp.cy - ry, rx * 2, ry * 2);
+            else if (isMultiSelected) _drawAnnotationMultiSelectRing(drawCtx, cp.cx - rx, cp.cy - ry, rx * 2, ry * 2);
         }
 
         else if (a.type === 'line') {
@@ -2486,8 +2492,8 @@ function drawAnnotations(drawCtx, ppf) {
             drawCtx.moveTo(p1.cx, p1.cy);
             drawCtx.lineTo(p2.cx, p2.cy);
             drawCtx.stroke();
-            if (isSelected) {
-                drawCtx.strokeStyle = 'rgba(255,255,255,0.5)';
+            if (isSelected || isMultiSelected) {
+                drawCtx.strokeStyle = isMultiSelected ? 'rgba(167, 139, 250, 0.7)' : 'rgba(255,255,255,0.5)';
                 drawCtx.lineWidth = lineW + 3;
                 drawCtx.setLineDash([3, 3]);
                 drawCtx.beginPath();
@@ -2523,8 +2529,8 @@ function drawAnnotations(drawCtx, ppf) {
                 drawCtx.closePath();
                 drawCtx.fill();
             }
-            if (isSelected) {
-                drawCtx.strokeStyle = 'rgba(255,255,255,0.5)';
+            if (isSelected || isMultiSelected) {
+                drawCtx.strokeStyle = isMultiSelected ? 'rgba(167, 139, 250, 0.7)' : 'rgba(255,255,255,0.5)';
                 drawCtx.lineWidth = lw + 3;
                 drawCtx.setLineDash([3, 3]);
                 drawCtx.beginPath();
@@ -2549,8 +2555,8 @@ function drawAnnotations(drawCtx, ppf) {
                 drawCtx.lineTo(pi.cx, pi.cy);
             }
             drawCtx.stroke();
-            if (isSelected) {
-                drawCtx.strokeStyle = 'rgba(255,255,255,0.5)';
+            if (isSelected || isMultiSelected) {
+                drawCtx.strokeStyle = isMultiSelected ? 'rgba(167, 139, 250, 0.7)' : 'rgba(255,255,255,0.5)';
                 drawCtx.lineWidth = lw + 3;
                 drawCtx.setLineDash([3, 3]);
                 drawCtx.beginPath();
@@ -2574,9 +2580,9 @@ function drawAnnotations(drawCtx, ppf) {
             drawCtx.fillStyle = col.fill;
             roundRect(drawCtx, p.cx - pad, p.cy - fontSize - pad, tw + pad * 2, fontSize + pad * 2, 3);
             drawCtx.fill();
-            if (isSelected) {
-                drawCtx.strokeStyle = 'rgba(255,255,255,0.5)';
-                drawCtx.lineWidth = 1.5;
+            if (isSelected || isMultiSelected) {
+                drawCtx.strokeStyle = isMultiSelected ? 'rgba(167, 139, 250, 0.7)' : 'rgba(255,255,255,0.5)';
+                drawCtx.lineWidth = isMultiSelected ? 2 : 1.5;
                 drawCtx.setLineDash([3, 3]);
                 drawCtx.stroke();
             }
@@ -2589,8 +2595,8 @@ function drawAnnotations(drawCtx, ppf) {
 
         drawCtx.restore();
 
-        // Delete button (only on hovered or selected annotation)
-        if (isSelected || a.id === _hoveredAnnotationId) {
+        // Delete button (only on hovered, selected, or multi-selected annotation)
+        if (isSelected || isMultiSelected || a.id === _hoveredAnnotationId) {
             _drawAnnotationDeleteBtn(drawCtx, a, ppf);
         }
 
@@ -2606,6 +2612,16 @@ function _drawAnnotationSelectionRing(drawCtx, x, y, w, h) {
     drawCtx.save();
     drawCtx.strokeStyle = 'rgba(255,255,255,0.5)';
     drawCtx.lineWidth = 1.5;
+    drawCtx.setLineDash([3, 3]);
+    drawCtx.strokeRect(x - 3, y - 3, w + 6, h + 6);
+    drawCtx.restore();
+}
+
+/** Draw multi-selection ring (purple) around an annotation bounding box */
+function _drawAnnotationMultiSelectRing(drawCtx, x, y, w, h) {
+    drawCtx.save();
+    drawCtx.strokeStyle = 'rgba(167, 139, 250, 0.7)';
+    drawCtx.lineWidth = 2;
     drawCtx.setLineDash([3, 3]);
     drawCtx.strokeRect(x - 3, y - 3, w + 6, h + 6);
     drawCtx.restore();

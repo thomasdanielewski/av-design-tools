@@ -547,11 +547,20 @@ document.getElementById('remove-annotation-btn')?.addEventListener('click', () =
     if (state.selectedAnnotationId) removeAnnotation(state.selectedAnnotationId);
 });
 
-// Annotation list click to select
+// Annotation list click to select (shift+click for multi-select)
 document.getElementById('annotation-list')?.addEventListener('click', e => {
     const pill = e.target.closest('.annotation-pill');
     if (!pill) return;
     const id = parseInt(pill.dataset.annotationId, 10);
+    if (e.shiftKey) {
+        if (multiSelectedAnnotationIds.has(id)) {
+            multiSelectedAnnotationIds.delete(id);
+        } else {
+            multiSelectedAnnotationIds.add(id);
+        }
+    } else {
+        multiSelectedAnnotationIds.clear();
+    }
     state.selectedAnnotationId = id;
     syncAnnotationListUI();
     syncAnnotationPropsUI();
@@ -596,8 +605,12 @@ document.addEventListener('keydown', e => {
             pushHistory('duplicated table');
         }
     }
-    // Delete selected annotation, measurement, or table
-    if (e.key === 'Delete' && state.selectedAnnotationId !== null) {
+    // Delete selected annotation(s), measurement, or table
+    if (e.key === 'Delete' && multiSelectedAnnotationIds.size > 0) {
+        const idsToRemove = [...multiSelectedAnnotationIds];
+        multiSelectedAnnotationIds.clear();
+        for (const id of idsToRemove) removeAnnotation(id);
+    } else if (e.key === 'Delete' && state.selectedAnnotationId !== null) {
         removeAnnotation(state.selectedAnnotationId);
     } else if (e.key === 'Delete' && _selectedMeasureId !== null) {
         removeMeasurement(_selectedMeasureId);
@@ -913,6 +926,7 @@ document.addEventListener('keydown', e => {
 
         case 'Escape':
             // Clear multi-selection if active
+            if (multiSelectedAnnotationIds.size > 0) { multiSelectedAnnotationIds.clear(); scheduleRender(); break; }
             if (multiSelectedIds.size > 0) { multiSelectedIds.clear(); scheduleRender(); break; }
             // Close export preview modal if open
             if (!document.getElementById('export-preview-overlay').hasAttribute('hidden')) {

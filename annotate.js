@@ -104,6 +104,7 @@ function removeAnnotation(id) {
     if (state.selectedAnnotationId === id) {
         state.selectedAnnotationId = null;
     }
+    multiSelectedAnnotationIds.delete(id);
     pushHistory('removed annotation');
     syncAnnotationListUI();
     syncAnnotationPropsUI();
@@ -320,7 +321,8 @@ function syncAnnotationListUI() {
     list.innerHTML = '';
     for (const a of state.annotations) {
         const pill = document.createElement('div');
-        pill.className = 'table-pill annotation-pill' + (a.id === state.selectedAnnotationId ? ' selected' : '');
+        const isMultiSel = multiSelectedAnnotationIds.has(a.id);
+        pill.className = 'table-pill annotation-pill' + (a.id === state.selectedAnnotationId ? ' selected' : '') + (isMultiSel ? ' multi-selected' : '');
         pill.dataset.annotationId = a.id;
         const label = a.type === 'text' || a.type === 'zone' ? (a.text || a.type) : a.type === 'freehand' ? 'draw' : a.type;
         const swatch = `<span class="ann-color-dot" style="background:${ANNOTATION_COLORS[a.color || 'blue'].stroke}"></span>`;
