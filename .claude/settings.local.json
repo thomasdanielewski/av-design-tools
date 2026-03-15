@@ -55,7 +55,15 @@
       "Bash(echo \"$class: FOUND in CSS\")",
       "Bash(else)",
       "Bash(echo \"$class: MISSING in CSS\")",
-      "Bash(fi)"
+      "Bash(fi)",
+      "Bash(grep -rn \"keydown\\\\|keyup\\\\|keypress\" /c/Users/Thomas/Documents/GitHub/av-design-tools/*.js)",
+      "Bash(wc -l /c/Users/Thomas/Documents/GitHub/av-design-tools/*.html /c/Users/Thomas/Documents/GitHub/av-design-tools/*.css)",
+      "Bash(ls -1 /c/Users/Thomas/Documents/GitHub/av-design-tools/*.js)",
+      "Bash(node -c init.js)",
+      "Bash(node -c draw.js)",
+      "Bash(node -c tables.js)",
+      "Bash(netstat -ano)",
+      "Bash(taskkill //F //IM node.exe)"
     ]
   }
 }

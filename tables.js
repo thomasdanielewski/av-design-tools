@@ -168,6 +168,7 @@ function duplicateTable(sourceId) {
 function removeTable() {
     if (state.tables.length <= 1) return;
     const idx = state.tables.findIndex(t => t.id === state.selectedTableId);
+    multiSelectedIds.delete(state.selectedTableId);
     state.tables.splice(idx, 1);
     const next = state.tables[Math.max(0, idx - 1)];
     state.selectedTableId = next.id;

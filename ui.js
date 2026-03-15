@@ -322,9 +322,10 @@ function collapseGroup(el) {
 function expandGroup(el) {
     el.setAttribute('aria-expanded', 'true');
     // Scroll into view after transition if needed
-    el.querySelector('.control-group-body')?.addEventListener('transitionend', function handler(e) {
-        if (e.propertyName !== 'grid-template-rows') return;
-        e.currentTarget.removeEventListener('transitionend', handler);
+    const body = el.querySelector('.control-group-body');
+    body?.addEventListener('transitionend', function handler(e) {
+        if (e.propertyName !== 'height') return;
+        body.removeEventListener('transitionend', handler);
         const container = el.closest('.sidebar-content');
         if (container && el.getBoundingClientRect().bottom > container.getBoundingClientRect().bottom) {
             el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -342,13 +343,6 @@ function initGroups() {
     document.querySelectorAll('.control-group[aria-expanded]').forEach(el => {
         const body = el.querySelector('.control-group-body');
         if (!body) return;
-        // Wrap inner contents in .control-group-body-inner for CSS grid transition
-        if (!body.querySelector('.control-group-body-inner')) {
-            const inner = document.createElement('div');
-            inner.className = 'control-group-body-inner';
-            while (body.firstChild) inner.appendChild(body.firstChild);
-            body.appendChild(inner);
-        }
     });
 }
 

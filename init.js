@@ -431,13 +431,25 @@ canvas.addEventListener('keydown', e => {
     const t = getSelectedTable();
     if (!t) return;
     let handled = false;
-    if (e.key === 'ArrowLeft')  { setTableProp('tableX', Math.max(-(state.roomWidth / 2 - t.width / 2), t.x - step)); handled = true; }
-    if (e.key === 'ArrowRight') { setTableProp('tableX', Math.min(state.roomWidth / 2 - t.width / 2, t.x + step)); handled = true; }
-    if (e.key === 'ArrowUp')    { setTableProp('tableDist', Math.max(0, t.dist - step)); handled = true; }
-    if (e.key === 'ArrowDown')  { setTableProp('tableDist', Math.min(state.roomLength - t.length, t.dist + step)); handled = true; }
+    let dx = 0, dy = 0;
+    if (e.key === 'ArrowLeft')  { dx = -step; handled = true; }
+    if (e.key === 'ArrowRight') { dx = step; handled = true; }
+    if (e.key === 'ArrowUp')    { dy = -step; handled = true; }
+    if (e.key === 'ArrowDown')  { dy = step; handled = true; }
     if (handled) {
         e.preventDefault();
+        // Move primary selected table
+        setTableProp('tableX', Math.max(-(state.roomWidth / 2 - t.width / 2), Math.min(state.roomWidth / 2 - t.width / 2, t.x + dx)));
+        setTableProp('tableDist', Math.max(0, Math.min(state.roomLength - t.length, t.dist + dy)));
         updateTableSliders();
+        // Also move other multi-selected tables
+        for (const id of multiSelectedIds) {
+            if (id === t.id) continue;
+            const other = state.tables.find(tbl => tbl.id === id);
+            if (!other) continue;
+            other.x = Math.round(Math.max(-(state.roomWidth / 2 - other.width / 2), Math.min(state.roomWidth / 2 - other.width / 2, other.x + dx)) * 2) / 2;
+            other.dist = Math.round(Math.max(0, Math.min(state.roomLength - other.length, other.dist + dy)) * 2) / 2;
+        }
         debouncedPushHistory();
         scheduleRender();
     }
@@ -591,6 +603,8 @@ document.addEventListener('keydown', e => {
             break;
 
         case 'Escape':
+            // Clear multi-selection if active
+            if (multiSelectedIds.size > 0) { multiSelectedIds.clear(); scheduleRender(); break; }
             // Close shortcut dialog if open
             if (document.getElementById('shortcut-help').open) {
                 document.getElementById('shortcut-help').close();

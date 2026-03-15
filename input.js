@@ -16,6 +16,13 @@ function syncCircleValue(changedKey, v) {
     }
 }
 
+/**
+ * Bind an <input type="range"> to a state key with formatted badge updates.
+ * @param {string} id         - DOM id of the slider element
+ * @param {string} sk         - State key to write the parsed value into
+ * @param {string} vl         - DOM id of the value badge element
+ * @param {boolean} [triggersBg=false] - If true, also re-renders the background canvas layer
+ */
 function bindSlider(id, sk, vl, triggersBg = false) {
     const unit = (sk === 'displaySize' || sk === 'displayElev' || sk === 'tableHeight') ? 'in'
         : (sk === 'tableRotation' || sk === 'povYaw') ? 'deg'
@@ -39,6 +46,12 @@ function bindSlider(id, sk, vl, triggersBg = false) {
     });
 }
 
+/**
+ * Bind a <select> element to a state key, handling special cases
+ * for table shape changes and video bar auto-sizing.
+ * @param {string} id - DOM id of the select element
+ * @param {string} sk - State key to write the selected value into
+ */
 function bindSelect(id, sk) {
     (DOM[id] || document.getElementById(id)).addEventListener('change', function () {
         state[sk] = this.value;

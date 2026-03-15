@@ -96,7 +96,20 @@ function drawDisplayPOV(x, y, w, h, label) {
  * @param {object} device  - EQUIPMENT entry
  * @param {number} facingAngle - Angle the device faces (radians)
  */
-/** Shared helper: draw a single coverage arc (full-circle or sector). */
+/**
+ * Draw a single coverage arc (full-circle or sector) for a device overlay.
+ * @param {CanvasRenderingContext2D} drawCtx - Canvas 2D context
+ * @param {number} devX        - Device center X in canvas px
+ * @param {number} devY        - Device center Y in canvas px
+ * @param {number} radius      - Arc radius in canvas px
+ * @param {number} facingAngle - Direction the device faces (radians)
+ * @param {number} arcDeg      - Arc sweep in degrees (>=315 draws full circle)
+ * @param {string} fillColor   - CSS fill color
+ * @param {string} strokeColor - CSS stroke color
+ * @param {number} lineWidth   - Stroke width in px
+ * @param {number[]} dashPattern - Line dash array (empty for solid)
+ * @param {Array<[number,string]>|null} gradientStops - Radial gradient stops, or null for flat fill
+ */
 function _drawCoverageArc(drawCtx, devX, devY, radius, facingAngle, arcDeg, fillColor, strokeColor, lineWidth, dashPattern, gradientStops) {
     // Set fill: radial gradient heatmap or flat color
     if (gradientStops) {
@@ -765,6 +778,7 @@ function drawTable(drawCtx, ox, ry, wallThick, ppf) {
 
     state.tables.forEach(t => {
         const isSelected = t.id === state.selectedTableId;
+        const isMultiSelected = multiSelectedIds.has(t.id);
         const tl = t.length * ppf;
         const tw = t.width * ppf;
         const tcx = ox + t.x * ppf;
@@ -775,10 +789,10 @@ function drawTable(drawCtx, ox, ry, wallThick, ppf) {
         drawCtx.save();
         drawCtx.translate(tcx, tcy);
         drawCtx.rotate(angle);
-        drawCtx.globalAlpha = isSelected ? 1.0 : 0.55;
+        drawCtx.globalAlpha = (isSelected || isMultiSelected) ? 1.0 : 0.55;
         drawCtx.fillStyle = cc().surface;
-        drawCtx.strokeStyle = cc().tableStroke;
-        drawCtx.lineWidth = isSelected ? 1.5 : 1;
+        drawCtx.strokeStyle = isMultiSelected ? '#a78bfa' : cc().tableStroke;
+        drawCtx.lineWidth = isMultiSelected ? 2.5 : (isSelected ? 1.5 : 1);
 
         if (t.shape === 'rectangular') {
             roundRect(drawCtx, x0, y0, tw, tl, 6);
@@ -803,7 +817,7 @@ function drawTable(drawCtx, ox, ry, wallThick, ppf) {
 
         // Chairs around the table
         const chairs = getChairPositions(t);
-        drawChairsForTable(drawCtx, chairs, ppf, isSelected ? 1.0 : 0.55);
+        drawChairsForTable(drawCtx, chairs, ppf, (isSelected || isMultiSelected) ? 1.0 : 0.55);
 
         // Label
         drawCtx.font = `400 ${Math.max(7, ppf * 0.28)}px 'JetBrains Mono', monospace`;

@@ -787,9 +787,13 @@ const DRAG_IDLE = {
     resizeElementPOVStartHeight: 0, resizeElementPOVStartSill: 0, resizeElementPOVStartPos: 0,
     measurement: false, measureId: null, measureOffsetX: 0, measureOffsetY: 0,
     panning: false, spaceDown: false,
-    panStartX: 0, panStartY: 0, panStartOffsetX: 0, panStartOffsetY: 0
+    panStartX: 0, panStartY: 0, panStartOffsetX: 0, panStartOffsetY: 0,
+    multiOriginals: null
 };
 let drag = { ...DRAG_IDLE };
+
+/** Multi-selection: set of table IDs highlighted via Shift+Click for group movement */
+let multiSelectedIds = new Set();
 
 let _selectedMeasureId = null;
 
@@ -898,8 +902,44 @@ function startRotateDrag(selT) {
     pushHistory('rotated table');
 }
 
-function startTableDrag(mx, my, metrics, t) {
+function startTableDrag(mx, my, metrics, t, isShift) {
     const { ox, ry, wt, ppf } = metrics;
+
+    // Shift+click: toggle multi-selection without starting a drag
+    if (isShift) {
+        if (multiSelectedIds.has(t.id)) {
+            multiSelectedIds.delete(t.id);
+        } else {
+            multiSelectedIds.add(t.id);
+        }
+        // Also select this table in the sidebar
+        if (t.id !== state.selectedTableId) selectTable(t.id);
+        scheduleRender();
+        return;
+    }
+
+    // Normal click: if table is in multi-selection, start group drag
+    if (multiSelectedIds.size > 0 && multiSelectedIds.has(t.id)) {
+        // Make sure dragged table is the primary selection
+        if (t.id !== state.selectedTableId) selectTable(t.id);
+        drag.tableId = t.id;
+        drag.tableGhost = { x: t.x, dist: t.dist, rotation: t.rotation, shape: t.shape, width: t.width, length: t.length };
+        // Store original positions for all multi-selected tables (for group offset)
+        drag.multiOriginals = {};
+        for (const id of multiSelectedIds) {
+            const mt = state.tables.find(tbl => tbl.id === id);
+            if (mt) drag.multiOriginals[id] = { x: mt.x, dist: mt.dist };
+        }
+        const tcx = ox + t.x * ppf;
+        const tcy = ry + wt + t.dist * ppf + (t.length * ppf) / 2;
+        drag.tableOffset = { x: mx - tcx, y: my - tcy };
+        canvas.style.cursor = 'grabbing';
+        pushHistory('moved tables');
+        return;
+    }
+
+    // Normal click on non-multi-selected table: clear multi-selection, single drag
+    multiSelectedIds.clear();
     if (t.id !== state.selectedTableId) selectTable(t.id);
     if (!_contextMenuHintShown) { _contextMenuHintShown = true; showToast('Tip: Right-click table for more options'); }
     drag.tableId = t.id;
@@ -1044,7 +1084,7 @@ canvas.addEventListener('mousedown', e => {
     for (let i = state.tables.length - 1; i >= 0; i--) {
         const t = state.tables[i];
         if (isPointInTableHitbox(mx, my, t, ox, ry, wt, ppf)) {
-            startTableDrag(mx, my, metrics, t); return;
+            startTableDrag(mx, my, metrics, t, e.shiftKey); return;
         }
     }
 
@@ -1053,6 +1093,12 @@ canvas.addEventListener('mousedown', e => {
         if (hitTestStructuralElement(mx, my, el, metrics.rx, ry, metrics.rw, metrics.rl, ppf, wt)) {
             startElementDrag(mx, my, metrics, el); return;
         }
+    }
+
+    // Clicked on empty space — clear multi-selection
+    if (multiSelectedIds.size > 0) {
+        multiSelectedIds.clear();
+        scheduleRender();
     }
 });
 
@@ -1362,6 +1408,25 @@ canvas.addEventListener('mousemove', e => {
                 updateSliderTrack(DOM['table-dist']); updateSliderTrack(DOM['table-x']);
             } else {
                 t.dist = nd; t.x = nx;
+            }
+
+            // Group move: apply same delta to all other multi-selected tables
+            if (drag.multiOriginals && multiSelectedIds.size > 0) {
+                const origPrimary = drag.multiOriginals[t.id];
+                if (origPrimary) {
+                    const deltaX = t.x - origPrimary.x;
+                    const deltaDist = t.dist - origPrimary.dist;
+                    for (const id of multiSelectedIds) {
+                        if (id === t.id) continue;
+                        const orig = drag.multiOriginals[id];
+                        const other = state.tables.find(tbl => tbl.id === id);
+                        if (!orig || !other) continue;
+                        other.x = Math.round(Math.max(-(state.roomWidth / 2 - other.width / 2),
+                            Math.min(state.roomWidth / 2 - other.width / 2, orig.x + deltaX)) * 2) / 2;
+                        other.dist = Math.round(Math.max(0,
+                            Math.min(state.roomLength - other.length, orig.dist + deltaDist)) * 2) / 2;
+                    }
+                }
             }
 
             // Check for overlap with other tables (rotated AABB test)

@@ -33,6 +33,13 @@ let _pov = {};
 
 // ── Projection helpers (read from module-scope _pov) ──────────
 
+/**
+ * Transform a world-space point into camera-relative coordinates.
+ * @param {number} x   - World X (lateral offset in feet)
+ * @param {number} yIn - World Y (vertical height in inches)
+ * @param {number} z   - World Z (depth from display wall in feet)
+ * @returns {{ right: number, up: number, forward: number }} Camera-space axes
+ */
 function toCam(x, yIn, z) {
     const dx = x - _pov.vo;
     const dz = z - _pov.vd;
@@ -43,6 +50,13 @@ function toCam(x, yIn, z) {
     };
 }
 
+/**
+ * Project a world-space point to 2D screen coordinates via perspective division.
+ * @param {number} x   - World X (lateral offset in feet)
+ * @param {number} yIn - World Y (vertical height in inches)
+ * @param {number} z   - World Z (depth from display wall in feet)
+ * @returns {{ x: number, y: number }|null} Screen coords, or null if behind the near plane
+ */
 function proj(x, yIn, z) {
     const c = toCam(x, yIn, z);
     if (c.forward < _pov.NEAR) return null;
