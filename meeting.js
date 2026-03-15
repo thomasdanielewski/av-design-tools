@@ -425,6 +425,7 @@ function renderMeetingPreviewPanel(meetingData) {
     const panelW = panel ? panel.clientWidth : 640;
     const pw = panelW;
     const ph = Math.round(pw * 9 / 16);
+    if (pw < 1 || ph < 1) return; // panel not yet visible
     const dpr = Math.min(window.devicePixelRatio || 2, 2);
     if (previewCanvas.width !== pw * dpr || previewCanvas.height !== ph * dpr) {
         previewCanvas.width = pw * dpr;
@@ -995,6 +996,7 @@ function _renderGridView(pCtx, pw, ph, eq, camX, camY, facingAngle, visible, isD
  * plus conference table and back wall for realism.
  */
 function _renderRoomScene(pCtx, rx, ry, rw, rh, eq, camX, camY, facingAngle, occupied, isDark, highlightSeat, overrideFOV, panOffset) {
+    if (rw < 1 || rh < 1) return; // guard against invalid dimensions during animation
     const fullFOV = Math.min(eq.cameraFOV || 90, 170);
     const hFOV = overrideFOV || fullFOV;
     const focalLen = (rw / 2) / Math.tan(hFOV * Math.PI / 360);

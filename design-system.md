@@ -29,9 +29,13 @@
 | `input.js` | Slider binding, form control handlers | New form controls |
 | `ui.js` | UI state management, brand switching, presets | UI logic |
 | `tables.js` | Multi-table management, arrangements | Table features |
+| `structural.js` | Structural elements (doors, windows) | Structural features |
+| `measure.js` | Measurement tool, dimension lines | Measurement features |
+| `annotate.js` | Annotation system (text, shapes, freehand) | Annotation features |
 | `draw.js` | Canvas drawing primitives | New canvas shapes |
 | `render.js` | Main rendering orchestration | Render pipeline changes |
-| `pov.js` | Point-of-view (first-person) calculations | POV features |
+| `meeting.js` | Meeting mode analysis, seat classification | Meeting features |
+| `pov.js` | Point-of-view (first-person) rendering | POV features |
 | `drag.js` | Interactive table dragging, pan/zoom | Interaction changes |
 | `export.js` | PNG download, JSON import/export | Export features |
 | `init.js` | Event binding, initialization (loaded with `defer`) | New event listeners |

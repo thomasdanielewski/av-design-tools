@@ -248,78 +248,22 @@ function renderPOVWalls(p) {
     else if (p.dw === 'east')  { leftWall = 'north'; rightWall = 'south'; }
     else                       { leftWall = 'south'; rightWall = 'north'; }
 
-    function getWallFill(compassWall) {
-        if (!state.showEnvironment) return defaultWallFill;
-        const mat = state.wallMaterials[compassWall];
-        const tints = {
-            'drywall':        'rgba(160,160,170,0.06)',
-            'glass':          'rgba(140,220,240,0.04)',
-            'wood':           'rgba(160,120,60,0.10)',
-            'concrete':       'rgba(100,100,110,0.10)',
-            'acoustic-panel': 'rgba(80,180,100,0.10)'
-        };
-        return tints[mat] || defaultWallFill;
-    }
-
     drawPoly([
         { x: -p.rHW, yIn: 0, z: 0 }, { x: p.rHW, yIn: 0, z: 0 },
         { x: p.rHW, yIn: p.ceilHI, z: 0 }, { x: -p.rHW, yIn: p.ceilHI, z: 0 }
-    ], getWallFill(p.dw), wallStroke, 0);
+    ], defaultWallFill, wallStroke, 0);
     drawPoly([
         { x: -p.rHW, yIn: 0, z: p.roomDepth }, { x: p.rHW, yIn: 0, z: p.roomDepth },
         { x: p.rHW, yIn: p.ceilHI, z: p.roomDepth }, { x: -p.rHW, yIn: p.ceilHI, z: p.roomDepth }
-    ], getWallFill(oppWall), wallStroke, 0);
+    ], defaultWallFill, wallStroke, 0);
     drawPoly([
         { x: -p.rHW, yIn: 0, z: 0 }, { x: -p.rHW, yIn: 0, z: p.roomDepth },
         { x: -p.rHW, yIn: p.ceilHI, z: p.roomDepth }, { x: -p.rHW, yIn: p.ceilHI, z: 0 }
-    ], getWallFill(leftWall), wallStroke, 0);
+    ], defaultWallFill, wallStroke, 0);
     drawPoly([
         { x: p.rHW, yIn: 0, z: 0 }, { x: p.rHW, yIn: 0, z: p.roomDepth },
         { x: p.rHW, yIn: p.ceilHI, z: p.roomDepth }, { x: p.rHW, yIn: p.ceilHI, z: 0 }
-    ], getWallFill(rightWall), wallStroke, 0);
-
-    // Glass wall overlays
-    function drawGlassOverlay(verts) {
-        const pts = clipAndProject(verts);
-        if (!pts || pts.length < 3) return;
-        ctx.save();
-        ctx.fillStyle = 'rgba(180,225,245,0.04)';
-        ctx.beginPath();
-        ctx.moveTo(pts[0].x, pts[0].y);
-        for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
-        ctx.closePath();
-        ctx.fill();
-        ctx.strokeStyle = 'rgba(160,215,235,0.18)';
-        ctx.lineWidth = 1;
-        ctx.setLineDash([8, 6]);
-        ctx.stroke();
-        ctx.restore();
-    }
-
-    if (state.wallMaterials[p.dw] === 'glass') {
-        drawGlassOverlay([
-            { x: -p.rHW, yIn: 0, z: 0 }, { x: p.rHW, yIn: 0, z: 0 },
-            { x: p.rHW, yIn: p.ceilHI, z: 0 }, { x: -p.rHW, yIn: p.ceilHI, z: 0 }
-        ]);
-    }
-    if (state.wallMaterials[oppWall] === 'glass') {
-        drawGlassOverlay([
-            { x: -p.rHW, yIn: 0, z: p.roomDepth }, { x: p.rHW, yIn: 0, z: p.roomDepth },
-            { x: p.rHW, yIn: p.ceilHI, z: p.roomDepth }, { x: -p.rHW, yIn: p.ceilHI, z: p.roomDepth }
-        ]);
-    }
-    if (state.wallMaterials[leftWall] === 'glass') {
-        drawGlassOverlay([
-            { x: -p.rHW, yIn: 0, z: 0 }, { x: -p.rHW, yIn: 0, z: p.roomDepth },
-            { x: -p.rHW, yIn: p.ceilHI, z: p.roomDepth }, { x: -p.rHW, yIn: p.ceilHI, z: 0 }
-        ]);
-    }
-    if (state.wallMaterials[rightWall] === 'glass') {
-        drawGlassOverlay([
-            { x: p.rHW, yIn: 0, z: 0 }, { x: p.rHW, yIn: 0, z: p.roomDepth },
-            { x: p.rHW, yIn: p.ceilHI, z: p.roomDepth }, { x: p.rHW, yIn: p.ceilHI, z: 0 }
-        ]);
-    }
+    ], defaultWallFill, wallStroke, 0);
 
     // Wall ambient occlusion
     const isDark = p.isDark;

@@ -1804,6 +1804,14 @@ body.animating #fg-canvas {
     filter: saturate(0);
 }
 
+.toolbar-btn {
+    width: auto;
+    padding: 0 10px;
+    font-size: 11px;
+    font-family: var(--font-mono);
+    gap: 5px;
+}
+
 .measure-btn.active,
 .measure-btn.active:hover {
     background: var(--accent);
@@ -2430,100 +2438,6 @@ body.animating #fg-canvas {
 .room-warning-dot {
     background: var(--error-red);
     box-shadow: 0 0 6px rgba(239, 68, 68, 0.4);
-}
-
-
-/* ══════════════════════════════════════════════════════════════
-   ENVIRONMENT ADVISORY — blue/cyan
-   ══════════════════════════════════════════════════════════════ */
-.env-section-label {
-    font-family: var(--font-mono);
-    font-size: var(--text-xs);
-    text-transform: uppercase;
-    letter-spacing: 0.8px;
-    color: var(--text-secondary);
-    margin: 4px 0 2px;
-}
-
-.env-wall-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 2px 12px;
-}
-
-.env-advisory {
-    display: none;
-    margin-top: var(--space-md);
-    padding: 12px 14px;
-    border: none;
-    border-radius: 0 10px 10px 0;
-    background: rgba(56, 189, 248, 0.04);
-    border-left: 3px solid transparent;
-    border-image: linear-gradient(to top, #38bdf8, transparent) 1;
-    animation: fadeIn 0.4s var(--ease-out) both;
-}
-
-.env-advisory.visible {
-    display: block;
-}
-
-.env-advisory-header {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    font-family: var(--font-mono);
-    font-size: var(--text-xs);
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.8px;
-    color: #38bdf8;
-    background: rgba(56, 189, 248, 0.08);
-    border-radius: var(--radius-xs);
-    padding: 2px 8px;
-    margin-left: -8px;
-    margin-bottom: 6px;
-}
-
-.env-advisory-dot {
-    width: 5px;
-    height: 5px;
-    border-radius: 50%;
-    background: #38bdf8;
-    box-shadow: 0 0 6px rgba(56, 189, 248, 0.4);
-}
-
-.env-advisory-text {
-    font-size: var(--text-sm);
-    color: var(--text-secondary);
-    line-height: 1.5;
-}
-
-.env-advisory-line {
-    padding: 3px 0;
-}
-
-.env-advisory-line.env-sev-warning {
-    color: var(--warning-amber);
-}
-
-.env-advisory-line.env-sev-caution {
-    color: rgba(255, 255, 255, 0.75);
-}
-
-.env-advisory-line.env-sev-info {
-    color: var(--text-secondary);
-}
-
-[data-theme="light"] .env-advisory {
-    background: rgba(56, 189, 248, 0.06);
-}
-
-[data-theme="light"] .env-advisory-header {
-    background: rgba(56, 189, 248, 0.10);
-}
-
-[data-theme="light"] .env-advisory-line.env-sev-caution {
-    color: rgba(0, 0, 0, 0.65);
 }
 
 
@@ -3575,4 +3489,114 @@ select:focus-visible {
         --text-secondary: rgba(0, 0, 0, 0.72);
         --text-tertiary: rgba(0, 0, 0, 0.50);
     }
+}
+
+/* ── Annotation Tool ────────────────────────────────────────── */
+
+.annotation-tools {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+.annotation-color-swatches {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+}
+
+.ann-swatch {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    cursor: pointer;
+    border: 2px solid transparent;
+    transition: border-color 0.15s, transform 0.15s;
+}
+
+.ann-swatch:hover {
+    transform: scale(1.2);
+}
+
+.ann-swatch.active {
+    border-color: var(--text-primary);
+    box-shadow: 0 0 0 1px var(--bg-primary);
+}
+
+.ann-color-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    margin-right: 4px;
+    flex-shrink: 0;
+}
+
+.annotation-pill {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+}
+
+.annotation-pill .pill-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 120px;
+}
+
+.annotation-font-btns {
+    display: flex;
+    gap: 4px;
+}
+
+.ann-font-btn {
+    padding: 2px 8px;
+    background: transparent;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    color: var(--text-tertiary);
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.ann-font-btn:hover {
+    border-color: var(--border-focus);
+    color: var(--text-secondary);
+}
+
+.ann-font-btn.active {
+    background: var(--brand-dim);
+    border-color: var(--brand);
+    color: var(--brand);
+}
+
+.annotation-text-overlay {
+    position: absolute;
+    z-index: 100;
+    background: var(--bg-primary);
+    border: 1px solid var(--brand);
+    border-radius: var(--radius-sm);
+    padding: 2px 6px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--text-primary);
+    outline: none;
+    width: 120px;
+    max-width: 200px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+
+[data-annotate].active {
+    background: var(--brand-dim);
+    border-color: var(--brand);
+    color: var(--brand);
+}
+
+#annotate-btn.active {
+    background: var(--brand-dim);
+    border-color: var(--brand);
+    color: var(--brand);
 }

@@ -99,21 +99,6 @@ DOM['micpod-mode'].addEventListener('change', () => {
     render();
 });
 
-// ── Wire up environment selects ──────────────────────────────
-['wall-mat-north','wall-mat-south','wall-mat-east','wall-mat-west'].forEach(id => {
-    DOM[id].addEventListener('change', () => {
-        const wall = id.replace('wall-mat-', '');
-        state.wallMaterials[wall] = DOM[id].value;
-        pushHistory('changed wall material');
-        render();
-    });
-});
-bindSelect('ceiling-type', 'ceilingType');
-bindSelect('floor-material', 'floorMaterial');
-bindSelect('lighting-type', 'lightingType');
-bindSelect('hvac-noise', 'hvacNoise');
-bindCheckbox('show-environment', 'showEnvironment', true);
-
 // ── Wire up checkboxes ───────────────────────────────────────
 bindCheckbox('show-view-angle', 'showViewAngle');
 bindCheckbox('show-camera', 'showCamera');
@@ -331,13 +316,11 @@ document.getElementById('reset-defaults-btn').addEventListener('click', function
         selectedElementId: null,
         measurements: [],
         measureToolActive: false,
+        annotations: [],
+        selectedAnnotationId: null,
+        annotateToolActive: false,
+        annotateToolType: null,
         roomName: '',
-        wallMaterials: { north: 'drywall', south: 'drywall', east: 'drywall', west: 'drywall' },
-        ceilingType: 'drop-tile',
-        floorMaterial: 'carpet',
-        lightingType: 'led',
-        hvacNoise: 'low',
-        showEnvironment: false
     });
     _suppressHistory = false;
     syncUIFromState();
@@ -404,6 +387,97 @@ document.querySelector('[data-action="share"]').addEventListener('click', copySh
 // ── Measure tool button ─────────────────────────────────────
 document.querySelector('[data-action="toggle-measure"]').addEventListener('click', toggleMeasureTool);
 
+// ── Annotate tool ─────────────────────────────────────────────
+// Toolbar button opens annotation group and activates last-used tool
+document.querySelector('[data-action="toggle-annotate"]')?.addEventListener('click', () => {
+    if (state.annotateToolActive) {
+        deactivateAnnotateTool();
+    } else {
+        toggleAnnotateTool(state.annotateToolType || 'text');
+        // Open the annotations group
+        const cg = document.getElementById('cg-annotations');
+        if (cg && cg.getAttribute('aria-expanded') !== 'true') expandGroup(cg);
+    }
+});
+
+// Tool selection buttons in sidebar
+document.querySelectorAll('[data-annotate]').forEach(btn => {
+    btn.addEventListener('click', () => toggleAnnotateTool(btn.dataset.annotate));
+});
+
+// Color swatch selection
+document.getElementById('annotation-color-swatches')?.addEventListener('click', e => {
+    const sw = e.target.closest('.ann-swatch');
+    if (!sw) return;
+    const color = sw.dataset.color;
+    // Set preview color for next annotation
+    state._annotatePreviewColor = color;
+    // Update active state on all swatches
+    document.querySelectorAll('#annotation-color-swatches .ann-swatch').forEach(s => {
+        s.classList.toggle('active', s.dataset.color === color);
+    });
+    // Update selected annotation's color
+    if (state.selectedAnnotationId) {
+        updateAnnotation(state.selectedAnnotationId, { color });
+    }
+});
+
+// Text input for selected annotation
+document.getElementById('annotation-text-input')?.addEventListener('input', e => {
+    if (state.selectedAnnotationId) {
+        const a = state.annotations.find(a => a.id === state.selectedAnnotationId);
+        if (a) {
+            a.text = e.target.value;
+            syncAnnotationListUI();
+            scheduleRender();
+            debouncedSerializeToHash();
+        }
+    }
+});
+
+// Font size buttons
+document.querySelectorAll('#annotation-font-row .ann-font-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        if (state.selectedAnnotationId) {
+            updateAnnotation(state.selectedAnnotationId, { fontSize: parseFloat(btn.dataset.fontSize) });
+        }
+    });
+});
+
+// Fill toggle buttons
+document.getElementById('ann-fill-on')?.addEventListener('click', () => {
+    if (state.selectedAnnotationId) updateAnnotation(state.selectedAnnotationId, { filled: true });
+    syncAnnotationPropsUI();
+});
+document.getElementById('ann-fill-off')?.addEventListener('click', () => {
+    if (state.selectedAnnotationId) updateAnnotation(state.selectedAnnotationId, { filled: false });
+    syncAnnotationPropsUI();
+});
+
+// Z-order buttons
+document.getElementById('ann-bring-front')?.addEventListener('click', () => {
+    if (state.selectedAnnotationId) bringAnnotationToFront(state.selectedAnnotationId);
+});
+document.getElementById('ann-send-back')?.addEventListener('click', () => {
+    if (state.selectedAnnotationId) sendAnnotationToBack(state.selectedAnnotationId);
+});
+
+// Remove annotation button
+document.getElementById('remove-annotation-btn')?.addEventListener('click', () => {
+    if (state.selectedAnnotationId) removeAnnotation(state.selectedAnnotationId);
+});
+
+// Annotation list click to select
+document.getElementById('annotation-list')?.addEventListener('click', e => {
+    const pill = e.target.closest('.annotation-pill');
+    if (!pill) return;
+    const id = parseInt(pill.dataset.annotationId, 10);
+    state.selectedAnnotationId = id;
+    syncAnnotationListUI();
+    syncAnnotationPropsUI();
+    scheduleRender();
+});
+
 // ── Meeting mode toggle ─────────────────────────────────────
 document.querySelectorAll('[data-action="toggle-meeting"]').forEach(btn => {
     btn.addEventListener('click', toggleMeetingMode);
@@ -422,21 +496,35 @@ document.addEventListener('keydown', e => {
         e.preventDefault();
         redo();
     }
-    // Ctrl+D → duplicate selected table
+    // Ctrl+D → duplicate selected annotation or table
     if ((e.ctrlKey || e.metaKey) && e.key === 'd') {
         e.preventDefault();
-        if (state.selectedTableId) {
+        if (state.selectedAnnotationId) {
+            duplicateAnnotation(state.selectedAnnotationId);
+        } else if (state.selectedTableId) {
             duplicateTable(state.selectedTableId);
             pushHistory('duplicated table');
         }
     }
-    // Delete selected measurement, or selected table (guard: keep at least 1 table)
-    if (e.key === 'Delete' && _selectedMeasureId !== null) {
+    // Delete selected annotation, measurement, or table
+    if (e.key === 'Delete' && state.selectedAnnotationId !== null) {
+        removeAnnotation(state.selectedAnnotationId);
+    } else if (e.key === 'Delete' && _selectedMeasureId !== null) {
         removeMeasurement(_selectedMeasureId);
         _selectedMeasureId = null;
     } else if (e.key === 'Delete' && state.selectedTableId && state.tables.length > 1) {
         removeTable();
         scheduleRender();
+    }
+    // Escape cancels annotation tool or pending annotation
+    if (e.key === 'Escape' && state.annotateToolActive) {
+        if (_annotatePending) {
+            _annotatePending = null;
+            _annotateHoverPx = null;
+            scheduleRender();
+        } else {
+            deactivateAnnotateTool();
+        }
     }
     // Escape cancels measure tool or pending measurement
     if (e.key === 'Escape' && state.measureToolActive) {
@@ -509,7 +597,6 @@ if (savedUnits === 'metric' || savedUnits === 'imperial') {
 }
 
 setBrand('neat');
-initGroups();
 initSliderTracks();
 renderTableList();
 renderElementList();
@@ -527,11 +614,15 @@ if (!hadHash && savedLayout) {
         Object.assign(state, JSON.parse(savedLayout));
         syncUIFromState();
         syncMeasureNextId();
+        syncAnnotateNextId();
+        syncAnnotationListUI();
         showToast('Recovered unsaved layout', 'success');
     } catch (_) {}
 } else if (hadHash) {
     syncUIFromState();
     syncMeasureNextId();
+    syncAnnotateNextId();
+    syncAnnotationListUI();
 }
 
 render();
@@ -598,6 +689,17 @@ document.addEventListener('keydown', e => {
         case 'v':
         case 'V':
             setViewMode(state.viewMode === 'top' ? 'pov' : 'top');
+            break;
+
+        case 'a':
+        case 'A':
+            if (state.annotateToolActive) {
+                deactivateAnnotateTool();
+            } else {
+                toggleAnnotateTool(state.annotateToolType || 'text');
+                const cg = document.getElementById('cg-annotations');
+                if (cg && cg.getAttribute('aria-expanded') !== 'true') expandGroup(cg);
+            }
             break;
 
         case 'm':

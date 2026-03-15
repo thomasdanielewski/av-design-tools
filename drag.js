@@ -1,5 +1,11 @@
 // ── Drag Interactions (Top-Down View) ────────────────────────
 
+/** Tracks which annotation the mouse is hovering over (for hover-only delete buttons) */
+let _hoveredAnnotationId = null;
+
+/** Freehand annotation drawing state */
+let _freehandPoints = null; // array of {x, y} in room-feet while drawing
+
 // ── Drag discoverability hint ────────────────────────────────
 let _dragHintShown = false;
 let _contextMenuHintShown = false;
@@ -360,10 +366,21 @@ canvas.addEventListener('mousemove', e => {
             onTarget = hit.target;
         }
 
-        canvas.style.cursor = state.measureToolActive ? 'crosshair'
+        // Annotation hover tracking (for hover-only delete buttons)
+        const prevHoveredAnn = _hoveredAnnotationId;
+        if (!state.annotateToolActive && !state.measureToolActive) {
+            const hitAnn = hitTestAnnotation(mx, my);
+            _hoveredAnnotationId = hitAnn ? hitAnn.id : null;
+        } else {
+            _hoveredAnnotationId = null;
+        }
+
+        canvas.style.cursor = state.annotateToolActive ? 'crosshair'
+            : state.measureToolActive ? 'crosshair'
             : onRotateHandle ? 'crosshair'
             : onTarget === 'delete' ? 'pointer'
             : onTarget === 'measure' ? 'grab'
+            : _hoveredAnnotationId ? 'grab'
             : onTarget ? 'grab' : '';
 
         // Equipment hover detection for tooltips (generous padding since devices are thin in top-down)
@@ -423,7 +440,7 @@ canvas.addEventListener('mousemove', e => {
                 Math.abs(hoveredEquipment.x - newHover.x) > 2 || Math.abs(hoveredEquipment.y - newHover.y) > 2));
         hoveredEquipment = newHover;
 
-        if (hoverChanged) {
+        if (hoverChanged || prevHoveredAnn !== _hoveredAnnotationId) {
             scheduleRender();
         } else if (state.showViewAngle && (Math.abs(mousePos.x - _lastViewAngleX) > 2 || Math.abs(mousePos.y - _lastViewAngleY) > 2)) {
             _lastViewAngleX = mousePos.x; _lastViewAngleY = mousePos.y;
@@ -786,6 +803,8 @@ const DRAG_IDLE = {
     resizeElementPOVStartMouse: 0, resizeElementPOVStartWidth: 0,
     resizeElementPOVStartHeight: 0, resizeElementPOVStartSill: 0, resizeElementPOVStartPos: 0,
     measurement: false, measureId: null, measureOffsetX: 0, measureOffsetY: 0,
+    annotation: false, annotationId: null, annotationOffsetX: 0, annotationOffsetY: 0,
+    annotationCreate: false, annotationCreateType: null,
     panning: false, spaceDown: false,
     panStartX: 0, panStartY: 0, panStartOffsetX: 0, panStartOffsetY: 0,
     multiOriginals: null
@@ -1007,6 +1026,101 @@ canvas.addEventListener('mousedown', e => {
         if (hitM) { startMeasurementDrag(mx, my, hitM); return; }
     }
 
+    // Annotation tool interactions (top-down only)
+    if (state.viewMode === 'top' && e.button === 0) {
+        const { mx, my } = getDragMetrics(e);
+
+        // Check delete button click on any annotation
+        const annDelId = hitTestAnnotationDelete(mx, my);
+        if (annDelId !== null) {
+            removeAnnotation(annDelId);
+            return;
+        }
+
+        if (state.annotateToolActive) {
+            const raw = canvasPxToRoomFt(mx, my);
+            const ft = snapMeasurePoint(raw.x, raw.y);
+            const toolType = state.annotateToolType;
+            const color = state._annotatePreviewColor || 'blue';
+
+            if (toolType === 'text') {
+                // Single click places text
+                const a = addAnnotation({ type: 'text', x: ft.x, y: ft.y, text: 'Label', color, fontSize: 1 });
+                if (a) showAnnotationTextInput(a);
+                return;
+            }
+
+            if (toolType === 'line' || toolType === 'arrow') {
+                // Two-click placement
+                if (!_annotatePending) {
+                    _annotatePending = { x: ft.x, y: ft.y };
+                    _annotateHoverPx = { x: mx, y: my };
+                    scheduleRender();
+                } else {
+                    addAnnotation({ type: toolType, x: _annotatePending.x, y: _annotatePending.y, x2: ft.x, y2: ft.y, color });
+                    _annotatePending = null;
+                    _annotateHoverPx = null;
+                }
+                return;
+            }
+
+            if (toolType === 'freehand') {
+                // Start freehand drawing
+                _freehandPoints = [{ x: ft.x, y: ft.y }];
+                drag.annotationCreate = true;
+                drag.annotationCreateType = 'freehand';
+                canvas.style.cursor = 'crosshair';
+                scheduleRender();
+                return;
+            }
+
+            if (toolType === 'rect' || toolType === 'circle' || toolType === 'zone') {
+                // Start drag-create
+                _annotateCreateStart = { x: ft.x, y: ft.y };
+                _annotateHoverPx = { x: mx, y: my };
+                drag.annotationCreate = true;
+                drag.annotationCreateType = toolType;
+                canvas.style.cursor = 'crosshair';
+                scheduleRender();
+                return;
+            }
+            return;
+        }
+
+        // Not in annotation tool mode — check for selection/drag
+        const hitA = hitTestAnnotation(mx, my);
+        if (hitA) {
+            state.selectedAnnotationId = hitA.id;
+            syncAnnotationListUI();
+            syncAnnotationPropsUI();
+            // Start dragging
+            drag.annotation = true;
+            drag.annotationId = hitA.id;
+            if (hitA.type === 'freehand' && hitA.points) {
+                let cx = 0, cy = 0;
+                for (const pt of hitA.points) { cx += pt.x; cy += pt.y; }
+                cx /= hitA.points.length; cy /= hitA.points.length;
+                const centPx = roomFtToCanvasPx(cx, cy);
+                drag.annotationOffsetX = mx - centPx.cx;
+                drag.annotationOffsetY = my - centPx.cy;
+            } else if (hitA.type === 'line' || hitA.type === 'arrow') {
+                const midX = (hitA.x + hitA.x2) / 2;
+                const midY = (hitA.y + hitA.y2) / 2;
+                const midPx = roomFtToCanvasPx(midX, midY);
+                drag.annotationOffsetX = mx - midPx.cx;
+                drag.annotationOffsetY = my - midPx.cy;
+            } else {
+                const p = roomFtToCanvasPx(hitA.x, hitA.y);
+                drag.annotationOffsetX = mx - p.cx;
+                drag.annotationOffsetY = my - p.cy;
+            }
+            canvas.style.cursor = 'grabbing';
+            pushHistory('moved annotation');
+            scheduleRender();
+            return;
+        }
+    }
+
     // POV mode: display drag, structural element drag, or viewer pan
     if (state.viewMode === 'pov') {
         const rect = canvas.getBoundingClientRect();
@@ -1135,6 +1249,71 @@ canvas.addEventListener('mousemove', e => {
             const deltaY = newMidFt.y - midFtY;
             m.x1 += deltaX; m.y1 += deltaY;
             m.x2 += deltaX; m.y2 += deltaY;
+            scheduleRender();
+        }
+        return;
+    }
+
+    // Annotation tool: update rubber-band preview for line/arrow
+    if (state.annotateToolActive && _annotatePending && state.viewMode === 'top') {
+        const { mx, my } = getDragMetrics(e);
+        _annotateHoverPx = { x: mx, y: my };
+        scheduleRender();
+        return;
+    }
+
+    // Freehand annotation drawing
+    if (drag.annotationCreate && drag.annotationCreateType === 'freehand' && _freehandPoints && state.viewMode === 'top') {
+        const { mx, my } = getDragMetrics(e);
+        const ft = canvasPxToRoomFt(mx, my);
+        // Only add point if moved enough (>0.1 ft) to avoid excess density
+        const last = _freehandPoints[_freehandPoints.length - 1];
+        if (Math.abs(ft.x - last.x) > 0.05 || Math.abs(ft.y - last.y) > 0.05) {
+            _freehandPoints.push({ x: ft.x, y: ft.y });
+        }
+        scheduleRender();
+        return;
+    }
+
+    // Annotation drag-create (rect/circle/zone)
+    if (drag.annotationCreate && _annotateCreateStart && state.viewMode === 'top') {
+        const { mx, my } = getDragMetrics(e);
+        _annotateHoverPx = { x: mx, y: my };
+        scheduleRender();
+        return;
+    }
+
+    // Annotation drag-move
+    if (drag.annotation && drag.annotationId !== null) {
+        const { mx, my } = getDragMetrics(e);
+        const a = state.annotations.find(ann => ann.id === drag.annotationId);
+        if (a) {
+            if (a.type === 'freehand' && a.points) {
+                // Move all points by delta from centroid
+                let cx = 0, cy = 0;
+                for (const pt of a.points) { cx += pt.x; cy += pt.y; }
+                cx /= a.points.length; cy /= a.points.length;
+                const centPx = roomFtToCanvasPx(cx, cy);
+                const newPx = { cx: mx - drag.annotationOffsetX, cy: my - drag.annotationOffsetY };
+                const newFt = canvasPxToRoomFt(newPx.cx, newPx.cy);
+                const deltaX = newFt.x - cx;
+                const deltaY = newFt.y - cy;
+                for (const pt of a.points) { pt.x += deltaX; pt.y += deltaY; }
+            } else if (a.type === 'line' || a.type === 'arrow') {
+                const midX = (a.x + a.x2) / 2;
+                const midY = (a.y + a.y2) / 2;
+                const newMidPx = { cx: mx - drag.annotationOffsetX, cy: my - drag.annotationOffsetY };
+                const newMidFt = canvasPxToRoomFt(newMidPx.cx, newMidPx.cy);
+                const deltaX = newMidFt.x - midX;
+                const deltaY = newMidFt.y - midY;
+                a.x += deltaX; a.y += deltaY;
+                a.x2 += deltaX; a.y2 += deltaY;
+            } else {
+                const newPx = { cx: mx - drag.annotationOffsetX, cy: my - drag.annotationOffsetY };
+                const newFt = canvasPxToRoomFt(newPx.cx, newPx.cy);
+                a.x = newFt.x;
+                a.y = newFt.y;
+            }
             scheduleRender();
         }
         return;
@@ -1549,9 +1728,42 @@ canvas.addEventListener('mousemove', e => {
 });
 
 // ── Mouse up / leave: end drag ───────────────────────────────
-canvas.addEventListener('mouseup', () => {
+canvas.addEventListener('mouseup', (e) => {
+    // Commit freehand annotation
+    if (drag.annotationCreate && drag.annotationCreateType === 'freehand' && _freehandPoints) {
+        if (_freehandPoints.length >= 3) {
+            const simplified = simplifyPath(_freehandPoints, 0.08);
+            const color = state._annotatePreviewColor || 'blue';
+            addAnnotation({ type: 'freehand', points: simplified, color });
+        }
+        _freehandPoints = null;
+    }
+
+    // Commit annotation drag-create (rect/circle/zone)
+    if (drag.annotationCreate && _annotateCreateStart) {
+        const { mx, my } = getDragMetrics(e);
+        const endRaw = canvasPxToRoomFt(mx, my);
+        const endFt = snapMeasurePoint(endRaw.x, endRaw.y);
+        const x = Math.min(_annotateCreateStart.x, endFt.x);
+        const y = Math.min(_annotateCreateStart.y, endFt.y);
+        const w = Math.abs(endFt.x - _annotateCreateStart.x);
+        const h = Math.abs(endFt.y - _annotateCreateStart.y);
+        const color = state._annotatePreviewColor || 'blue';
+        if (w >= 0.3 && h >= 0.3) {
+            const toolType = drag.annotationCreateType;
+            if (toolType === 'zone') {
+                const a = addAnnotation({ type: 'zone', x, y, w: +w.toFixed(2), h: +h.toFixed(2), text: 'Zone', color, fontSize: 1 });
+                if (a) showAnnotationTextInput(a);
+            } else {
+                addAnnotation({ type: toolType, x, y, w: +w.toFixed(2), h: +h.toFixed(2), color });
+            }
+        }
+        _annotateCreateStart = null;
+        _annotateHoverPx = null;
+    }
+
     resetDrag();
-    canvas.style.cursor = drag.spaceDown ? 'grab' : '';
+    canvas.style.cursor = state.annotateToolActive ? 'crosshair' : (drag.spaceDown ? 'grab' : '');
     serializeToHash();
 });
 
@@ -1559,6 +1771,7 @@ canvas.addEventListener('mouseleave', () => {
     resetDrag();
     canvas.style.cursor = '';
     mousePos = { x: -9999, y: -9999 };
+    _hoveredAnnotationId = null;
     if (hoveredEquipment) { hoveredEquipment = null; scheduleRender(); }
     if (state.showViewAngle) scheduleRender();
 });
@@ -1625,6 +1838,16 @@ document.addEventListener('keyup', e => {
 // ── Double-click: reset zoom and pan to defaults ─────────────
 canvas.addEventListener('dblclick', e => {
     if (state.viewMode !== 'top') return;
+    // Double-click on text/zone annotation → inline edit
+    const { mx, my } = getDragMetrics(e);
+    const hitA = hitTestAnnotation(mx, my);
+    if (hitA && (hitA.type === 'text' || hitA.type === 'zone')) {
+        state.selectedAnnotationId = hitA.id;
+        syncAnnotationListUI();
+        syncAnnotationPropsUI();
+        showAnnotationTextInput(hitA);
+        return;
+    }
     viewportZoom = 1.0;
     viewportPanX = 0;
     viewportPanY = 0;

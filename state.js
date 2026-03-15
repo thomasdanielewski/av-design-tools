@@ -26,14 +26,12 @@ const state = {
     units: 'imperial',
     measurements: [],
     measureToolActive: false,
+    // Annotations
+    annotations: [],
+    selectedAnnotationId: null,
+    annotateToolActive: false,
+    annotateToolType: null,
     roomName: '',
-    // Room environment
-    wallMaterials: { north: 'drywall', south: 'drywall', east: 'drywall', west: 'drywall' },
-    ceilingType: 'drop-tile',
-    floorMaterial: 'carpet',
-    lightingType: 'led',
-    hvacNoise: 'low',
-    showEnvironment: false,
     // Meeting mode
     meetingMode: false,
     meetingParticipants: 0,        // 0 = auto (fill all seats)
@@ -200,11 +198,8 @@ function serializeToHash() {
         if (sk === 'micPodPosY') { params.set(k, state.micPodPos.y.toFixed(2)); continue; }
         if (sk === 'micPod2PosX') { params.set(k, state.micPod2Pos.x.toFixed(2)); continue; }
         if (sk === 'micPod2PosY') { params.set(k, state.micPod2Pos.y.toFixed(2)); continue; }
-        if (sk === 'wallMatNorth') { params.set(k, state.wallMaterials.north); continue; }
-        if (sk === 'wallMatSouth') { params.set(k, state.wallMaterials.south); continue; }
-        if (sk === 'wallMatEast')  { params.set(k, state.wallMaterials.east); continue; }
-        if (sk === 'wallMatWest')  { params.set(k, state.wallMaterials.west); continue; }
         if (sk === 'measurements') continue; // handled separately below
+        if (sk === 'annotations') continue; // handled separately below
         if (sk === 'roomName') { if (state.roomName) params.set(k, encodeURIComponent(state.roomName)); continue; }
         const v = state[sk];
         if (typeof v === 'boolean') params.set(k, v ? '1' : '0');
@@ -222,6 +217,10 @@ function serializeToHash() {
         params.set('ms', state.measurements.map(m =>
             [m.x1, m.y1, m.x2, m.y2].map(v => v.toFixed(2)).join(',')
         ).join('|'));
+    }
+    // Serialize annotations as JSON
+    if (state.annotations && state.annotations.length > 0) {
+        params.set('an', JSON.stringify(state.annotations));
     }
     const hashStr = params.toString();
     if (('#' + hashStr).length > 2000) {
@@ -248,15 +247,8 @@ function loadFromHash() {
             if (sk === 'micPodPosY') { state.micPodPos.y = parseFloat(raw); continue; }
             if (sk === 'micPod2PosX') { state.micPod2Pos.x = parseFloat(raw); continue; }
             if (sk === 'micPod2PosY') { state.micPod2Pos.y = parseFloat(raw); continue; }
-            if (sk === 'wallMatNorth') { if (VALID_WALL_MATERIALS.has(raw)) state.wallMaterials.north = raw; continue; }
-            if (sk === 'wallMatSouth') { if (VALID_WALL_MATERIALS.has(raw)) state.wallMaterials.south = raw; continue; }
-            if (sk === 'wallMatEast')  { if (VALID_WALL_MATERIALS.has(raw)) state.wallMaterials.east = raw; continue; }
-            if (sk === 'wallMatWest')  { if (VALID_WALL_MATERIALS.has(raw)) state.wallMaterials.west = raw; continue; }
             if (sk === 'measurements') continue; // handled separately below
-            if (sk === 'ceilingType')       { if (VALID_CEILING_TYPES.has(raw)) state[sk] = raw; continue; }
-            if (sk === 'floorMaterial')     { if (VALID_FLOOR_MATERIALS.has(raw)) state[sk] = raw; continue; }
-            if (sk === 'lightingType')      { if (VALID_LIGHTING_TYPES.has(raw)) state[sk] = raw; continue; }
-            if (sk === 'hvacNoise')         { if (VALID_HVAC_NOISE.has(raw)) state[sk] = raw; continue; }
+            if (sk === 'annotations') continue; // handled separately below
             if (sk === 'roomName') { state.roomName = decodeURIComponent(raw); if (DOM['room-name']) DOM['room-name'].value = state.roomName; continue; }
             if (typeof state[sk] === 'boolean') { state[sk] = raw === '1'; continue; }
             if (typeof state[sk] === 'number') {
@@ -300,6 +292,13 @@ function loadFromHash() {
                     }).filter(m => !isNaN(m.x1) && !isNaN(m.y1) && !isNaN(m.x2) && !isNaN(m.y2));
                 }
                 syncMeasureNextId();
+            } catch (_) {}
+        }
+        // Load annotations from JSON
+        if (params.has('an')) {
+            try {
+                state.annotations = JSON.parse(params.get('an'));
+                if (typeof syncAnnotateNextId === 'function') syncAnnotateNextId();
             } catch (_) {}
         }
         // Ensure selectedTableId points to an existing table
@@ -346,17 +345,12 @@ const UI_BINDINGS = [
     // Selects: { type: 'select', key, dom }
     { type: 'select', key: 'tableShape',       dom: 'table-shape'       },
     { type: 'select', key: 'seatingDensity',   dom: 'seating-density'   },
-    { type: 'select', key: 'ceilingType',      dom: 'ceiling-type'      },
-    { type: 'select', key: 'floorMaterial',    dom: 'floor-material'    },
-    { type: 'select', key: 'lightingType',     dom: 'lighting-type'     },
-    { type: 'select', key: 'hvacNoise',        dom: 'hvac-noise'        },
     // Checkboxes: { type: 'checkbox', key, dom }
     { type: 'checkbox', key: 'showCamera',     dom: 'show-camera'       },
     { type: 'checkbox', key: 'showMic',        dom: 'show-mic'          },
     { type: 'checkbox', key: 'showGrid',       dom: 'show-grid'         },
     { type: 'checkbox', key: 'showViewAngle',  dom: 'show-view-angle'   },
     { type: 'checkbox', key: 'showSnap',       dom: 'show-snap'         },
-    { type: 'checkbox', key: 'showEnvironment', dom: 'show-environment' },
     // Text inputs: { type: 'text', key, dom }
     { type: 'text',   key: 'roomName',         dom: 'room-name'         },
     // Meeting mode
@@ -426,10 +420,11 @@ function syncUIFromState() {
     if (state.meetingMode && typeof updateFramingModeOptions === 'function') updateFramingModeOptions();
     if (typeof invalidateMeetingCache === 'function') invalidateMeetingCache();
 
-    // Wall materials (nested state)
-    ['north','south','east','west'].forEach(w => {
-        if (DOM['wall-mat-' + w]) DOM['wall-mat-' + w].value = state.wallMaterials[w];
-    });
+    // Annotation UI sync
+    if (typeof syncAnnotateNextId === 'function') syncAnnotateNextId();
+    if (typeof syncAnnotateToolUI === 'function') syncAnnotateToolUI();
+    if (typeof syncAnnotationListUI === 'function') syncAnnotationListUI();
+    if (typeof syncAnnotationPropsUI === 'function') syncAnnotationPropsUI();
 
     // Unit toggle
     DOM['unit-toggle']

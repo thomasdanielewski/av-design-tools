@@ -86,7 +86,23 @@
       "Bash(taskkill //PID 259044 //F)",
       "Bash(wc -l \"C:\\\\Users\\\\Thomas\\\\Documents\\\\GitHub\\\\av-design-tools\"/*.js)",
       "Bash(find \"C:\\\\Users\\\\Thomas\\\\Documents\\\\GitHub\\\\av-design-tools\" -maxdepth 1 -name \"*.js\" -exec wc -l {} +)",
-      "Bash(grep -n \"const EQUIPMENT\\\\|const HASH_KEYS\\\\|const CHAIR\\\\|const GRID\" /c/Users/Thomas/Documents/GitHub/av-design-tools/*.js)"
+      "Bash(grep -n \"const EQUIPMENT\\\\|const HASH_KEYS\\\\|const CHAIR\\\\|const GRID\" /c/Users/Thomas/Documents/GitHub/av-design-tools/*.js)",
+      "Bash(grep -n \"getOppositeWall\\\\|oppositeWall\" \"C:\\\\Users\\\\Thomas\\\\Documents\\\\GitHub\\\\av-design-tools\"/*.js)",
+      "Bash(grep -n \"drawAnnotations\\\\|drawMeasurements\" /c/Users/Thomas/Documents/GitHub/av-design-tools/*.js)",
+      "Bash(grep -rn \"RT60\\\\|reverb\\\\|reverberation\" C:UsersThomasDocumentsGitHubav-design-tools --include=*.js --include=*.html --include=*.css)",
+      "Bash(grep -rn \"ceilingType\\\\|floorMaterial\\\\|lightingType\\\\|hvacNoise\\\\|wallMaterials\" C:UsersThomasDocumentsGitHubav-design-tools --include=*.js --include=*.html)",
+      "Bash(grep -rn \"ceilingType\\\\|floorMaterial\\\\|lightingType\\\\|hvacNoise\\\\|wallMaterials\\\\|env-advisory\\\\|showEnvironment\\\\|generateEnvironmentAdvisories\\\\|checkEnvironmentAdvisories\" C:UsersThomasDocumentsGitHubav-design-tools --include=*.js --include=*.html --include=*.css)",
+      "Bash(sed -n '1500,3500p' \"C:\\\\Users\\\\Thomas\\\\Documents\\\\GitHub\\\\av-design-tools\\\\style.css\")",
+      "Read(//tmp/**)",
+      "Bash(grep -n \"^\\\\s*$\")",
+      "Bash(grep -B3 -A3 \":\\\\s*$\")",
+      "Bash(grep -c \"^\\\\s*$\")",
+      "Bash(grep -h \"showToast.*''''error''''\\\\|showToast.*''''success''''\\\\|showToast.*''''info''''\" \"C:\\\\Users\\\\Thomas\\\\Documents\\\\GitHub\\\\av-design-tools\"/*.js)",
+      "Bash(grep -E \"showToast.*,\\\\s*''\\(error|success\\)''\" \"C:\\\\Users\\\\Thomas\\\\Documents\\\\GitHub\\\\av-design-tools\"/*.js)",
+      "Bash(find . -maxdepth 1 -name \"*.js\" -exec grep -H \"showToast\" {})",
+      "Bash(grep \"showToast.*''''info''''\\\\|showToast\\([^,]*\\)\" \"C:\\\\Users\\\\Thomas\\\\Documents\\\\GitHub\\\\av-design-tools\"/*.js)",
+      "Bash(find \"C:\\\\Users\\\\Thomas\\\\Documents\\\\GitHub\\\\av-design-tools\" -maxdepth 1 -name \"*.js\" -exec grep -H \"showToast\" {})",
+      "Bash(find \"C:\\\\Users\\\\Thomas\\\\Documents\\\\GitHub\\\\av-design-tools\" -maxdepth 1 -name \"*.js\" -exec grep \"showToast.*''''error''''\\\\|showToast.*''''success''''\\\\|showToast.*''''info''''\" {})"
     ]
   }
 }

@@ -191,7 +191,7 @@ function getTopDownLayout() {
     const padF = 2;
     const totalW = state.roomWidth + padF * 2;
     const totalH = state.roomLength + padF * 2;
-    const scale = Math.min(cw / totalW, ch / totalH);
+    const scale = Math.max(0.1, Math.min(cw / totalW, ch / totalH));
     const ppf = scale;
 
     const canvasW = Math.floor(totalW * scale);

@@ -132,98 +132,66 @@
                 </div>
             </div>
 
-            <!-- Room Environment -->
-            <div class="control-group" aria-expanded="false" id="cg-environment">
-                <div class="control-group-title" data-toggle-group="cg-environment">Room Environment<svg class="cg-chevron" aria-hidden="true"
+            <!-- Annotations -->
+            <div class="control-group" aria-expanded="false" id="cg-annotations">
+                <div class="control-group-title" data-toggle-group="cg-annotations">Annotations<svg class="cg-chevron" aria-hidden="true"
                         width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
                         stroke-linecap="round" stroke-linejoin="round">
                         <polyline points="6 9 12 15 18 9"></polyline>
                     </svg></div>
                 <div class="control-group-body">
-                    <div class="env-section-label">Wall Materials</div>
-                    <div class="env-wall-grid">
-                        <div class="control-row">
-                            <div class="control-label"><label for="wall-mat-north">North</label></div>
-                            <select id="wall-mat-north">
-                                <option value="drywall" selected>Drywall</option>
-                                <option value="glass">Glass</option>
-                                <option value="wood">Wood</option>
-                                <option value="concrete">Concrete</option>
-                                <option value="acoustic-panel">Acoustic Panel</option>
-                            </select>
-                        </div>
-                        <div class="control-row">
-                            <div class="control-label"><label for="wall-mat-south">South</label></div>
-                            <select id="wall-mat-south">
-                                <option value="drywall" selected>Drywall</option>
-                                <option value="glass">Glass</option>
-                                <option value="wood">Wood</option>
-                                <option value="concrete">Concrete</option>
-                                <option value="acoustic-panel">Acoustic Panel</option>
-                            </select>
-                        </div>
-                        <div class="control-row">
-                            <div class="control-label"><label for="wall-mat-east">East</label></div>
-                            <select id="wall-mat-east">
-                                <option value="drywall" selected>Drywall</option>
-                                <option value="glass">Glass</option>
-                                <option value="wood">Wood</option>
-                                <option value="concrete">Concrete</option>
-                                <option value="acoustic-panel">Acoustic Panel</option>
-                            </select>
-                        </div>
-                        <div class="control-row">
-                            <div class="control-label"><label for="wall-mat-west">West</label></div>
-                            <select id="wall-mat-west">
-                                <option value="drywall" selected>Drywall</option>
-                                <option value="glass">Glass</option>
-                                <option value="wood">Wood</option>
-                                <option value="concrete">Concrete</option>
-                                <option value="acoustic-panel">Acoustic Panel</option>
-                            </select>
+                    <div class="annotation-tools">
+                        <button class="arr-pill" data-annotate="text" title="Text label">Text</button>
+                        <button class="arr-pill" data-annotate="rect" title="Rectangle">Rect</button>
+                        <button class="arr-pill" data-annotate="circle" title="Circle">Circle</button>
+                        <button class="arr-pill" data-annotate="line" title="Line">Line</button>
+                        <button class="arr-pill" data-annotate="arrow" title="Arrow">Arrow</button>
+                        <button class="arr-pill" data-annotate="zone" title="Zone / area label">Zone</button>
+                        <button class="arr-pill" data-annotate="freehand" title="Freehand draw">Draw</button>
+                    </div>
+                    <div class="control-row" style="margin-top:6px">
+                        <label style="font-size:11px;opacity:0.7">Color</label>
+                        <div id="annotation-color-swatches" class="annotation-color-swatches">
+                            <span class="ann-swatch active" data-color="red" style="background:rgba(239,68,68,0.8)" title="Red"></span>
+                            <span class="ann-swatch" data-color="blue" style="background:rgba(59,130,246,0.8)" title="Blue"></span>
+                            <span class="ann-swatch" data-color="green" style="background:rgba(34,197,94,0.8)" title="Green"></span>
+                            <span class="ann-swatch" data-color="orange" style="background:rgba(251,146,60,0.8)" title="Orange"></span>
+                            <span class="ann-swatch" data-color="gray" style="background:rgba(148,163,184,0.6)" title="Gray"></span>
                         </div>
                     </div>
-                    <div class="control-row">
-                        <div class="control-label"><label for="ceiling-type">Ceiling Type</label></div>
-                        <select id="ceiling-type">
-                            <option value="drop-tile" selected>Drop Tile</option>
-                            <option value="open-exposed">Open / Exposed</option>
-                            <option value="acoustic">Acoustic Tile</option>
-                        </select>
+                    <div id="annotation-list" class="table-list"></div>
+                    <div class="empty-state" id="annotation-empty">
+                        <p class="empty-state-text">Add text labels, shapes, and zones to plan your room layout.</p>
+                        <span class="empty-state-hint">Select a tool above, then click on the room</span>
                     </div>
-                    <div class="control-row">
-                        <div class="control-label"><label for="floor-material">Floor Material</label></div>
-                        <select id="floor-material">
-                            <option value="carpet" selected>Carpet</option>
-                            <option value="hardwood">Hardwood</option>
-                            <option value="tile">Tile</option>
-                            <option value="concrete">Concrete</option>
-                        </select>
-                    </div>
-                    <div class="control-row">
-                        <div class="control-label"><label for="lighting-type">Lighting</label></div>
-                        <select id="lighting-type">
-                            <option value="led" selected>LED</option>
-                            <option value="fluorescent">Fluorescent</option>
-                            <option value="recessed">Recessed</option>
-                            <option value="natural-only">Natural Only</option>
-                        </select>
-                    </div>
-                    <div class="control-row">
-                        <div class="control-label"><label for="hvac-noise">HVAC Noise Level</label></div>
-                        <select id="hvac-noise">
-                            <option value="none">None</option>
-                            <option value="low" selected>Low</option>
-                            <option value="moderate">Moderate</option>
-                            <option value="high">High</option>
-                        </select>
-                    </div>
-                    <div class="control-row" style="margin-top:8px">
-                        <label class="checkbox-label"><input type="checkbox" id="show-environment"> Show wall material overlay</label>
-                    </div>
-                    <div class="env-advisory" id="env-advisory" aria-live="polite">
-                        <div class="env-advisory-header"><span class="env-advisory-dot"></span> Environment Advisory</div>
-                        <div class="env-advisory-text" id="env-advisory-text"></div>
+                    <div id="annotation-props" style="display:none">
+                        <div class="control-row" id="annotation-text-row" style="display:none">
+                            <div class="control-label"><label for="annotation-text-input">Label</label></div>
+                            <input type="text" id="annotation-text-input" class="compact-input" maxlength="40" placeholder="Label text">
+                        </div>
+                        <div class="control-row" id="annotation-font-row" style="display:none">
+                            <div class="control-label"><label>Size</label></div>
+                            <div class="annotation-font-btns">
+                                <button class="ann-font-btn" data-font-size="0.75" title="Small">S</button>
+                                <button class="ann-font-btn active" data-font-size="1" title="Medium">M</button>
+                                <button class="ann-font-btn" data-font-size="1.5" title="Large">L</button>
+                            </div>
+                        </div>
+                        <div class="control-row" id="annotation-fill-row" style="display:none">
+                            <div class="control-label"><label>Fill</label></div>
+                            <div class="annotation-font-btns">
+                                <button class="ann-font-btn" id="ann-fill-on" data-fill="true" title="Filled">Filled</button>
+                                <button class="ann-font-btn" id="ann-fill-off" data-fill="false" title="Outline only">Outline</button>
+                            </div>
+                        </div>
+                        <div class="control-row" id="annotation-zorder-row">
+                            <div class="control-label"><label>Order</label></div>
+                            <div class="annotation-font-btns">
+                                <button class="ann-font-btn" id="ann-bring-front" title="Bring to Front">Front</button>
+                                <button class="ann-font-btn" id="ann-send-back" title="Send to Back">Back</button>
+                            </div>
+                        </div>
+                        <button class="table-action-btn table-action-remove" id="remove-annotation-btn">Remove</button>
                     </div>
                 </div>
             </div>
@@ -588,8 +556,6 @@
                         Bar Gen 2</span></div>
                 <div class="info-item"><span class="dot"
                         style="color:var(--mic-color);background:var(--mic-color)"></span><span id="header-capacity">Capacity: 0</span></div>
-                <div class="info-item"><span class="dot"
-                        style="color:var(--mic-color);background:var(--mic-color)"></span><span id="header-rt60">RT60: —</span></div>
             </div>
             <div style="display:flex;align-items:center;gap:14px">
                 <div class="undo-redo-group" style="position:relative">
@@ -601,14 +567,13 @@
                         <ul id="history-list"></ul>
                     </div>
                 </div>
-                <button class="undo-btn meeting-mode-btn" id="meeting-mode-btn" title="Meeting Mode (F)" data-action="toggle-meeting"
-                    style="width:auto;padding:0 10px;font-size:11px;font-family:var(--font-mono);gap:5px"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="15" rx="2" ry="2"/><polyline points="17 2 12 7 7 2"/></svg>
+                <button class="undo-btn toolbar-btn meeting-mode-btn" id="meeting-mode-btn" title="Meeting Mode (F)" data-action="toggle-meeting"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="15" rx="2" ry="2"/><polyline points="17 2 12 7 7 2"/></svg>
                     Meeting</button>
-                <button class="undo-btn measure-btn" id="measure-btn" title="Measure" data-action="toggle-measure"
-                    style="width:auto;padding:0 10px;font-size:11px;font-family:var(--font-mono);gap:5px"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h20"/><path d="M6 8v8"/><path d="M10 10v4"/><path d="M14 10v4"/><path d="M18 8v8"/></svg>
+                <button class="undo-btn toolbar-btn measure-btn" id="measure-btn" title="Measure (M)" data-action="toggle-measure"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h20"/><path d="M6 8v8"/><path d="M10 10v4"/><path d="M14 10v4"/><path d="M18 8v8"/></svg>
                     Measure</button>
-                <button class="undo-btn" id="share-btn" title="Copy shareable link" data-action="share"
-                    style="width:auto;padding:0 10px;font-size:11px;font-family:var(--font-mono);gap:5px">🔗
+                <button class="undo-btn toolbar-btn" id="annotate-btn" title="Annotate (A)" data-action="toggle-annotate"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                    Annotate</button>
+                <button class="undo-btn toolbar-btn" id="share-btn" title="Copy shareable link" data-action="share">🔗
                     Share</button>
                 <button class="tips-btn" id="show-tips-btn" title="Show Tips">?</button>
                 <button class="theme-toggle" id="theme-toggle" title="Toggle light/dark mode"
@@ -773,25 +738,25 @@
     </div>
 
     <script src="jspdf.umd.min.js"></script>
-    <script src="data.js?v=4"></script>
-    <script src="constants.js?v=4"></script>
-    <script src="theme.js?v=4"></script>
-    <script src="dom.js?v=4"></script>
-    <script src="utils.js?v=4"></script>
-    <script src="state.js?v=4"></script>
-    <script src="input.js?v=4"></script>
-    <script src="tables.js?v=4"></script>
-    <script src="structural.js?v=4"></script>
-    <script src="environment.js?v=4"></script>
-    <script src="ui.js?v=4"></script>
-    <script src="measure.js?v=4"></script>
-    <script src="draw.js?v=4"></script>
-    <script src="meeting.js?v=4"></script>
-    <script src="render.js?v=4"></script>
-    <script src="pov.js?v=4"></script>
-    <script src="drag.js?v=4"></script>
-    <script src="export.js?v=4"></script>
-    <script src="init.js?v=4" defer></script>
+    <script src="data.js?v=5"></script>
+    <script src="constants.js?v=5"></script>
+    <script src="theme.js?v=5"></script>
+    <script src="dom.js?v=5"></script>
+    <script src="utils.js?v=5"></script>
+    <script src="state.js?v=5"></script>
+    <script src="input.js?v=5"></script>
+    <script src="tables.js?v=5"></script>
+    <script src="structural.js?v=5"></script>
+    <script src="ui.js?v=5"></script>
+    <script src="measure.js?v=5"></script>
+    <script src="annotate.js?v=5"></script>
+    <script src="draw.js?v=5"></script>
+    <script src="meeting.js?v=5"></script>
+    <script src="render.js?v=5"></script>
+    <script src="pov.js?v=5"></script>
+    <script src="drag.js?v=5"></script>
+    <script src="export.js?v=5"></script>
+    <script src="init.js?v=5" defer></script>
 </body>
 
 </html>

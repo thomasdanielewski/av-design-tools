@@ -345,13 +345,6 @@ function toggleGroup(id) {
     else expandGroup(el);
 }
 
-function initGroups() {
-    document.querySelectorAll('.control-group[aria-expanded]').forEach(el => {
-        const body = el.querySelector('.control-group-body');
-        if (!body) return;
-    });
-}
-
 // ── Room Presets ─────────────────────────────────────────────
 
 function applyPreset(len, wid, targetBtn) {

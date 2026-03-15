@@ -13,6 +13,17 @@ const DEBOUNCE_RESIZE = 100;
 const DRAG_HINT_DELAY = 800;
 const MAX_MEASUREMENTS = 10;
 const SCALE_BAR_CANDIDATES = [1, 2, 5, 10, 20];
+const MAX_ANNOTATIONS = 30;
+
+/** Fixed annotation color palette — semi-transparent RGBA works on both themes */
+const ANNOTATION_COLORS = {
+    red:    { fill: 'rgba(239, 68, 68, 0.15)', stroke: 'rgba(239, 68, 68, 0.70)', text: 'rgba(239, 68, 68, 0.90)' },
+    blue:   { fill: 'rgba(59, 130, 246, 0.15)', stroke: 'rgba(59, 130, 246, 0.70)', text: 'rgba(59, 130, 246, 0.90)' },
+    green:  { fill: 'rgba(34, 197, 94, 0.15)',  stroke: 'rgba(34, 197, 94, 0.70)',  text: 'rgba(34, 197, 94, 0.90)' },
+    orange: { fill: 'rgba(251, 146, 60, 0.15)', stroke: 'rgba(251, 146, 60, 0.70)', text: 'rgba(251, 146, 60, 0.90)' },
+    gray:   { fill: 'rgba(148, 163, 184, 0.12)', stroke: 'rgba(148, 163, 184, 0.50)', text: 'rgba(148, 163, 184, 0.80)' },
+};
+const ANNOTATION_COLOR_NAMES = ['red', 'blue', 'green', 'orange', 'gray'];
 
 /** Chair spacing in feet per seat (center-to-center) by density */
 const CHAIR_SPACING = { sparse: 3.0, normal: 2.0, dense: 1.5 };
@@ -50,20 +61,9 @@ const HASH_KEYS = {
     un: 'units',
     mt: 'measureToolActive',
     ms: 'measurements',
-    // Room environment
-    wmn: 'wallMatNorth', wms: 'wallMatSouth', wme: 'wallMatEast', wmw: 'wallMatWest',
-    ect: 'ceilingType', efm: 'floorMaterial', elt: 'lightingType',
-    ehn: 'hvacNoise',
-    env: 'showEnvironment',
-    rn: 'roomName'
+    rn: 'roomName',
+    an: 'annotations'
 };
-
-/** Valid environment values for hash deserialization */
-const VALID_WALL_MATERIALS = new Set(['drywall', 'glass', 'wood', 'concrete', 'acoustic-panel']);
-const VALID_CEILING_TYPES = new Set(['open-exposed', 'drop-tile', 'acoustic']);
-const VALID_FLOOR_MATERIALS = new Set(['carpet', 'hardwood', 'tile', 'concrete']);
-const VALID_LIGHTING_TYPES = new Set(['fluorescent', 'led', 'recessed', 'natural-only']);
-const VALID_HVAC_NOISE = new Set(['none', 'low', 'moderate', 'high']);
 
 // ── Meeting Mode Constants ──────────────────────────────────
 

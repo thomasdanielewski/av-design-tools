@@ -17,8 +17,6 @@ function updateHeaderDOM(eq) {
     DOM['header-capacity'].textContent = `Capacity: ${cap}`;
     const capInput = DOM['seat-capacity-input'];
     if (capInput && document.activeElement !== capInput) capInput.value = cap;
-    const rt60El = DOM['header-rt60'];
-    if (rt60El) rt60El.textContent = `RT60: ${calcRT60().toFixed(1)}s`;
     DOM['mount-row'].style.display =
         (eq.type === 'bar') ? '' : 'none';
 
@@ -28,7 +26,6 @@ function updateHeaderDOM(eq) {
     updateLegendState();
     debouncedSerializeToHash();
     checkRoomWarnings();
-    checkEnvironmentAdvisories();
 }
 
 /**
@@ -89,9 +86,6 @@ function renderBackground() {
     // Room outline and front wall accent
     drawRoom(bgCtx, rx, ry, rw, rl, ppf);
 
-    // Wall material overlay (when environment toggle is on)
-    drawWallMaterialOverlay(bgCtx, rx, ry, rw, rl, ppf);
-
     // Structural elements (doors) on walls
     const wallThickBg = Math.max(5, ppf * 0.25);
     drawStructuralElements(bgCtx, rx, ry, rw, rl, ppf, wallThickBg);
@@ -111,6 +105,7 @@ function renderForeground() {
     if (state.viewMode === 'pov') return;
 
     const { dpr, ppf, canvasW, canvasH, ox, oy, rw, rl, rx, ry, wallThick } = getTopDownLayout();
+    if (ppf <= 0 || canvasW < 1 || canvasH < 1) return;
 
     // Size the foreground canvas to match the background canvas
     _sizeCanvas(fgCanvas, ctx, canvasW, canvasH, dpr);
@@ -223,6 +218,9 @@ function renderForeground() {
         drawSnapGuides(ctx, snapGuides, rx, ry, rw, rl, wallThick);
     }
 
+    // Annotation markup (drawn on top of room content, behind measurements)
+    drawAnnotations(ctx, ppf);
+
     // Measurement dimension lines (drawn on top of room content)
     drawMeasurements(ctx, ppf);
 
@@ -272,6 +270,103 @@ function renderForeground() {
                 ctx.restore();
             }
             // Keep animating the pulse
+            scheduleRender();
+        }
+    }
+
+    // Annotate tool: preview for line/arrow (pulsing dot + dashed line) or rect/circle/zone (rubber-band)
+    if (state.annotateToolActive) {
+        const pending = getAnnotatePending();
+        const hoverPx = getAnnotateHoverPx();
+        const createStart = getAnnotateCreateStart();
+        const toolType = state.annotateToolType;
+
+        // Two-click preview (line/arrow)
+        if (pending && hoverPx && (toolType === 'line' || toolType === 'arrow')) {
+            const p1 = roomFtToCanvasPx(pending.x, pending.y);
+            const pulse = 0.5 + 0.5 * Math.sin(Date.now() / 200);
+            ctx.save();
+            ctx.globalAlpha = pulse;
+            ctx.beginPath();
+            ctx.arc(p1.cx, p1.cy, 6, 0, Math.PI * 2);
+            ctx.fillStyle = ANNOTATION_COLORS[state._annotatePreviewColor || 'blue'].stroke;
+            ctx.fill();
+            ctx.restore();
+
+            ctx.save();
+            ctx.setLineDash([6, 4]);
+            ctx.strokeStyle = ANNOTATION_COLORS[state._annotatePreviewColor || 'blue'].stroke;
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.moveTo(p1.cx, p1.cy);
+            ctx.lineTo(hoverPx.x, hoverPx.y);
+            ctx.stroke();
+            ctx.restore();
+            scheduleRender();
+        }
+
+        // Drag-create preview (rect/circle/zone)
+        if (createStart && hoverPx && (toolType === 'rect' || toolType === 'circle' || toolType === 'zone')) {
+            const p1 = roomFtToCanvasPx(createStart.x, createStart.y);
+            const col = ANNOTATION_COLORS[state._annotatePreviewColor || 'blue'];
+            ctx.save();
+            ctx.fillStyle = col.fill;
+            ctx.strokeStyle = col.stroke;
+            ctx.lineWidth = 1.5;
+            ctx.setLineDash([4, 3]);
+            const w = hoverPx.x - p1.cx;
+            const h = hoverPx.y - p1.cy;
+            if (toolType === 'circle') {
+                const rx = Math.abs(w) / 2;
+                const ry = Math.abs(h) / 2;
+                const cxp = p1.cx + w / 2;
+                const cyp = p1.cy + h / 2;
+                ctx.beginPath();
+                ctx.ellipse(cxp, cyp, Math.max(1, rx), Math.max(1, ry), 0, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.stroke();
+            } else {
+                const rx = Math.min(p1.cx, p1.cx + w);
+                const ry = Math.min(p1.cy, p1.cy + h);
+                ctx.fillRect(rx, ry, Math.abs(w), Math.abs(h));
+                ctx.strokeRect(rx, ry, Math.abs(w), Math.abs(h));
+            }
+            // Show dimensions during drag-create
+            const { ppf: previewPpf } = getTopDownLayout();
+            const wFt = Math.abs(w) / previewPpf;
+            const hFt = Math.abs(h) / previewPpf;
+            if (wFt >= 0.3 && hFt >= 0.3) {
+                const dimLabel = formatFtIn(+wFt.toFixed(1)) + ' \u00d7 ' + formatFtIn(+hFt.toFixed(1));
+                ctx.font = "500 10px 'JetBrains Mono', monospace";
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'top';
+                ctx.fillStyle = col.text;
+                ctx.globalAlpha = 0.8;
+                const dimX = Math.min(p1.cx, p1.cx + w) + Math.abs(w) / 2;
+                const dimY = Math.max(p1.cy, p1.cy + h) + 6;
+                ctx.fillText(dimLabel, dimX, dimY);
+            }
+            ctx.restore();
+        }
+
+        // Freehand live preview
+        if (toolType === 'freehand' && _freehandPoints && _freehandPoints.length >= 2) {
+            const col = ANNOTATION_COLORS[state._annotatePreviewColor || 'blue'];
+            ctx.save();
+            ctx.strokeStyle = col.stroke;
+            ctx.lineWidth = 2;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            ctx.setLineDash([]);
+            ctx.beginPath();
+            const fp0 = roomFtToCanvasPx(_freehandPoints[0].x, _freehandPoints[0].y);
+            ctx.moveTo(fp0.cx, fp0.cy);
+            for (let i = 1; i < _freehandPoints.length; i++) {
+                const fpi = roomFtToCanvasPx(_freehandPoints[i].x, _freehandPoints[i].y);
+                ctx.lineTo(fpi.cx, fpi.cy);
+            }
+            ctx.stroke();
+            ctx.restore();
             scheduleRender();
         }
     }

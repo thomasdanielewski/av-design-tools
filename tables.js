@@ -350,6 +350,8 @@ function checkMicRange() {
     }
 }
 
+// ── Geometry Helpers ─────────────────────────────────────────
+
 function getTableCorners(tbl) {
     const cx = tbl.x;
     const cy = tbl.dist + tbl.length / 2;

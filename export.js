@@ -113,14 +113,6 @@ function downloadPDF() {
     doc.text(`Companion Devices:  ${companionStr}`, textX, textY); textY += lineH;
     doc.text(`Total Seating Capacity:  ${capacityStr}`, textX, textY); textY += lineH;
 
-    // Environment summary
-    const wallMatStr = Object.entries(state.wallMaterials)
-        .map(([w, m]) => `${w[0].toUpperCase()}: ${m.replace(/-/g, ' ')}`)
-        .join(', ');
-    doc.text(`Wall Materials:  ${wallMatStr}`, textX, textY); textY += lineH;
-    doc.text(`Surfaces:  ${state.ceilingType.replace(/-/g, ' ')} ceiling, ${state.floorMaterial} floor`, textX, textY); textY += lineH;
-    const rt60 = calcRT60().toFixed(1);
-    doc.text(`Est. RT60:  ${rt60}s  |  Lighting:  ${state.lightingType.replace(/-/g, ' ')}  |  HVAC Noise:  ${state.hvacNoise}`, textX, textY); textY += lineH;
     doc.text(`Date:  ${timestamp}`, textX, textY);
 
     // 5. Save

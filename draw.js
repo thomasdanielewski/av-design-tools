@@ -89,14 +89,6 @@ function drawDisplayPOV(x, y, w, h, label) {
 }
 
 /**
- * Draw coverage arcs for a device (mic pickup and/or camera FOV).
- * Uses the global ppf_g for scaling.
- * @param {number} devX    - Device center X in canvas px
- * @param {number} devY    - Device center Y in canvas px
- * @param {object} device  - EQUIPMENT entry
- * @param {number} facingAngle - Angle the device faces (radians)
- */
-/**
  * Draw a single coverage arc (full-circle or sector) for a device overlay.
  * @param {CanvasRenderingContext2D} drawCtx - Canvas 2D context
  * @param {number} devX        - Device center X in canvas px
@@ -159,6 +151,15 @@ function _drawCoverageArc(drawCtx, devX, devY, radius, facingAngle, arcDeg, fill
     }
 }
 
+/**
+ * Draw coverage arcs for a device (mic pickup and/or camera FOV).
+ * Uses the global ppf_g for scaling.
+ * @param {CanvasRenderingContext2D} drawCtx - Canvas 2D context
+ * @param {number} devX    - Device center X in canvas px
+ * @param {number} devY    - Device center Y in canvas px
+ * @param {object} device  - EQUIPMENT entry
+ * @param {number} facingAngle - Angle the device faces (radians)
+ */
 function drawCoverage(drawCtx, devX, devY, device, facingAngle) {
     if (state.showMic) {
         _drawCoverageArc(drawCtx, devX, devY, device.micRange * ppf_g, facingAngle,
@@ -244,56 +245,6 @@ function drawRoom(drawCtx, rx, ry, rw, rl, ppf) {
     }
 
     return wallThick;
-}
-
-/**
- * Draw wall material color overlay when showEnvironment is enabled.
- */
-function drawWallMaterialOverlay(drawCtx, rx, ry, rw, rl, ppf) {
-    if (!state.showEnvironment) return;
-    const wallThick = Math.max(5, ppf * 0.25);
-    const colors = {
-        'drywall': 'rgba(180,180,180,0.12)',
-        'glass': 'rgba(140,210,235,0.10)',
-        'wood': 'rgba(160,120,60,0.22)',
-        'concrete': 'rgba(128,128,128,0.22)',
-        'acoustic-panel': 'rgba(100,200,100,0.25)'
-    };
-    const walls = {
-        north: [rx, ry, rw, wallThick],
-        south: [rx, ry + rl - wallThick, rw, wallThick],
-        west:  [rx, ry, wallThick, rl],
-        east:  [rx + rw - wallThick, ry, wallThick, rl]
-    };
-    for (const [wall, rect] of Object.entries(walls)) {
-        drawCtx.fillStyle = colors[state.wallMaterials[wall]] || colors['drywall'];
-        drawCtx.fillRect(...rect);
-    }
-
-    // Glass wall accent — draw dashed translucent line over glass walls
-    for (const [wall, rect] of Object.entries(walls)) {
-        if (state.wallMaterials[wall] !== 'glass') continue;
-        drawCtx.save();
-        drawCtx.strokeStyle = 'rgba(140,220,240,0.45)';
-        drawCtx.lineWidth = 1;
-        drawCtx.setLineDash([6, 4]);
-        const [wx, wy, ww, wh] = rect;
-        const isHoriz = ww > wh;
-        if (isHoriz) {
-            const my = wy + wh / 2;
-            drawCtx.beginPath();
-            drawCtx.moveTo(wx, my);
-            drawCtx.lineTo(wx + ww, my);
-            drawCtx.stroke();
-        } else {
-            const mx = wx + ww / 2;
-            drawCtx.beginPath();
-            drawCtx.moveTo(mx, wy);
-            drawCtx.lineTo(mx, wy + wh);
-            drawCtx.stroke();
-        }
-        drawCtx.restore();
-    }
 }
 
 /**
@@ -650,9 +601,30 @@ function getChairPositions(table) {
     }
 
     // Filter out chairs on the display-wall side of the table
-    // (between camera/display and table — backs would face the camera)
+    // (between camera/display and table — backs would face the camera).
+    // The "toward display wall" direction in room-space depends on which wall has the display.
+    const dw = state.displayWall;
+    const twX = dw === 'west' ? -1 : dw === 'east' ? 1 : 0;
+    const twY = dw === 'north' ? -1 : dw === 'south' ? 1 : 0;
     const rot = (table.rotation || 0) * Math.PI / 180;
-    return chairs.filter(ch => Math.sin(ch.angle + rot) >= 0);
+
+    // When the camera faces along the table's short axis, end-of-table
+    // chairs show side profiles and clutter the camera view. Use a stricter
+    // filter that keeps only far-side seating. When the camera faces along
+    // the long axis, perpendicular side chairs are acceptable.
+    const cosR = Math.cos(rot), sinR = Math.sin(rot);
+    // Table length axis in room-space (length is along local Y)
+    const cameraAlongLength = Math.abs(twX * sinR + twY * cosR);
+    // cameraAlongLength ≈ 1 → camera faces the long axis (keep side chairs)
+    // cameraAlongLength ≈ 0 → camera faces the short axis (only far side)
+    const threshold = cameraAlongLength > 0.5 ? 0.01 : -0.4;
+
+    return chairs.filter(ch => {
+        // Chair outward direction in room-space (after table rotation)
+        const a = ch.angle + rot;
+        const dot = Math.cos(a) * twX + Math.sin(a) * twY;
+        return dot < threshold;
+    });
 }
 
 /**
@@ -673,6 +645,7 @@ function calcTotalCapacity() {
  * @param {number} alpha - opacity (1.0 for selected, 0.55 for others)
  */
 function drawChairsForTable(drawCtx, chairs, ppf, alpha) {
+    if (ppf <= 0) return;
     const cw = CHAIR_WIDTH * ppf;
     const cd = CHAIR_DEPTH * ppf;
 
@@ -2197,4 +2170,244 @@ function drawSeatStatusIndicators(drawCtx, classifiedSeats, occupiedSeats, ppf, 
             drawCtx.lineJoin = 'miter';
         }
     }
+}
+
+// ── Annotation Drawing ──────────────────────────────────────────
+
+function drawAnnotations(drawCtx, ppf) {
+    if (!state.annotations || state.annotations.length === 0) return;
+
+    for (const a of state.annotations) {
+        const col = ANNOTATION_COLORS[a.color || 'blue'];
+        const isSelected = a.id === state.selectedAnnotationId;
+        const lineW = Math.max(1.5, ppf * 0.04);
+
+        drawCtx.save();
+
+        if (a.type === 'rect') {
+            const p = roomFtToCanvasPx(a.x, a.y);
+            const w = (a.w || 0) * ppf;
+            const h = (a.h || 0) * ppf;
+            if (a.filled !== false) {
+                drawCtx.fillStyle = col.fill;
+                drawCtx.fillRect(p.cx, p.cy, w, h);
+            }
+            drawCtx.strokeStyle = col.stroke;
+            drawCtx.lineWidth = lineW;
+            drawCtx.setLineDash([4, 3]);
+            drawCtx.strokeRect(p.cx, p.cy, w, h);
+            if (isSelected) {
+                _drawAnnotationSelectionRing(drawCtx, p.cx, p.cy, w, h);
+                _drawAnnotationDimensions(drawCtx, p.cx, p.cy, w, h, a.w, a.h, col);
+            }
+        }
+
+        else if (a.type === 'zone') {
+            const p = roomFtToCanvasPx(a.x, a.y);
+            const w = (a.w || 0) * ppf;
+            const h = (a.h || 0) * ppf;
+            if (a.filled !== false) {
+                drawCtx.fillStyle = col.fill;
+                drawCtx.fillRect(p.cx, p.cy, w, h);
+            }
+            drawCtx.strokeStyle = col.stroke;
+            drawCtx.lineWidth = lineW;
+            drawCtx.setLineDash([6, 3]);
+            drawCtx.strokeRect(p.cx, p.cy, w, h);
+            // Zone label centered
+            const fontSize = Math.max(9, ppf * 0.3 * (a.fontSize || 1));
+            drawCtx.font = `600 ${fontSize}px 'JetBrains Mono', monospace`;
+            drawCtx.textAlign = 'center';
+            drawCtx.textBaseline = 'middle';
+            drawCtx.fillStyle = col.text;
+            drawCtx.fillText(a.text || 'Zone', p.cx + w / 2, p.cy + h / 2);
+            if (isSelected) {
+                _drawAnnotationSelectionRing(drawCtx, p.cx, p.cy, w, h);
+                _drawAnnotationDimensions(drawCtx, p.cx, p.cy, w, h, a.w, a.h, col);
+            }
+        }
+
+        else if (a.type === 'circle') {
+            const cx = a.x + (a.w || 0) / 2;
+            const cy = a.y + (a.h || 0) / 2;
+            const cp = roomFtToCanvasPx(cx, cy);
+            const rx = ((a.w || 0) / 2) * ppf;
+            const ry = ((a.h || 0) / 2) * ppf;
+            drawCtx.beginPath();
+            drawCtx.ellipse(cp.cx, cp.cy, Math.max(1, rx), Math.max(1, ry), 0, 0, Math.PI * 2);
+            if (a.filled !== false) {
+                drawCtx.fillStyle = col.fill;
+                drawCtx.fill();
+            }
+            drawCtx.strokeStyle = col.stroke;
+            drawCtx.lineWidth = lineW;
+            drawCtx.setLineDash([4, 3]);
+            drawCtx.stroke();
+            if (isSelected) _drawAnnotationSelectionRing(drawCtx, cp.cx - rx, cp.cy - ry, rx * 2, ry * 2);
+        }
+
+        else if (a.type === 'line') {
+            const p1 = roomFtToCanvasPx(a.x, a.y);
+            const p2 = roomFtToCanvasPx(a.x2, a.y2);
+            drawCtx.strokeStyle = col.stroke;
+            drawCtx.lineWidth = Math.max(2, ppf * 0.06);
+            drawCtx.setLineDash([]);
+            drawCtx.beginPath();
+            drawCtx.moveTo(p1.cx, p1.cy);
+            drawCtx.lineTo(p2.cx, p2.cy);
+            drawCtx.stroke();
+            if (isSelected) {
+                drawCtx.strokeStyle = 'rgba(255,255,255,0.5)';
+                drawCtx.lineWidth = lineW + 3;
+                drawCtx.setLineDash([3, 3]);
+                drawCtx.beginPath();
+                drawCtx.moveTo(p1.cx, p1.cy);
+                drawCtx.lineTo(p2.cx, p2.cy);
+                drawCtx.stroke();
+            }
+        }
+
+        else if (a.type === 'arrow') {
+            const p1 = roomFtToCanvasPx(a.x, a.y);
+            const p2 = roomFtToCanvasPx(a.x2, a.y2);
+            const lw = Math.max(2, ppf * 0.06);
+            drawCtx.strokeStyle = col.stroke;
+            drawCtx.lineWidth = lw;
+            drawCtx.setLineDash([]);
+            drawCtx.beginPath();
+            drawCtx.moveTo(p1.cx, p1.cy);
+            drawCtx.lineTo(p2.cx, p2.cy);
+            drawCtx.stroke();
+            // Arrowhead
+            const dx = p2.cx - p1.cx;
+            const dy = p2.cy - p1.cy;
+            const len = Math.sqrt(dx * dx + dy * dy);
+            if (len > 4) {
+                const headLen = Math.min(14, len * 0.3);
+                const angle = Math.atan2(dy, dx);
+                drawCtx.fillStyle = col.stroke;
+                drawCtx.beginPath();
+                drawCtx.moveTo(p2.cx, p2.cy);
+                drawCtx.lineTo(p2.cx - headLen * Math.cos(angle - 0.4), p2.cy - headLen * Math.sin(angle - 0.4));
+                drawCtx.lineTo(p2.cx - headLen * Math.cos(angle + 0.4), p2.cy - headLen * Math.sin(angle + 0.4));
+                drawCtx.closePath();
+                drawCtx.fill();
+            }
+            if (isSelected) {
+                drawCtx.strokeStyle = 'rgba(255,255,255,0.5)';
+                drawCtx.lineWidth = lw + 3;
+                drawCtx.setLineDash([3, 3]);
+                drawCtx.beginPath();
+                drawCtx.moveTo(p1.cx, p1.cy);
+                drawCtx.lineTo(p2.cx, p2.cy);
+                drawCtx.stroke();
+            }
+        }
+
+        else if (a.type === 'freehand' && a.points && a.points.length >= 2) {
+            const lw = Math.max(2, ppf * 0.06);
+            drawCtx.strokeStyle = col.stroke;
+            drawCtx.lineWidth = lw;
+            drawCtx.setLineDash([]);
+            drawCtx.lineCap = 'round';
+            drawCtx.lineJoin = 'round';
+            drawCtx.beginPath();
+            const p0 = roomFtToCanvasPx(a.points[0].x, a.points[0].y);
+            drawCtx.moveTo(p0.cx, p0.cy);
+            for (let i = 1; i < a.points.length; i++) {
+                const pi = roomFtToCanvasPx(a.points[i].x, a.points[i].y);
+                drawCtx.lineTo(pi.cx, pi.cy);
+            }
+            drawCtx.stroke();
+            if (isSelected) {
+                drawCtx.strokeStyle = 'rgba(255,255,255,0.5)';
+                drawCtx.lineWidth = lw + 3;
+                drawCtx.setLineDash([3, 3]);
+                drawCtx.beginPath();
+                drawCtx.moveTo(p0.cx, p0.cy);
+                for (let i = 1; i < a.points.length; i++) {
+                    const pi = roomFtToCanvasPx(a.points[i].x, a.points[i].y);
+                    drawCtx.lineTo(pi.cx, pi.cy);
+                }
+                drawCtx.stroke();
+            }
+        }
+
+        else if (a.type === 'text') {
+            const p = roomFtToCanvasPx(a.x, a.y);
+            const fontSize = Math.max(9, ppf * 0.35 * (a.fontSize || 1));
+            drawCtx.font = `600 ${fontSize}px 'JetBrains Mono', monospace`;
+            const text = a.text || 'Label';
+            const tw = drawCtx.measureText(text).width;
+            const pad = 4;
+            // Background pill
+            drawCtx.fillStyle = col.fill;
+            roundRect(drawCtx, p.cx - pad, p.cy - fontSize - pad, tw + pad * 2, fontSize + pad * 2, 3);
+            drawCtx.fill();
+            if (isSelected) {
+                drawCtx.strokeStyle = 'rgba(255,255,255,0.5)';
+                drawCtx.lineWidth = 1.5;
+                drawCtx.setLineDash([3, 3]);
+                drawCtx.stroke();
+            }
+            // Text
+            drawCtx.fillStyle = col.text;
+            drawCtx.textAlign = 'left';
+            drawCtx.textBaseline = 'alphabetic';
+            drawCtx.fillText(text, p.cx, p.cy);
+        }
+
+        drawCtx.restore();
+
+        // Delete button (only on hovered or selected annotation)
+        if (isSelected || a.id === _hoveredAnnotationId) {
+            _drawAnnotationDeleteBtn(drawCtx, a, ppf);
+        }
+    }
+}
+
+/** Draw selection ring around an annotation bounding box */
+function _drawAnnotationSelectionRing(drawCtx, x, y, w, h) {
+    drawCtx.save();
+    drawCtx.strokeStyle = 'rgba(255,255,255,0.5)';
+    drawCtx.lineWidth = 1.5;
+    drawCtx.setLineDash([3, 3]);
+    drawCtx.strokeRect(x - 3, y - 3, w + 6, h + 6);
+    drawCtx.restore();
+}
+
+/** Draw width x height dimension label below a selected rect/zone annotation */
+function _drawAnnotationDimensions(drawCtx, px, py, pw, ph, wFt, hFt, col) {
+    drawCtx.save();
+    const label = formatFtIn(wFt) + ' \u00d7 ' + formatFtIn(hFt);
+    const fontSize = 10;
+    drawCtx.font = `500 ${fontSize}px 'JetBrains Mono', monospace`;
+    drawCtx.textAlign = 'center';
+    drawCtx.textBaseline = 'top';
+    drawCtx.fillStyle = col.text;
+    drawCtx.globalAlpha = 0.75;
+    drawCtx.fillText(label, px + pw / 2, py + ph + 6);
+    drawCtx.restore();
+}
+
+/** Draw the delete button (X circle) on an annotation */
+function _drawAnnotationDeleteBtn(drawCtx, a, ppf) {
+    const pos = _getAnnotationDeleteBtnPos(a, ppf);
+    if (!pos) return;
+    const { x, y, r } = pos;
+    drawCtx.save();
+    drawCtx.fillStyle = 'rgba(239, 68, 68, 0.75)';
+    drawCtx.beginPath();
+    drawCtx.arc(x, y, r, 0, Math.PI * 2);
+    drawCtx.fill();
+    drawCtx.strokeStyle = 'rgba(255,255,255,0.9)';
+    drawCtx.lineWidth = 1.5;
+    const xOff = 3;
+    drawCtx.beginPath();
+    drawCtx.moveTo(x - xOff, y - xOff);
+    drawCtx.lineTo(x + xOff, y + xOff);
+    drawCtx.moveTo(x + xOff, y - xOff);
+    drawCtx.lineTo(x - xOff, y + xOff);
+    drawCtx.stroke();
+    drawCtx.restore();
 }
