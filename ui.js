@@ -412,10 +412,6 @@ function toggleMeetingMode() {
     const btn = DOM['meeting-mode-btn'];
     if (btn) btn.classList.toggle('active', state.meetingMode);
 
-    // Show/hide sidebar section
-    const cg = DOM['cg-meeting'];
-    if (cg) cg.style.display = state.meetingMode ? '' : 'none';
-
     // Show/hide camera preview panel with fade-in
     const preview = DOM['meeting-camera-preview'];
     if (preview) {
@@ -428,9 +424,24 @@ function toggleMeetingMode() {
                 preview.style.opacity = '1';
                 preview.style.transform = 'translateY(0)';
             });
+            // Hint animation on settings tray
+            const tray = DOM['meeting-settings-tray'];
+            if (tray) {
+                tray.classList.remove('hint', 'expanded');
+                void tray.offsetWidth; // force reflow for re-trigger
+                tray.classList.add('hint');
+                tray.addEventListener('animationend', () => tray.classList.remove('hint'), { once: true });
+            }
+            const gearBtn = DOM['meeting-settings-toggle'];
+            if (gearBtn) gearBtn.classList.remove('active');
+            updateMeetingSettingsSummary();
         } else {
             preview.style.display = 'none';
             preview.classList.remove('expanded');
+            const tray = DOM['meeting-settings-tray'];
+            if (tray) tray.classList.remove('expanded', 'hint');
+            const gearBtn = DOM['meeting-settings-toggle'];
+            if (gearBtn) gearBtn.classList.remove('active');
         }
     }
 
@@ -482,6 +493,38 @@ function toggleMeetingExpand() {
         // Re-render mid-transition and at end to catch the final width
         setTimeout(() => { invalidateMeetingCache(); scheduleRender(); }, 200);
         setTimeout(() => { invalidateMeetingCache(); scheduleRender(); }, 420);
+    }
+}
+
+/** Toggle the meeting settings tray open/closed */
+function toggleMeetingSettings() {
+    const tray = DOM['meeting-settings-tray'];
+    const btn = DOM['meeting-settings-toggle'];
+    if (!tray) return;
+    const expanded = tray.classList.toggle('expanded');
+    if (btn) btn.classList.toggle('active', expanded);
+    // Re-init slider tracks for newly-visible range inputs
+    if (expanded) {
+        tray.querySelectorAll('input[type="range"]').forEach(inp => updateSliderTrack(inp));
+    }
+}
+
+/** Update the summary chips in the collapsed settings tray */
+function updateMeetingSettingsSummary() {
+    const chipFraming = document.getElementById('chip-framing');
+    const chipParticipants = document.getElementById('chip-participants');
+    const chipZone = document.getElementById('chip-zone');
+    if (chipFraming) {
+        const sel = DOM['meeting-framing'];
+        chipFraming.textContent = sel ? sel.options[sel.selectedIndex].text : 'Group';
+    }
+    if (chipParticipants) {
+        const val = DOM['meeting-participants'] ? parseInt(DOM['meeting-participants'].value) : 0;
+        chipParticipants.textContent = val === 0 ? 'Auto' : val + ' participants';
+    }
+    if (chipZone) {
+        const val = DOM['meeting-zone-depth'] ? parseFloat(DOM['meeting-zone-depth'].value) : 1;
+        chipZone.textContent = 'Zone ' + Math.round(val * 100) + '%';
     }
 }
 

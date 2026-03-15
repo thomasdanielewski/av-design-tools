@@ -6,6 +6,10 @@ let _hoveredAnnotationId = null;
 /** Freehand annotation drawing state */
 let _freehandPoints = null; // array of {x, y} in room-feet while drawing
 
+/** Annotation resize/rotate drag state */
+let _annResizeHandle = null; // { handleId, annotation, startMx, startMy, origProps }
+let _annRotating = null; // { annotation, centerX, centerY, startAngle, origRotation }
+
 // ── Drag discoverability hint ────────────────────────────────
 let _dragHintShown = false;
 let _contextMenuHintShown = false;
@@ -368,9 +372,13 @@ canvas.addEventListener('mousemove', e => {
 
         // Annotation hover tracking (for hover-only delete buttons)
         const prevHoveredAnn = _hoveredAnnotationId;
+        let annHandleCursor = null;
         if (!state.annotateToolActive && !state.measureToolActive) {
             const hitAnn = hitTestAnnotation(mx, my);
             _hoveredAnnotationId = hitAnn ? hitAnn.id : null;
+            // Check resize/rotate handle hover for cursor
+            const handleHit = hitTestAnnotationHandle(mx, my);
+            if (handleHit) annHandleCursor = handleHit.cursor;
         } else {
             _hoveredAnnotationId = null;
         }
@@ -380,6 +388,7 @@ canvas.addEventListener('mousemove', e => {
             : onRotateHandle ? 'crosshair'
             : onTarget === 'delete' ? 'pointer'
             : onTarget === 'measure' ? 'grab'
+            : annHandleCursor ? annHandleCursor
             : _hoveredAnnotationId ? 'grab'
             : onTarget ? 'grab' : '';
 
@@ -820,6 +829,8 @@ let _selectedMeasureId = null;
 function resetDrag() {
     drag = { ...DRAG_IDLE };
     snapGuides = [];
+    _annResizeHandle = null;
+    _annRotating = null;
 }
 
 // ── Drag-start helpers ────────────────────────────────────────
@@ -1035,6 +1046,62 @@ canvas.addEventListener('mousedown', e => {
         if (annDelId !== null) {
             removeAnnotation(annDelId);
             return;
+        }
+
+        // Check resize/rotate handle hit-test on selected annotation (before tool mode)
+        if (!state.annotateToolActive) {
+            const handleHit = hitTestAnnotationHandle(mx, my);
+            if (handleHit) {
+                const a = handleHit.annotation;
+                if (handleHit.handleId === 'rotate') {
+                    // Start rotation drag
+                    const bbox = _getAnnotationBBox(a, getTopDownLayout().ppf);
+                    if (bbox) {
+                        const cx = bbox.x + bbox.w / 2;
+                        const cy = bbox.y + bbox.h / 2;
+                        _annRotating = {
+                            annotation: a,
+                            centerX: cx,
+                            centerY: cy,
+                            startAngle: Math.atan2(my - cy, mx - cx),
+                            origRotation: a.rotation || 0
+                        };
+                        canvas.style.cursor = 'grabbing';
+                        pushHistory('rotated annotation');
+                        scheduleRender();
+                        return;
+                    }
+                } else {
+                    // Start resize drag — save original properties
+                    const origProps = {};
+                    if (a.type === 'line' || a.type === 'arrow') {
+                        origProps.x = a.x; origProps.y = a.y;
+                        origProps.x2 = a.x2; origProps.y2 = a.y2;
+                    } else if (a.type === 'freehand' && a.points) {
+                        origProps.points = a.points.map(p => ({ x: p.x, y: p.y }));
+                        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+                        for (const pt of a.points) {
+                            minX = Math.min(minX, pt.x); minY = Math.min(minY, pt.y);
+                            maxX = Math.max(maxX, pt.x); maxY = Math.max(maxY, pt.y);
+                        }
+                        origProps.minX = minX; origProps.minY = minY;
+                        origProps.maxX = maxX; origProps.maxY = maxY;
+                    } else {
+                        origProps.x = a.x; origProps.y = a.y;
+                        origProps.w = a.w; origProps.h = a.h;
+                    }
+                    _annResizeHandle = {
+                        handleId: handleHit.handleId,
+                        annotation: a,
+                        startMx: mx, startMy: my,
+                        origProps
+                    };
+                    canvas.style.cursor = handleHit.cursor;
+                    pushHistory('resized annotation');
+                    scheduleRender();
+                    return;
+                }
+            }
         }
 
         if (state.annotateToolActive) {
@@ -1279,6 +1346,110 @@ canvas.addEventListener('mousemove', e => {
     if (drag.annotationCreate && _annotateCreateStart && state.viewMode === 'top') {
         const { mx, my } = getDragMetrics(e);
         _annotateHoverPx = { x: mx, y: my };
+        scheduleRender();
+        return;
+    }
+
+    // Annotation resize handle drag
+    if (_annResizeHandle) {
+        const { mx, my, ppf } = getDragMetrics(e);
+        const { handleId, annotation: a, origProps } = _annResizeHandle;
+
+        if (a.type === 'line' || a.type === 'arrow') {
+            // Move the endpoint being dragged
+            const ft = canvasPxToRoomFt(mx, my);
+            const snapped = snapMeasurePoint(ft.x, ft.y);
+            if (handleId === 'p1') {
+                a.x = snapped.x; a.y = snapped.y;
+            } else if (handleId === 'p2') {
+                a.x2 = snapped.x; a.y2 = snapped.y;
+            }
+        } else if (a.type === 'freehand' && a.points) {
+            // Scale freehand points from original bounding box
+            const { minX, minY, maxX, maxY, points: origPts } = origProps;
+            const origW = maxX - minX;
+            const origH = maxY - minY;
+            if (origW < 0.01 || origH < 0.01) { scheduleRender(); return; }
+
+            const curFt = canvasPxToRoomFt(mx, my);
+            let newMinX = minX, newMinY = minY, newMaxX = maxX, newMaxY = maxY;
+
+            if (handleId.includes('e')) newMaxX = Math.max(minX + 0.3, curFt.x);
+            if (handleId.includes('w')) newMinX = Math.min(maxX - 0.3, curFt.x);
+            if (handleId.includes('s')) newMaxY = Math.max(minY + 0.3, curFt.y);
+            if (handleId.includes('n')) newMinY = Math.min(maxY - 0.3, curFt.y);
+
+            const newW = newMaxX - newMinX;
+            const newH = newMaxY - newMinY;
+            const sx = newW / origW;
+            const sy = newH / origH;
+
+            for (let i = 0; i < a.points.length; i++) {
+                a.points[i].x = newMinX + (origPts[i].x - minX) * sx;
+                a.points[i].y = newMinY + (origPts[i].y - minY) * sy;
+            }
+        } else {
+            // rect / zone / circle: resize bounding box
+            const curFt = canvasPxToRoomFt(mx, my);
+            const snapped = snapMeasurePoint(curFt.x, curFt.y);
+            let { x, y, w, h } = origProps;
+            const minSize = 0.3;
+
+            if (handleId === 'se') {
+                w = Math.max(minSize, snapped.x - x);
+                h = Math.max(minSize, snapped.y - y);
+            } else if (handleId === 'sw') {
+                const right = x + w;
+                x = Math.min(right - minSize, snapped.x);
+                w = right - x;
+                h = Math.max(minSize, snapped.y - y);
+            } else if (handleId === 'ne') {
+                const bottom = y + h;
+                w = Math.max(minSize, snapped.x - x);
+                y = Math.min(bottom - minSize, snapped.y);
+                h = bottom - y;
+            } else if (handleId === 'nw') {
+                const right = x + w;
+                const bottom = y + h;
+                x = Math.min(right - minSize, snapped.x);
+                y = Math.min(bottom - minSize, snapped.y);
+                w = right - x;
+                h = bottom - y;
+            } else if (handleId === 'n') {
+                const bottom = y + h;
+                y = Math.min(bottom - minSize, snapped.y);
+                h = bottom - y;
+            } else if (handleId === 's') {
+                h = Math.max(minSize, snapped.y - y);
+            } else if (handleId === 'e') {
+                w = Math.max(minSize, snapped.x - x);
+            } else if (handleId === 'w') {
+                const right = x + w;
+                x = Math.min(right - minSize, snapped.x);
+                w = right - x;
+            }
+
+            a.x = +x.toFixed(2);
+            a.y = +y.toFixed(2);
+            a.w = +w.toFixed(2);
+            a.h = +h.toFixed(2);
+        }
+        scheduleRender();
+        return;
+    }
+
+    // Annotation rotation drag
+    if (_annRotating) {
+        const { mx, my } = getDragMetrics(e);
+        const { annotation: a, centerX, centerY, startAngle, origRotation } = _annRotating;
+        const curAngle = Math.atan2(my - centerY, mx - centerX);
+        let degrees = origRotation + (curAngle - startAngle) * (180 / Math.PI);
+        // Snap to 5-degree increments
+        degrees = Math.round(degrees / 5) * 5;
+        // Normalize to -180..180
+        while (degrees > 180) degrees -= 360;
+        while (degrees < -180) degrees += 360;
+        a.rotation = degrees;
         scheduleRender();
         return;
     }
@@ -1737,6 +1908,16 @@ canvas.addEventListener('mouseup', (e) => {
             addAnnotation({ type: 'freehand', points: simplified, color });
         }
         _freehandPoints = null;
+    }
+
+    // Commit annotation resize/rotate
+    if (_annResizeHandle) {
+        _annResizeHandle = null;
+        syncAnnotationPropsUI();
+    }
+    if (_annRotating) {
+        _annRotating = null;
+        syncAnnotationPropsUI();
     }
 
     // Commit annotation drag-create (rect/circle/zone)

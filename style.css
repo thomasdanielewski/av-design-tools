@@ -1756,6 +1756,105 @@ body.animating #fg-canvas {
 }
 
 
+/* Canvas View Mode Toggle */
+@keyframes cvt-enter {
+    from { opacity: 0; transform: translateY(-6px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+.canvas-view-toggle {
+    position: absolute;
+    top: var(--space-lg);
+    left: var(--space-lg);
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 0;
+    z-index: 10;
+    border-radius: 100px;
+    background: rgba(22, 22, 26, 0.70);
+    border: 1px solid var(--border-subtle);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    box-shadow:
+        0 0 0 1px rgba(255, 255, 255, 0.10),
+        0 2px 8px rgba(0, 0, 0, 0.35),
+        0 8px 32px rgba(0, 0, 0, 0.25),
+        0 20px 56px rgba(0, 0, 0, 0.18),
+        inset 0 1px 1px rgba(255, 255, 255, 0.12);
+    overflow: hidden;
+    animation: cvt-enter 0.35s var(--ease-out) both;
+    transition:
+        backdrop-filter 0.2s var(--ease-out),
+        -webkit-backdrop-filter 0.2s var(--ease-out),
+        background 0.2s var(--ease-out);
+}
+
+.canvas-view-toggle:hover {
+    backdrop-filter: blur(40px) saturate(2.0) brightness(1.15);
+    -webkit-backdrop-filter: blur(40px) saturate(2.0) brightness(1.15);
+    background: rgba(22, 22, 26, 0.82);
+}
+
+.cvt-btn {
+    height: 32px;
+    padding: 0 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 11px;
+    font-family: var(--font-mono);
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.15s var(--ease-out), color 0.15s var(--ease-out);
+    flex-shrink: 0;
+    letter-spacing: 0.03em;
+}
+
+.cvt-btn:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+}
+
+.cvt-btn:active {
+    background: var(--bg-active);
+}
+
+.cvt-btn.active {
+    color: var(--text-primary);
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.cvt-divider {
+    width: 1px;
+    height: 16px;
+    background: var(--border-subtle);
+    flex-shrink: 0;
+}
+
+[data-theme="light"] .canvas-view-toggle {
+    background: rgba(245, 245, 247, 0.75);
+    box-shadow:
+        0 0 0 1px rgba(0, 0, 0, 0.07),
+        0 2px 6px rgba(0, 0, 0, 0.07),
+        0 8px 24px rgba(0, 0, 0, 0.05),
+        0 20px 48px rgba(0, 0, 0, 0.03),
+        inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+[data-theme="light"] .canvas-view-toggle:hover {
+    backdrop-filter: blur(40px) saturate(2.0) brightness(1.15);
+    -webkit-backdrop-filter: blur(40px) saturate(2.0) brightness(1.15);
+    background: rgba(245, 245, 247, 0.90);
+}
+
+[data-theme="light"] .cvt-btn.active {
+    background: rgba(0, 0, 0, 0.06);
+}
+
 /* ══════════════════════════════════════════════════════════════
    UNDO / REDO / SHARE
    ══════════════════════════════════════════════════════════════ */
@@ -2072,6 +2171,123 @@ body.animating #fg-canvas {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+}
+
+/* Meeting settings tray — collapsible controls inside preview panel */
+.meeting-settings-tray {
+    border-top: 1px solid var(--border);
+    background: var(--bg-elevated);
+    overflow: hidden;
+    max-height: 34px;
+    transition: max-height 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.meeting-settings-tray.expanded {
+    max-height: 280px;
+}
+.meeting-settings-summary {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    font-size: 10px;
+    font-family: var(--font-mono);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: background 0.15s;
+    user-select: none;
+}
+.meeting-settings-summary:hover {
+    background: rgba(255, 255, 255, 0.04);
+}
+.meeting-settings-summary svg {
+    transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.meeting-settings-tray.expanded .meeting-settings-summary svg {
+    transform: rotate(180deg);
+}
+.setting-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 1px 8px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid var(--border-subtle);
+    font-size: 10px;
+    color: var(--text-primary);
+    white-space: nowrap;
+}
+.meeting-settings-body {
+    padding: 4px 14px 12px;
+    border-top: 1px solid var(--border-subtle);
+    opacity: 0;
+    transition: opacity 0.25s cubic-bezier(0.22, 1, 0.36, 1) 0.1s;
+}
+.meeting-settings-tray.expanded .meeting-settings-body {
+    opacity: 1;
+}
+/* Compact overrides for controls inside the preview panel */
+.meeting-settings-body .control-row {
+    margin-bottom: 8px;
+}
+.meeting-settings-body .control-row:last-of-type {
+    margin-bottom: 6px;
+}
+.meeting-settings-body .control-label label,
+.meeting-settings-body .control-label span {
+    font-size: 11px;
+}
+.meeting-settings-body .check-row {
+    padding: 3px 0;
+    font-size: 11px;
+}
+.meeting-settings-body select {
+    font-size: 11px;
+}
+/* Gear button active state */
+#meeting-settings-toggle.active {
+    color: var(--text-primary);
+    background: rgba(255, 255, 255, 0.08);
+}
+#meeting-settings-toggle svg {
+    transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+}
+#meeting-settings-toggle.active svg {
+    transform: rotate(60deg);
+}
+/* Hint animation — pulses the summary bar on meeting mode activation */
+@keyframes meeting-settings-hint {
+    0%   { background: transparent; }
+    30%  { background: rgba(238, 50, 36, 0.10); }
+    100% { background: transparent; }
+}
+.meeting-settings-tray.hint .meeting-settings-summary {
+    animation: meeting-settings-hint 1.8s cubic-bezier(0.22, 1, 0.36, 1) 0.4s;
+}
+/* Light theme overrides */
+[data-theme="light"] .meeting-settings-tray {
+    background: rgba(255, 255, 255, 0.6);
+}
+[data-theme="light"] .meeting-settings-summary:hover {
+    background: rgba(0, 0, 0, 0.04);
+}
+[data-theme="light"] .setting-chip {
+    background: rgba(0, 0, 0, 0.05);
+    border-color: rgba(0, 0, 0, 0.08);
+}
+[data-theme="light"] #meeting-settings-toggle.active {
+    background: rgba(0, 0, 0, 0.06);
+}
+@media (prefers-reduced-motion: reduce) {
+    .meeting-settings-tray,
+    .meeting-settings-summary svg,
+    #meeting-settings-toggle svg,
+    .meeting-settings-body {
+        transition: none;
+    }
+    .meeting-settings-tray.hint .meeting-settings-summary {
+        animation: none;
+    }
 }
 
 /* Meeting mode toggle button active state */
@@ -3599,4 +3815,118 @@ select:focus-visible {
     background: var(--brand-dim);
     border-color: var(--brand);
     color: var(--brand);
+}
+
+/* ── Floating Annotation Toolbar ───────────────────────────── */
+
+.annotation-floating-toolbar {
+    position: absolute;
+    top: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 90;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-lg);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(255,255,255,0.05);
+    animation: aft-slide-in 0.25s ease-out;
+}
+
+@keyframes aft-slide-in {
+    from {
+        opacity: 0;
+        transform: translateX(-50%) translateY(-12px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+    }
+}
+
+.aft-tools {
+    display: flex;
+    gap: 2px;
+}
+
+.aft-btn {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 5px 10px;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: var(--radius-sm);
+    color: var(--text-secondary);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+}
+
+.aft-btn:hover {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+}
+
+.aft-btn.active {
+    background: var(--brand-dim);
+    border-color: var(--brand);
+    color: var(--brand);
+}
+
+.aft-divider {
+    width: 1px;
+    height: 20px;
+    background: var(--border-subtle);
+    flex-shrink: 0;
+}
+
+.aft-colors {
+    display: flex;
+    gap: 5px;
+    align-items: center;
+}
+
+.aft-swatch {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    cursor: pointer;
+    border: 2px solid transparent;
+    transition: border-color 0.15s, transform 0.15s;
+}
+
+.aft-swatch:hover {
+    transform: scale(1.15);
+}
+
+.aft-swatch.active {
+    border-color: var(--text-primary);
+    box-shadow: 0 0 0 1px var(--bg-secondary);
+}
+
+.aft-close {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    background: transparent;
+    border: none;
+    border-radius: var(--radius-sm);
+    color: var(--text-tertiary);
+    font-size: 16px;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.aft-close:hover {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
 }

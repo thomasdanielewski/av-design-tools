@@ -405,21 +405,58 @@ document.querySelectorAll('[data-annotate]').forEach(btn => {
     btn.addEventListener('click', () => toggleAnnotateTool(btn.dataset.annotate));
 });
 
-// Color swatch selection
+// Color swatch selection (sidebar)
 document.getElementById('annotation-color-swatches')?.addEventListener('click', e => {
     const sw = e.target.closest('.ann-swatch');
     if (!sw) return;
     const color = sw.dataset.color;
     // Set preview color for next annotation
     state._annotatePreviewColor = color;
-    // Update active state on all swatches
+    // Update active state on all swatches (sidebar + floating)
     document.querySelectorAll('#annotation-color-swatches .ann-swatch').forEach(s => {
         s.classList.toggle('active', s.dataset.color === color);
+    });
+    document.querySelectorAll('.aft-swatch').forEach(s => {
+        s.classList.toggle('active', s.dataset.aftColor === color);
     });
     // Update selected annotation's color
     if (state.selectedAnnotationId) {
         updateAnnotation(state.selectedAnnotationId, { color });
     }
+});
+
+// ── Floating annotation toolbar ────────────────────────────────
+// Tool selection buttons
+document.querySelectorAll('[data-aft-tool]').forEach(btn => {
+    btn.addEventListener('click', () => {
+        toggleAnnotateTool(btn.dataset.aftTool);
+        // Also open sidebar group
+        const cg = document.getElementById('cg-annotations');
+        if (cg && cg.getAttribute('aria-expanded') !== 'true') expandGroup(cg);
+    });
+});
+
+// Color swatch selection (floating toolbar)
+document.getElementById('annotation-floating-toolbar')?.addEventListener('click', e => {
+    const sw = e.target.closest('.aft-swatch');
+    if (!sw) return;
+    const color = sw.dataset.aftColor;
+    state._annotatePreviewColor = color;
+    // Sync both sidebar and floating swatches
+    document.querySelectorAll('#annotation-color-swatches .ann-swatch').forEach(s => {
+        s.classList.toggle('active', s.dataset.color === color);
+    });
+    document.querySelectorAll('.aft-swatch').forEach(s => {
+        s.classList.toggle('active', s.dataset.aftColor === color);
+    });
+    if (state.selectedAnnotationId) {
+        updateAnnotation(state.selectedAnnotationId, { color });
+    }
+});
+
+// Close button
+document.getElementById('aft-close-btn')?.addEventListener('click', () => {
+    deactivateAnnotateTool();
 });
 
 // Text input for selected annotation
@@ -485,6 +522,16 @@ document.querySelectorAll('[data-action="toggle-meeting"]').forEach(btn => {
 
 // ── Meeting preview expand button ───────────────────────────
 document.getElementById('meeting-expand-btn')?.addEventListener('click', toggleMeetingExpand);
+
+// ── Meeting settings tray toggle ────────────────────────────
+document.getElementById('meeting-settings-toggle')?.addEventListener('click', toggleMeetingSettings);
+document.getElementById('meeting-settings-summary')?.addEventListener('click', toggleMeetingSettings);
+
+// Update summary chips when meeting controls change
+['meeting-participants', 'meeting-zone-depth'].forEach(id => {
+    document.getElementById(id)?.addEventListener('input', updateMeetingSettingsSummary);
+});
+document.getElementById('meeting-framing')?.addEventListener('change', updateMeetingSettingsSummary);
 
 // ── Keyboard shortcuts for undo/redo ─────────────────────────
 document.addEventListener('keydown', e => {

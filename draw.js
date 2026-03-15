@@ -2188,6 +2188,11 @@ function drawAnnotations(drawCtx, ppf) {
             const p = roomFtToCanvasPx(a.x, a.y);
             const w = (a.w || 0) * ppf;
             const h = (a.h || 0) * ppf;
+            if (a.rotation) {
+                drawCtx.translate(p.cx + w / 2, p.cy + h / 2);
+                drawCtx.rotate(a.rotation * Math.PI / 180);
+                drawCtx.translate(-(p.cx + w / 2), -(p.cy + h / 2));
+            }
             if (a.filled !== false) {
                 drawCtx.fillStyle = col.fill;
                 drawCtx.fillRect(p.cx, p.cy, w, h);
@@ -2206,6 +2211,11 @@ function drawAnnotations(drawCtx, ppf) {
             const p = roomFtToCanvasPx(a.x, a.y);
             const w = (a.w || 0) * ppf;
             const h = (a.h || 0) * ppf;
+            if (a.rotation) {
+                drawCtx.translate(p.cx + w / 2, p.cy + h / 2);
+                drawCtx.rotate(a.rotation * Math.PI / 180);
+                drawCtx.translate(-(p.cx + w / 2), -(p.cy + h / 2));
+            }
             if (a.filled !== false) {
                 drawCtx.fillStyle = col.fill;
                 drawCtx.fillRect(p.cx, p.cy, w, h);
@@ -2234,7 +2244,7 @@ function drawAnnotations(drawCtx, ppf) {
             const rx = ((a.w || 0) / 2) * ppf;
             const ry = ((a.h || 0) / 2) * ppf;
             drawCtx.beginPath();
-            drawCtx.ellipse(cp.cx, cp.cy, Math.max(1, rx), Math.max(1, ry), 0, 0, Math.PI * 2);
+            drawCtx.ellipse(cp.cx, cp.cy, Math.max(1, rx), Math.max(1, ry), (a.rotation || 0) * Math.PI / 180, 0, Math.PI * 2);
             if (a.filled !== false) {
                 drawCtx.fillStyle = col.fill;
                 drawCtx.fill();
@@ -2363,6 +2373,11 @@ function drawAnnotations(drawCtx, ppf) {
         if (isSelected || a.id === _hoveredAnnotationId) {
             _drawAnnotationDeleteBtn(drawCtx, a, ppf);
         }
+
+        // Resize/rotate handles (only on selected annotation)
+        if (isSelected) {
+            _drawAnnotationHandles(drawCtx, a, ppf);
+        }
     }
 }
 
@@ -2409,5 +2424,67 @@ function _drawAnnotationDeleteBtn(drawCtx, a, ppf) {
     drawCtx.moveTo(x + xOff, y - xOff);
     drawCtx.lineTo(x - xOff, y + xOff);
     drawCtx.stroke();
+    drawCtx.restore();
+}
+
+/** Draw resize/rotate handles on a selected annotation */
+function _drawAnnotationHandles(drawCtx, a, ppf) {
+    const handles = _getAnnotationHandles(a, ppf);
+    if (!handles || handles.length === 0) return;
+
+    drawCtx.save();
+
+    // Draw rotation handle connector line
+    const rotateHandle = handles.find(h => h.id === 'rotate');
+    if (rotateHandle) {
+        const topCenter = handles.find(h => h.id === 'n');
+        if (topCenter) {
+            drawCtx.strokeStyle = 'rgba(255,255,255,0.4)';
+            drawCtx.lineWidth = 1;
+            drawCtx.setLineDash([2, 2]);
+            drawCtx.beginPath();
+            drawCtx.moveTo(topCenter.x, topCenter.y);
+            drawCtx.lineTo(rotateHandle.x, rotateHandle.y);
+            drawCtx.stroke();
+            drawCtx.setLineDash([]);
+        }
+    }
+
+    for (const h of handles) {
+        if (h.id === 'rotate') {
+            // Rotation handle: circle with rotate icon
+            drawCtx.fillStyle = 'rgba(59,130,246,0.85)';
+            drawCtx.strokeStyle = 'rgba(255,255,255,0.9)';
+            drawCtx.lineWidth = 1.5;
+            drawCtx.beginPath();
+            drawCtx.arc(h.x, h.y, 6, 0, Math.PI * 2);
+            drawCtx.fill();
+            drawCtx.stroke();
+            // Small curved arrow icon
+            drawCtx.strokeStyle = 'rgba(255,255,255,0.9)';
+            drawCtx.lineWidth = 1.2;
+            drawCtx.beginPath();
+            drawCtx.arc(h.x, h.y, 3, -Math.PI * 0.7, Math.PI * 0.5);
+            drawCtx.stroke();
+            // Arrowhead tip
+            const tipAngle = Math.PI * 0.5;
+            const tipX = h.x + 3 * Math.cos(tipAngle);
+            const tipY = h.y + 3 * Math.sin(tipAngle);
+            drawCtx.beginPath();
+            drawCtx.moveTo(tipX - 2, tipY - 1);
+            drawCtx.lineTo(tipX, tipY);
+            drawCtx.lineTo(tipX + 1, tipY - 2);
+            drawCtx.stroke();
+        } else {
+            // Resize handle: small square
+            const s = HANDLE_SIZE;
+            drawCtx.fillStyle = 'rgba(255,255,255,0.9)';
+            drawCtx.strokeStyle = 'rgba(100,100,100,0.8)';
+            drawCtx.lineWidth = 1;
+            drawCtx.fillRect(h.x - s, h.y - s, s * 2, s * 2);
+            drawCtx.strokeRect(h.x - s, h.y - s, s * 2, s * 2);
+        }
+    }
+
     drawCtx.restore();
 }

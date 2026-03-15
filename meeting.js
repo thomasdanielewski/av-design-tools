@@ -467,7 +467,8 @@ function _getPreviewHash(pw, ph, meetingData) {
     const occ = meetingData.occupied;
     const theme = document.documentElement.getAttribute('data-theme') || 'dark';
     // Include seat positions for auto-framing zoom sensitivity
-    return `${pw}|${ph}|${theme}|${comp.type}|${comp.cols}|${comp.rows}|${comp.label}|${occ.length}|${occ.map(s => `${s.tableId}:${s.seatIdx}:${s.status}:${s.roomX.toFixed(1)}:${s.roomY.toFixed(1)}`).join(',')}|${state.displayWall}|${state.displayOffsetX}|${state.videoBar}`;
+    // Also include display/camera geometry so elevation, size, and mount position changes update the preview
+    return `${pw}|${ph}|${theme}|${comp.type}|${comp.cols}|${comp.rows}|${comp.label}|${occ.length}|${occ.map(s => `${s.tableId}:${s.seatIdx}:${s.status}:${s.roomX.toFixed(1)}:${s.roomY.toFixed(1)}`).join(',')}|${state.displayWall}|${state.displayOffsetX}|${state.videoBar}|${state.displayElev}|${state.displaySize}|${state.mountPos}`;
 }
 
 // ── Preview Rendering Helpers ────────────────────────────────
@@ -1000,10 +1001,32 @@ function _renderRoomScene(pCtx, rx, ry, rw, rh, eq, camX, camY, facingAngle, occ
     const fullFOV = Math.min(eq.cameraFOV || 90, 170);
     const hFOV = overrideFOV || fullFOV;
     const focalLen = (rw / 2) / Math.tan(hFOV * Math.PI / 360);
-    // When zoomed in, push horizon up slightly so people are better centered vertically
+
+    // Compute actual camera height from display elevation and mount position
+    const dhi = state.displaySize * 0.49;         // display height in inches
+    const dyc = state.displayElev;                 // display center elevation (inches)
+    const dyt = dyc + dhi / 2;                     // display top
+    const dyb = dyc - dhi / 2;                     // display bottom
+    const ehi = eq.height * 12;                     // equipment height in inches
+    let camHeightIn;
+    if (eq.type === 'board') {
+        camHeightIn = dyt - 1.5;
+    } else if (state.mountPos === 'above') {
+        camHeightIn = dyt + ehi / 2 + 2;
+    } else {
+        camHeightIn = dyb - ehi / 2 - 2;
+    }
+    const camHeightFt = camHeightIn / 12;
+    const seatedTorsoFt = 3.33;                     // ~40 inches — seated person chest/center
+    const verticalDrop = camHeightFt - seatedTorsoFt; // positive = camera above people
+
+    // Horizon shifts based on camera elevation angle — higher camera looks down, lower looks up
+    // Baseline horizon at 0.36 of frame when camera is roughly at seated head height (~4ft)
+    const baselineDropFt = 1.0;                     // the ~1.2ft drop the old hardcoded value assumed
+    const elevationShift = (verticalDrop - baselineDropFt) * 0.03; // shift horizon per foot of difference
     const zoomRatio = fullFOV / hFOV;
     const horizonShift = Math.max(0, (zoomRatio - 1) * 0.06);
-    const horizon = rh * (0.36 - horizonShift);
+    const horizon = rh * Math.max(0.15, Math.min(0.55, 0.36 + elevationShift - horizonShift));
     const pan = (panOffset || 0) * rw; // lateral pan in pixels
 
     const cosF = Math.cos(-facingAngle);
@@ -1084,7 +1107,7 @@ function _renderRoomScene(pCtx, rx, ry, rw, rh, eq, camX, camY, facingAngle, occ
     pCtx.fillRect(rx, ry, rw, rh);
 
     // Draw perspective conference table
-    _renderPerspectiveTable(pCtx, rx, ry, rw, rh, focalLen, horizon, camX, camY, cosF, sinF, isDark, pan);
+    _renderPerspectiveTable(pCtx, rx, ry, rw, rh, focalLen, horizon, camX, camY, cosF, sinF, isDark, pan, verticalDrop);
 
     // Sort participants by depth (furthest first)
     const projected = [];
@@ -1097,7 +1120,7 @@ function _renderRoomScene(pCtx, rx, ry, rw, rh, eq, camX, camY, facingAngle, occ
         if (lz < 0.5) continue;
 
         const sx = rw / 2 + pan + (lx / lz) * focalLen;
-        const sy = horizon + (1.2 / lz) * focalLen;
+        const sy = horizon + (verticalDrop / lz) * focalLen;
         const size = Math.max(8, Math.min(rh * 0.50, 2.4 * focalLen / lz));
 
         if (sx < -size * 2 || sx > rw + size * 2) continue;
@@ -1137,7 +1160,7 @@ function _renderRoomScene(pCtx, rx, ry, rw, rh, eq, camX, camY, facingAngle, occ
 }
 
 /** Render perspective conference tables in the room scene — all tables */
-function _renderPerspectiveTable(pCtx, rx, ry, rw, rh, focalLen, horizon, camX, camY, cosF, sinF, isDark, pan) {
+function _renderPerspectiveTable(pCtx, rx, ry, rw, rh, focalLen, horizon, camX, camY, cosF, sinF, isDark, pan, verticalDrop) {
     if (!state.tables || state.tables.length === 0) return;
 
     for (const table of state.tables) {
@@ -1167,7 +1190,10 @@ function _renderPerspectiveTable(pCtx, rx, ry, rw, rh, focalLen, horizon, camX, 
             const lx = dx * sinF + dy * cosF;
             if (lz < 0.3) { allVisible = false; break; }
             const sx = rw / 2 + (pan || 0) + (lx / lz) * focalLen;
-            const sy = horizon + (1.0 / lz) * focalLen;
+            // Table surface is ~2.5ft high; verticalDrop is cam-to-torso(3.33ft),
+            // so cam-to-table = verticalDrop + (3.33 - 2.5) = verticalDrop + 0.83
+            const tableDrop = (verticalDrop != null ? verticalDrop : 1.0) + 0.83;
+            const sy = horizon + (tableDrop / lz) * focalLen;
             projCorners.push({ x: rx + sx, y: ry + sy, depth: lz });
         }
 

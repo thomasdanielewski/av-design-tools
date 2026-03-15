@@ -70,7 +70,7 @@ function cacheDOMRefs() {
         'meeting-framing', 'meeting-blind-spots', 'meeting-seat-status',
         'meeting-zone-depth', 'val-meeting-zone-depth',
         'meeting-camera-preview', 'meeting-preview-canvas', 'meeting-preview-info',
-        'cg-meeting'
+        'meeting-settings-tray', 'meeting-settings-toggle'
     ];
     ids.forEach(id => { DOM[id] = document.getElementById(id); });
 }

@@ -412,13 +412,13 @@ function syncUIFromState() {
 
     // Meeting mode UI sync
     if (DOM['meeting-mode-btn']) DOM['meeting-mode-btn'].classList.toggle('active', state.meetingMode);
-    if (DOM['cg-meeting']) DOM['cg-meeting'].style.display = state.meetingMode ? '' : 'none';
     if (DOM['meeting-camera-preview']) DOM['meeting-camera-preview'].style.display = state.meetingMode ? '' : 'none';
     if (DOM['info-overlay']) DOM['info-overlay'].style.display = state.meetingMode ? 'none' : '';
     const meetingLegend = document.getElementById('meeting-legend');
     if (meetingLegend) meetingLegend.style.display = state.meetingMode ? '' : 'none';
     if (state.meetingMode && typeof updateFramingModeOptions === 'function') updateFramingModeOptions();
     if (typeof invalidateMeetingCache === 'function') invalidateMeetingCache();
+    if (typeof updateMeetingSettingsSummary === 'function') updateMeetingSettingsSummary();
 
     // Annotation UI sync
     if (typeof syncAnnotateNextId === 'function') syncAnnotateNextId();

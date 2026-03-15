@@ -391,25 +391,6 @@
                 </div>
             </div>
 
-            <!-- View Mode -->
-            <div class="control-group" aria-expanded="false" id="cg-viewmode">
-                <div class="control-group-title" data-toggle-group="cg-viewmode">View Mode<svg class="cg-chevron" aria-hidden="true"
-                        width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
-                        stroke-linecap="round" stroke-linejoin="round">
-                        <polyline points="6 9 12 15 18 9"></polyline>
-                    </svg></div>
-                <div class="control-group-body">
-                    <div class="control-row">
-                        <div class="toggle-group" id="view-mode-toggle">
-                            <button class="toggle-btn active" data-val="top" data-action="set-view-mode">Top-Down
-                                View</button>
-                            <button class="toggle-btn" data-val="pov" data-action="set-view-mode">1st Person
-                                POV</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
             <!-- Coverage Overlays -->
             <div class="control-group" aria-expanded="false" id="cg-overlays">
                 <div class="control-group-title" data-toggle-group="cg-overlays">Coverage Overlays<svg
@@ -445,40 +426,7 @@
                 </div>
             </div>
 
-            <!-- Meeting Mode -->
-            <div class="control-group" id="cg-meeting" aria-expanded="true" style="display:none">
-                <div class="control-group-title" data-toggle-group="cg-meeting">Meeting Mode<svg
-                        class="cg-chevron" aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                        stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                        <polyline points="6 9 12 15 18 9"></polyline>
-                    </svg></div>
-                <div class="control-group-body">
-                    <div class="control-row">
-                        <div class="control-label"><label for="meeting-participants">Participants</label><span class="value" id="val-meeting-participants"
-                                title="Click to type exact value" data-slider="meeting-participants" data-key="meetingParticipants" data-unit="count">Auto</span>
-                        </div>
-                        <input type="range" id="meeting-participants" min="0" max="30" step="1" value="0">
-                    </div>
-                    <div class="control-row">
-                        <div class="control-label"><label for="meeting-framing">Framing Mode</label></div>
-                        <select id="meeting-framing">
-                            <option value="group">Group</option>
-                            <option value="individual">Individual</option>
-                            <option value="speaker">Speaker</option>
-                        </select>
-                    </div>
-                    <div class="control-row">
-                        <div class="control-label"><label for="meeting-zone-depth">Camera Zone</label><span class="value" id="val-meeting-zone-depth"
-                                title="Click to type exact value" data-slider="meeting-zone-depth" data-key="meetingCameraZoneDepth" data-unit="pct">100%</span>
-                        </div>
-                        <input type="range" id="meeting-zone-depth" min="0.1" max="1" step="0.05" value="1">
-                    </div>
-                    <div class="check-row"><span>Blind Spot Shading</span><label class="switch"><input type="checkbox"
-                                id="meeting-blind-spots" checked><span class="slider"></span></label></div>
-                    <div class="check-row"><span>Seat Status Indicators</span><label class="switch"><input type="checkbox"
-                                id="meeting-seat-status" checked><span class="slider"></span></label></div>
-                </div>
-            </div>
+            <!-- Meeting Mode (controls moved to camera preview panel) -->
 
             <!-- POV Settings (hidden by default) -->
             <div class="control-group" id="pov-controls" aria-expanded="false" style="display:none">
@@ -591,9 +539,58 @@
             </div>
         </div>
         <div class="canvas-container">
+            <!-- Floating annotation toolbar - appears when annotate mode is active -->
+            <div id="annotation-floating-toolbar" class="annotation-floating-toolbar" style="display:none">
+                <div class="aft-tools">
+                    <button class="aft-btn" data-aft-tool="text" title="Text label (T)">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9.5" y1="20" x2="14.5" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg>
+                        Text
+                    </button>
+                    <button class="aft-btn" data-aft-tool="rect" title="Rectangle">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/></svg>
+                        Rect
+                    </button>
+                    <button class="aft-btn" data-aft-tool="circle" title="Circle">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/></svg>
+                        Circle
+                    </button>
+                    <button class="aft-btn" data-aft-tool="line" title="Line">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="19" x2="19" y2="5"/></svg>
+                        Line
+                    </button>
+                    <button class="aft-btn" data-aft-tool="arrow" title="Arrow">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+                        Arrow
+                    </button>
+                    <button class="aft-btn" data-aft-tool="zone" title="Zone / area label">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2" stroke-dasharray="4 2"/></svg>
+                        Zone
+                    </button>
+                    <button class="aft-btn" data-aft-tool="freehand" title="Freehand draw">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17c3-3 6 2 9 0s6-5 9-3"/></svg>
+                        Draw
+                    </button>
+                </div>
+                <div class="aft-divider"></div>
+                <div class="aft-colors">
+                    <span class="aft-swatch active" data-aft-color="red" style="background:rgba(239,68,68,0.9)" title="Red"></span>
+                    <span class="aft-swatch" data-aft-color="blue" style="background:rgba(59,130,246,0.9)" title="Blue"></span>
+                    <span class="aft-swatch" data-aft-color="green" style="background:rgba(34,197,94,0.9)" title="Green"></span>
+                    <span class="aft-swatch" data-aft-color="orange" style="background:rgba(251,146,60,0.9)" title="Orange"></span>
+                    <span class="aft-swatch" data-aft-color="gray" style="background:rgba(148,163,184,0.7)" title="Gray"></span>
+                </div>
+                <div class="aft-divider"></div>
+                <button class="aft-close" id="aft-close-btn" title="Close annotation toolbar">&times;</button>
+            </div>
             <div class="canvas-stack">
                 <canvas id="bg-canvas" aria-hidden="true"></canvas>
                 <canvas id="fg-canvas" tabindex="0" role="img" aria-label="Conference room layout diagram showing tables, displays, and AV equipment coverage areas"></canvas>
+            </div>
+            <!-- Canvas View Mode Toggle -->
+            <div class="canvas-view-toggle" id="view-mode-toggle" role="toolbar" aria-label="View mode">
+                <button class="cvt-btn toggle-btn active" data-val="top" data-action="set-view-mode" aria-pressed="true">Top</button>
+                <div class="cvt-divider"></div>
+                <button class="cvt-btn toggle-btn" data-val="pov" data-action="set-view-mode" aria-pressed="false">POV</button>
             </div>
             <div class="zoom-controls" role="toolbar" aria-label="Zoom controls">
                 <button class="zoom-btn" id="zoom-in-btn" title="Zoom in" aria-label="Zoom in">+</button>
@@ -610,6 +607,9 @@
             <div class="meeting-preview-header">
                 <span class="meeting-preview-title">Remote Participant View</span>
                 <div style="display:flex;align-items:center;gap:2px">
+                    <button class="meeting-preview-expand" id="meeting-settings-toggle" title="Meeting Settings">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                    </button>
                     <button class="meeting-preview-expand" id="meeting-expand-btn" title="Expand/collapse preview">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
                     </button>
@@ -617,6 +617,40 @@
                 </div>
             </div>
             <canvas id="meeting-preview-canvas" width="960" height="540"></canvas>
+            <div class="meeting-settings-tray" id="meeting-settings-tray">
+                <div class="meeting-settings-summary" id="meeting-settings-summary">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity:0.5;flex-shrink:0"><polyline points="6 9 12 15 18 9"/></svg>
+                    <span class="setting-chip" id="chip-framing">Group</span>
+                    <span class="setting-chip" id="chip-participants">Auto</span>
+                    <span class="setting-chip" id="chip-zone">Zone 100%</span>
+                </div>
+                <div class="meeting-settings-body" id="meeting-settings-body">
+                    <div class="control-row">
+                        <div class="control-label"><label for="meeting-participants">Participants</label><span class="value" id="val-meeting-participants"
+                                title="Click to type exact value" data-slider="meeting-participants" data-key="meetingParticipants" data-unit="count">Auto</span>
+                        </div>
+                        <input type="range" id="meeting-participants" min="0" max="30" step="1" value="0">
+                    </div>
+                    <div class="control-row">
+                        <div class="control-label"><label for="meeting-framing">Framing Mode</label></div>
+                        <select id="meeting-framing">
+                            <option value="group">Group</option>
+                            <option value="individual">Individual</option>
+                            <option value="speaker">Speaker</option>
+                        </select>
+                    </div>
+                    <div class="control-row">
+                        <div class="control-label"><label for="meeting-zone-depth">Camera Zone</label><span class="value" id="val-meeting-zone-depth"
+                                title="Click to type exact value" data-slider="meeting-zone-depth" data-key="meetingCameraZoneDepth" data-unit="pct">100%</span>
+                        </div>
+                        <input type="range" id="meeting-zone-depth" min="0.1" max="1" step="0.05" value="1">
+                    </div>
+                    <div class="check-row"><span>Blind Spot Shading</span><label class="switch"><input type="checkbox"
+                                id="meeting-blind-spots" checked><span class="slider"></span></label></div>
+                    <div class="check-row"><span>Seat Status Indicators</span><label class="switch"><input type="checkbox"
+                                id="meeting-seat-status" checked><span class="slider"></span></label></div>
+                </div>
+            </div>
             <div class="meeting-preview-toolbar">
                 <div class="meeting-toolbar-left">
                     <span class="meeting-toolbar-time" id="meeting-toolbar-time"></span>

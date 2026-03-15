@@ -102,7 +102,14 @@
       "Bash(find . -maxdepth 1 -name \"*.js\" -exec grep -H \"showToast\" {})",
       "Bash(grep \"showToast.*''''info''''\\\\|showToast\\([^,]*\\)\" \"C:\\\\Users\\\\Thomas\\\\Documents\\\\GitHub\\\\av-design-tools\"/*.js)",
       "Bash(find \"C:\\\\Users\\\\Thomas\\\\Documents\\\\GitHub\\\\av-design-tools\" -maxdepth 1 -name \"*.js\" -exec grep -H \"showToast\" {})",
-      "Bash(find \"C:\\\\Users\\\\Thomas\\\\Documents\\\\GitHub\\\\av-design-tools\" -maxdepth 1 -name \"*.js\" -exec grep \"showToast.*''''error''''\\\\|showToast.*''''success''''\\\\|showToast.*''''info''''\" {})"
+      "Bash(find \"C:\\\\Users\\\\Thomas\\\\Documents\\\\GitHub\\\\av-design-tools\" -maxdepth 1 -name \"*.js\" -exec grep \"showToast.*''''error''''\\\\|showToast.*''''success''''\\\\|showToast.*''''info''''\" {})",
+      "Bash(grep -n \"toggle-meeting\\\\|toggleMeeting\\\\|meeting-mode-btn\" *.js)",
+      "Bash(grep -n \"key === ''f''\\\\|key === ''F''\" *.js)",
+      "Bash(grep -n \"meetingMode\" *.js)",
+      "Bash(grep -l \"displayElev\\\\|elevation\" *.js)",
+      "Bash(grep -n \"const.*ANNOTATION\\\\|const.*COLORS\\\\|drawAnnotation\" \"C:\\\\Users\\\\Thomas\\\\Documents\\\\GitHub\\\\av-design-tools\"/*.js)",
+      "Bash(grep -n \"const.*ANNOTATION\\\\|const.*COLORS\\\\|drawAnnotation\" /c/Users/Thomas/Documents/GitHub/av-design-tools/*.js)",
+      "Bash(grep -n \"fgCanvas.addEventListener\\\\|canvas.addEventListener\\\\|mousemove\\\\|mousedown\\\\|mouseup\" /c/Users/Thomas/Documents/GitHub/av-design-tools/*.js)"
     ]
   }
 }

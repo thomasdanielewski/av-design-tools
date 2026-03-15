@@ -284,13 +284,31 @@ function _getAnnotationDeleteBtnPos(a, ppf) {
     return null;
 }
 
-/** Update the tool button active states in the sidebar */
+/** Update the tool button active states in the sidebar and floating toolbar */
 function syncAnnotateToolUI() {
     document.querySelectorAll('[data-annotate]').forEach(btn => {
         btn.classList.toggle('active', state.annotateToolActive && state.annotateToolType === btn.dataset.annotate);
     });
     const mainBtn = document.getElementById('annotate-btn');
     if (mainBtn) mainBtn.classList.toggle('active', state.annotateToolActive);
+
+    // Sync floating toolbar
+    const floatingBar = document.getElementById('annotation-floating-toolbar');
+    if (floatingBar) {
+        if (state.annotateToolActive) {
+            floatingBar.style.display = '';
+            // Re-trigger animation
+            floatingBar.style.animation = 'none';
+            void floatingBar.offsetWidth;
+            floatingBar.style.animation = '';
+        } else {
+            floatingBar.style.display = 'none';
+        }
+        // Sync tool buttons
+        floatingBar.querySelectorAll('[data-aft-tool]').forEach(btn => {
+            btn.classList.toggle('active', state.annotateToolActive && state.annotateToolType === btn.dataset.aftTool);
+        });
+    }
 }
 
 /** Update the annotation list in the sidebar */
@@ -356,6 +374,95 @@ function syncAnnotationPropsUI() {
             document.getElementById('ann-fill-off')?.classList.toggle('active', !isFilled);
         }
     }
+}
+
+// ── Resize / Rotate Handle Positions ─────────────────────────
+
+const HANDLE_SIZE = 5; // half-size of square handles in canvas px
+const HANDLE_HIT_RADIUS = 8; // hit-test tolerance in canvas px
+const ROTATE_HANDLE_DIST = 20; // distance of rotate handle above shape
+
+/**
+ * Get the bounding box of an annotation in canvas px.
+ * Returns { x, y, w, h } or null if not applicable.
+ */
+function _getAnnotationBBox(a, ppf) {
+    if (a.type === 'rect' || a.type === 'zone') {
+        const p = roomFtToCanvasPx(a.x, a.y);
+        return { x: p.cx, y: p.cy, w: (a.w || 0) * ppf, h: (a.h || 0) * ppf };
+    }
+    if (a.type === 'circle') {
+        const p = roomFtToCanvasPx(a.x, a.y);
+        return { x: p.cx, y: p.cy, w: (a.w || 0) * ppf, h: (a.h || 0) * ppf };
+    }
+    if (a.type === 'freehand' && a.points && a.points.length >= 2) {
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        for (const pt of a.points) {
+            minX = Math.min(minX, pt.x); minY = Math.min(minY, pt.y);
+            maxX = Math.max(maxX, pt.x); maxY = Math.max(maxY, pt.y);
+        }
+        const p1 = roomFtToCanvasPx(minX, minY);
+        const p2 = roomFtToCanvasPx(maxX, maxY);
+        return { x: p1.cx, y: p1.cy, w: p2.cx - p1.cx, h: p2.cy - p1.cy };
+    }
+    return null;
+}
+
+/**
+ * Get handle positions for a selected annotation.
+ * Returns array of { id, x, y, cursor } objects in canvas px.
+ */
+function _getAnnotationHandles(a, ppf) {
+    const handles = [];
+
+    if (a.type === 'line' || a.type === 'arrow') {
+        const p1 = roomFtToCanvasPx(a.x, a.y);
+        const p2 = roomFtToCanvasPx(a.x2, a.y2);
+        handles.push({ id: 'p1', x: p1.cx, y: p1.cy, cursor: 'crosshair' });
+        handles.push({ id: 'p2', x: p2.cx, y: p2.cy, cursor: 'crosshair' });
+        return handles;
+    }
+
+    const bbox = _getAnnotationBBox(a, ppf);
+    if (!bbox) return handles;
+    const { x, y, w, h } = bbox;
+
+    // Corner handles
+    handles.push({ id: 'nw', x: x,     y: y,     cursor: 'nwse-resize' });
+    handles.push({ id: 'ne', x: x + w, y: y,     cursor: 'nesw-resize' });
+    handles.push({ id: 'sw', x: x,     y: y + h, cursor: 'nesw-resize' });
+    handles.push({ id: 'se', x: x + w, y: y + h, cursor: 'nwse-resize' });
+
+    // Edge midpoint handles
+    handles.push({ id: 'n', x: x + w / 2, y: y,     cursor: 'ns-resize' });
+    handles.push({ id: 's', x: x + w / 2, y: y + h, cursor: 'ns-resize' });
+    handles.push({ id: 'e', x: x + w,     y: y + h / 2, cursor: 'ew-resize' });
+    handles.push({ id: 'w', x: x,         y: y + h / 2, cursor: 'ew-resize' });
+
+    // Rotation handle (above top center)
+    if (a.type === 'rect' || a.type === 'zone' || a.type === 'circle') {
+        handles.push({ id: 'rotate', x: x + w / 2, y: y - ROTATE_HANDLE_DIST, cursor: 'grab' });
+    }
+
+    return handles;
+}
+
+/**
+ * Hit-test: is the point (mx, my) on a resize/rotate handle of the selected annotation?
+ * Returns { annotation, handleId, cursor } or null.
+ */
+function hitTestAnnotationHandle(mx, my) {
+    const { ppf } = getTopDownLayout();
+    const a = state.annotations.find(a => a.id === state.selectedAnnotationId);
+    if (!a) return null;
+
+    const handles = _getAnnotationHandles(a, ppf);
+    for (const h of handles) {
+        if (Math.abs(mx - h.x) <= HANDLE_HIT_RADIUS && Math.abs(my - h.y) <= HANDLE_HIT_RADIUS) {
+            return { annotation: a, handleId: h.id, cursor: h.cursor };
+        }
+    }
+    return null;
 }
 
 /** Show an inline text input overlay at a canvas position for text/zone annotations */
