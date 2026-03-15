@@ -258,9 +258,39 @@ document.querySelectorAll('[data-action="set-units"]').forEach(btn => {
 });
 
 // ── Download, Export, Import ─────────────────────────────────
-document.getElementById('download-btn').addEventListener('click', downloadLayout);
-document.getElementById('download-pdf-btn').addEventListener('click', downloadPDF);
+document.getElementById('download-btn').addEventListener('click', () => showExportPreview('png'));
+document.getElementById('download-pdf-btn').addEventListener('click', () => showExportPreview('pdf'));
 document.getElementById('room-name').addEventListener('input', e => { state.roomName = e.target.value; debouncedAutoSave(); });
+
+// ── Room identity: prominent name heading + notes ─────────────
+(function() {
+    const nameDisplay = document.getElementById('room-name-display');
+    const nameHidden  = document.getElementById('room-name');
+    const notesToggle = document.getElementById('room-notes-toggle');
+    const notesArea   = document.getElementById('room-notes');
+
+    nameDisplay.addEventListener('input', e => {
+        const v = e.target.value;
+        state.roomName = v;
+        if (nameHidden) nameHidden.value = v;
+        debouncedSerializeToHash();
+        debouncedAutoSave();
+    });
+
+    notesToggle.addEventListener('click', () => {
+        const open = notesArea.style.display === 'none' || notesArea.style.display === '';
+        notesArea.style.display = open ? 'block' : 'none';
+        notesToggle.textContent = open ? '− Hide notes' : '+ Add notes';
+        notesToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+        if (open) notesArea.focus();
+    });
+
+    notesArea.addEventListener('input', e => {
+        state.roomNotes = e.target.value;
+        debouncedSerializeToHash();
+        debouncedAutoSave();
+    });
+})();
 document.getElementById('export-btn').addEventListener('click', exportConfig);
 document.getElementById('import-btn').addEventListener('click', () => {
     document.getElementById('import-file-input').click();
@@ -340,8 +370,21 @@ document.querySelectorAll('[data-action="toggle-legend"]').forEach(el => {
 });
 
 // ── Undo / Redo buttons ──────────────────────────────────────
-document.querySelector('[data-action="undo"]').addEventListener('click', undo);
-document.querySelector('[data-action="redo"]').addEventListener('click', redo);
+function pulseUndoRedoBtn(btn) {
+    btn.classList.remove('undo-btn--pulse');
+    void btn.offsetWidth;
+    btn.classList.add('undo-btn--pulse');
+    btn.addEventListener('animationend', () => btn.classList.remove('undo-btn--pulse'), { once: true });
+}
+
+document.querySelector('[data-action="undo"]').addEventListener('click', () => {
+    undo();
+    pulseUndoRedoBtn(DOM['undo-btn']);
+});
+document.querySelector('[data-action="redo"]').addEventListener('click', () => {
+    redo();
+    pulseUndoRedoBtn(DOM['redo-btn']);
+});
 
 // ── History panel toggle ─────────────────────────────────────
 const historyBadge = document.getElementById('history-badge');
@@ -585,35 +628,63 @@ document.addEventListener('keydown', e => {
     }
 });
 
-// ── Canvas keyboard navigation (arrow keys move selected table) ──
+// ── Canvas keyboard navigation ───────────────────────────────
 canvas.addEventListener('keydown', e => {
     if (state.viewMode !== 'top') return;
-    const step = e.shiftKey ? 1.0 : 0.5;
+
+    // Tab / Shift+Tab: cycle through tables (existing selection highlight applies automatically)
+    if (e.key === 'Tab' && state.tables.length > 1) {
+        e.preventDefault();
+        const idx = state.tables.findIndex(t => t.id === state.selectedTableId);
+        const next = e.shiftKey
+            ? (idx - 1 + state.tables.length) % state.tables.length
+            : (idx + 1) % state.tables.length;
+        selectTable(state.tables[next].id);
+        pushHistory();
+        return;
+    }
+
+    // Delete / Backspace: remove selected table
+    // stopPropagation prevents the global Delete handler from calling removeTable() a second time
+    if ((e.key === 'Delete' || e.key === 'Backspace') && state.tables.length > 1) {
+        e.preventDefault();
+        e.stopPropagation();
+        removeTable();
+        return;
+    }
+
+    // Escape: keep canvas focused; let event bubble so document handler handles overlay/deselect
+    if (e.key === 'Escape') {
+        canvas.focus();
+        return;
+    }
+
+    // Arrow keys: nudge selected table
+    // Normal = 0.5 ft step, Shift = fine 0.1 ft step
+    const step = e.shiftKey ? 0.1 : 0.5;
     const t = getSelectedTable();
     if (!t) return;
-    let handled = false;
     let dx = 0, dy = 0;
-    if (e.key === 'ArrowLeft')  { dx = -step; handled = true; }
-    if (e.key === 'ArrowRight') { dx = step; handled = true; }
-    if (e.key === 'ArrowUp')    { dy = -step; handled = true; }
-    if (e.key === 'ArrowDown')  { dy = step; handled = true; }
-    if (handled) {
-        e.preventDefault();
-        // Move primary selected table
-        setTableProp('tableX', Math.max(-(state.roomWidth / 2 - t.width / 2), Math.min(state.roomWidth / 2 - t.width / 2, t.x + dx)));
-        setTableProp('tableDist', Math.max(0, Math.min(state.roomLength - t.length, t.dist + dy)));
-        updateTableSliders();
-        // Also move other multi-selected tables
-        for (const id of multiSelectedIds) {
-            if (id === t.id) continue;
-            const other = state.tables.find(tbl => tbl.id === id);
-            if (!other) continue;
-            other.x = Math.round(Math.max(-(state.roomWidth / 2 - other.width / 2), Math.min(state.roomWidth / 2 - other.width / 2, other.x + dx)) * 2) / 2;
-            other.dist = Math.round(Math.max(0, Math.min(state.roomLength - other.length, other.dist + dy)) * 2) / 2;
-        }
-        debouncedPushHistory();
-        scheduleRender();
+    if      (e.key === 'ArrowLeft')  { dx = -step; }
+    else if (e.key === 'ArrowRight') { dx =  step; }
+    else if (e.key === 'ArrowUp')    { dy = -step; }
+    else if (e.key === 'ArrowDown')  { dy =  step; }
+    else return;
+
+    e.preventDefault();
+    setTableProp('tableX',    Math.max(-(state.roomWidth / 2 - t.width / 2),  Math.min(state.roomWidth / 2 - t.width / 2,  t.x   + dx)));
+    setTableProp('tableDist', Math.max(0, Math.min(state.roomLength - t.length, t.dist + dy)));
+    updateTableSliders();
+    // Also nudge any multi-selected tables by the same delta
+    for (const id of multiSelectedIds) {
+        if (id === t.id) continue;
+        const other = state.tables.find(tbl => tbl.id === id);
+        if (!other) continue;
+        other.x    = Math.round(Math.max(-(state.roomWidth / 2 - other.width / 2), Math.min(state.roomWidth / 2 - other.width / 2, other.x    + dx)) * 10) / 10;
+        other.dist = Math.round(Math.max(0, Math.min(state.roomLength - other.length,                                                   other.dist + dy)) * 10) / 10;
     }
+    debouncedPushHistory();
+    scheduleRender();
 });
 
 // ── Window resize (debounced) ────────────────────────────────
@@ -645,6 +716,21 @@ if (savedUnits === 'metric' || savedUnits === 'imperial') {
 
 setBrand('neat');
 initSliderTracks();
+initSliderTooltip();
+
+// Value-bump: tactile feedback when a slider badge text changes.
+// Uses MutationObserver so it stays independent of input.js/bindSlider.
+(function initValueBump() {
+    document.querySelectorAll('.value[data-slider]').forEach(badge => {
+        new MutationObserver(() => {
+            // Cancel both animations, force reflow, then start value-bump
+            badge.classList.remove('value-updated', 'value-bump');
+            void badge.offsetWidth; // trigger reflow to restart animation
+            badge.classList.add('value-bump');
+            badge.addEventListener('animationend', () => badge.classList.remove('value-bump'), { once: true });
+        }).observe(badge, { childList: true, subtree: true, characterData: true });
+    });
+})();
 renderTableList();
 renderElementList();
 
@@ -706,13 +792,56 @@ if (state.viewMode === 'top') {
     });
 
     tipsBtn.addEventListener('click', () => {
-        document.getElementById('shortcut-help').showModal();
+        openShortcutHelp();
     });
 })();
 
-// ── Shortcut help dialog ───────────────────────────────────────
-document.getElementById('shortcut-close-btn').addEventListener('click', () => {
-    document.getElementById('shortcut-help').close();
+// ── Export preview modal ──────────────────────────────────────
+document.getElementById('export-preview-close').addEventListener('click', hideExportPreview);
+document.getElementById('export-preview-cancel').addEventListener('click', hideExportPreview);
+
+// Close on backdrop click
+document.getElementById('export-preview-overlay').addEventListener('click', e => {
+    if (e.target === document.getElementById('export-preview-overlay')) hideExportPreview();
+});
+
+// Confirm export
+document.getElementById('export-preview-confirm').addEventListener('click', () => {
+    const format = document.querySelector('input[name="export-format"]:checked')?.value || 'png';
+    const roomName = document.getElementById('export-preview-name').value;
+    const includeAnnotations = document.getElementById('export-incl-annotations').checked;
+    const includeMeasurements = document.getElementById('export-incl-measurements').checked;
+    const opts = { roomName, includeAnnotations, includeMeasurements };
+    hideExportPreview();
+    if (format === 'pdf') {
+        downloadPDF(opts);
+    } else {
+        downloadLayout(opts);
+    }
+});
+
+// Live-update filename preview and thumbnail/mockup when name or format changes
+document.getElementById('export-preview-name').addEventListener('input', updateExportFilenamePreview);
+document.querySelectorAll('input[name="export-format"]').forEach(r => {
+    r.addEventListener('change', updateExportFormatDisplay);
+});
+
+// ── Shortcut help overlay ──────────────────────────────────────
+function openShortcutHelp() {
+    const el = document.getElementById('shortcut-help');
+    el.removeAttribute('hidden');
+    el.querySelector('.shortcut-close-btn').focus();
+}
+
+function closeShortcutHelp() {
+    document.getElementById('shortcut-help').setAttribute('hidden', '');
+}
+
+document.getElementById('shortcut-close-btn').addEventListener('click', closeShortcutHelp);
+
+// Close on backdrop click (click outside the card)
+document.getElementById('shortcut-help').addEventListener('click', e => {
+    if (e.target === document.getElementById('shortcut-help')) closeShortcutHelp();
 });
 
 // ── Keyboard shortcuts (non-modifier keys) ─────────────────────
@@ -779,15 +908,20 @@ document.addEventListener('keydown', e => {
             break;
 
         case '?':
-            document.getElementById('shortcut-help').showModal();
+            openShortcutHelp();
             break;
 
         case 'Escape':
             // Clear multi-selection if active
             if (multiSelectedIds.size > 0) { multiSelectedIds.clear(); scheduleRender(); break; }
-            // Close shortcut dialog if open
-            if (document.getElementById('shortcut-help').open) {
-                document.getElementById('shortcut-help').close();
+            // Close export preview modal if open
+            if (!document.getElementById('export-preview-overlay').hasAttribute('hidden')) {
+                hideExportPreview();
+                break;
+            }
+            // Close shortcut overlay if open
+            if (!document.getElementById('shortcut-help').hasAttribute('hidden')) {
+                closeShortcutHelp();
                 break;
             }
             // Close onboarding if showing

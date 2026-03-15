@@ -186,6 +186,7 @@ function classifySeats(eq, zoneDepth) {
                 seatIdx: seat.seatIdx,
                 roomX: seat.roomX,
                 roomY: seat.roomY,
+                angle: seat.angle,
                 distFt: Math.sqrt(distSq),
                 angleDeg: angleDiff * RAD_TO_DEG,
                 status
@@ -395,6 +396,22 @@ function renderMeetingPreviewPanel(meetingData) {
     }
     if (statsSpan) statsSpan.textContent = `${visibleOccupied} visible · ${occupiedCount} seated · ${coveredCount}/${totalSeats} in range`;
 
+    // Update seat status legend counts
+    const statusCounts = { covered: 0, outOfRange: 0, blindSpot: 0, obstructed: 0 };
+    for (const s of classified) {
+        if (statusCounts[s.status] !== undefined) statusCounts[s.status]++;
+    }
+    for (const [key, count] of Object.entries(statusCounts)) {
+        const el = document.getElementById(`legend-count-${key}`);
+        if (el) el.textContent = count > 0 ? `(${count})` : '';
+    }
+
+    // Update coverage status bar
+    const coverageLabelEl = document.getElementById('meeting-coverage-label');
+    const coverageFillEl = document.getElementById('meeting-coverage-fill');
+    if (coverageLabelEl) coverageLabelEl.textContent = `${coveredCount} of ${totalSeats} seats covered`;
+    if (coverageFillEl) coverageFillEl.style.width = `${totalSeats > 0 ? Math.round(coveredCount / totalSeats * 100) : 0}%`;
+
     // Update toolbar device name (include companion if active)
     const deviceEl = document.getElementById('meeting-toolbar-device');
     if (deviceEl && eq) {
@@ -433,12 +450,31 @@ function renderMeetingPreviewPanel(meetingData) {
         previewCanvas.style.width = pw + 'px';
         previewCanvas.style.height = ph + 'px';
     }
+
+    // Detect framing mode change for crossfade
+    const newType = composition.type;
+    const framingChanged = _prevCompositionType !== null && newType !== _prevCompositionType;
+    if (framingChanged && _previewCacheCanvas) {
+        // Snapshot old frame before overwriting cache
+        if (!_crossfadeOldCanvas || _crossfadeOldCanvas.width !== pw * dpr || _crossfadeOldCanvas.height !== ph * dpr) {
+            _crossfadeOldCanvas = document.createElement('canvas');
+            _crossfadeOldCanvas.width = pw * dpr;
+            _crossfadeOldCanvas.height = ph * dpr;
+        }
+        const snapCtx = _crossfadeOldCanvas.getContext('2d');
+        snapCtx.clearRect(0, 0, pw * dpr, ph * dpr);
+        snapCtx.drawImage(_previewCacheCanvas, 0, 0);
+    }
+    _prevCompositionType = newType;
+
     // Skip render if nothing changed (use cached result)
     const hash = _getPreviewHash(pw, ph, meetingData);
     if (hash === _previewCacheHash && _previewCacheCanvas) {
-        const previewCtx = previewCanvas.getContext('2d');
-        previewCtx.clearRect(0, 0, pw * dpr, ph * dpr);
-        previewCtx.drawImage(_previewCacheCanvas, 0, 0);
+        if (!_crossfadeRAF) {
+            const previewCtx = previewCanvas.getContext('2d');
+            previewCtx.clearRect(0, 0, pw * dpr, ph * dpr);
+            previewCtx.drawImage(_previewCacheCanvas, 0, 0);
+        }
         return;
     }
 
@@ -452,15 +488,50 @@ function renderMeetingPreviewPanel(meetingData) {
     _renderMeetingPreview(cacheCtx, pw, ph, dpr, meetingData);
     _previewCacheHash = hash;
 
-    // Copy cache to visible canvas
-    const previewCtx = previewCanvas.getContext('2d');
-    previewCtx.clearRect(0, 0, pw * dpr, ph * dpr);
-    previewCtx.drawImage(_previewCacheCanvas, 0, 0);
+    // Copy cache to visible canvas — crossfade if framing type changed
+    if (framingChanged && _crossfadeOldCanvas) {
+        _startCrossfade(previewCanvas, pw, ph, dpr);
+    } else {
+        if (_crossfadeRAF) { cancelAnimationFrame(_crossfadeRAF); _crossfadeRAF = null; }
+        const previewCtx = previewCanvas.getContext('2d');
+        previewCtx.clearRect(0, 0, pw * dpr, ph * dpr);
+        previewCtx.drawImage(_previewCacheCanvas, 0, 0);
+    }
 }
 
 // ── Preview rendering cache ──────────────────────────────────
 let _previewCacheCanvas = null;
 let _previewCacheHash = '';
+
+// ── Crossfade transition state ───────────────────────────────
+let _prevCompositionType = null;
+let _crossfadeOldCanvas = null;
+let _crossfadeStartTime = null;
+let _crossfadeRAF = null;
+const _CROSSFADE_MS = 200;
+
+function _startCrossfade(previewCanvas, pw, ph, dpr) {
+    if (_crossfadeRAF) cancelAnimationFrame(_crossfadeRAF);
+    _crossfadeStartTime = performance.now();
+    function step(now) {
+        const t = Math.min((now - _crossfadeStartTime) / _CROSSFADE_MS, 1);
+        const ctx = previewCanvas.getContext('2d');
+        ctx.clearRect(0, 0, pw * dpr, ph * dpr);
+        ctx.globalAlpha = 1;
+        ctx.drawImage(_previewCacheCanvas, 0, 0);
+        if (t < 1 && _crossfadeOldCanvas) {
+            ctx.globalAlpha = 1 - t;
+            ctx.drawImage(_crossfadeOldCanvas, 0, 0);
+            ctx.globalAlpha = 1;
+        }
+        if (t < 1) {
+            _crossfadeRAF = requestAnimationFrame(step);
+        } else {
+            _crossfadeRAF = null;
+        }
+    }
+    _crossfadeRAF = requestAnimationFrame(step);
+}
 
 function _getPreviewHash(pw, ph, meetingData) {
     const comp = meetingData.composition;
@@ -820,12 +891,12 @@ function _renderSpeakerView(pCtx, pw, ph, eq, camX, camY, facingAngle, occupied,
     _drawTileBg(pCtx, margin, margin, pw - margin * 2, ph - margin * 2, isDark, 0, speakerColor.bg);
 
     if (speaker) {
-        const name = speakerColor.name || '';
-        const initials = name.split(' ').map(w => w[0]).join('').toUpperCase();
+        const speakerOccIdx = occupied.indexOf(speaker);
+        const speakerLabel = speakerOccIdx >= 0 ? `P${speakerOccIdx + 1}` : 'P1';
 
         // Draw speaker large and centered
         _drawSilhouette(pCtx, pw / 2, ph * 0.40, ph * 0.55,
-            speakerColor.fill, speakerColor.stroke, initials);
+            speakerColor.fill, speakerColor.stroke, speakerLabel);
 
         // Speaker name label (bottom center)
         if (name) {
@@ -951,11 +1022,9 @@ function _renderGridView(pCtx, pw, ph, eq, camX, camY, facingAngle, visible, isD
         const cx = tx + tw / 2;
         const cy = ty + th * 0.40;
 
-        // Get initials from name
-        const name = pColor.name || '';
-        const initials = name.split(' ').map(w => w[0]).join('').toUpperCase();
+        const tileLabel = `P${i + 1}`;
 
-        _drawSilhouette(pCtx, cx, cy, personH, pColor.fill, pColor.stroke, initials);
+        _drawSilhouette(pCtx, cx, cy, personH, pColor.fill, pColor.stroke, tileLabel);
 
         // Participant name label (bottom of tile)
         if (name && th > 40) {
@@ -1109,6 +1178,9 @@ function _renderRoomScene(pCtx, rx, ry, rw, rh, eq, camX, camY, facingAngle, occ
     // Draw perspective conference table
     _renderPerspectiveTable(pCtx, rx, ry, rw, rh, focalLen, horizon, camX, camY, cosF, sinF, isDark, pan, verticalDrop);
 
+    // Build seat → P-label map based on occupied order (P1 = nearest to camera)
+    const seatLabelMap = new Map(occupied.map((s, i) => [s, `P${i + 1}`]));
+
     // Sort participants by depth (furthest first)
     const projected = [];
     for (const seat of occupied) {
@@ -1141,9 +1213,7 @@ function _renderRoomScene(pCtx, rx, ry, rw, rh, eq, camX, camY, facingAngle, occ
         const fillColor = _adjustAlpha(pColor.fill, alpha);
         const strokeColor = _adjustAlpha(pColor.stroke, Math.min(alpha + 0.15, 0.95));
 
-        // Get initials
-        const name = pColor.name || '';
-        const initials = name.split(' ').map(w => w[0]).join('').toUpperCase();
+        const seatLabel = seatLabelMap.get(p.seat) || '';
 
         // Subtle depth-of-field: distant people get slightly blurred
         if (distNorm > 0.6 && p.size > 12) {
@@ -1152,7 +1222,7 @@ function _renderRoomScene(pCtx, rx, ry, rw, rh, eq, camX, camY, facingAngle, occ
             _drawSilhouette(pCtx, p.sx, p.sy, p.size, fillColor, strokeColor, null);
             pCtx.restore();
         } else {
-            _drawSilhouette(pCtx, p.sx, p.sy, p.size, fillColor, strokeColor, p.size > 25 ? initials : null);
+            _drawSilhouette(pCtx, p.sx, p.sy, p.size, fillColor, strokeColor, p.size > 20 ? seatLabel : null);
         }
     }
 

@@ -310,6 +310,7 @@ function setUnits(u) {
             b.setAttribute('aria-pressed', isActive);
         });
     // Re-sync all slider value badges
+    updatePresetDimLabels();
     syncUIFromState();
     render();
 }
@@ -330,7 +331,7 @@ function expandGroup(el) {
     // Scroll into view after transition if needed
     const body = el.querySelector('.control-group-body');
     body?.addEventListener('transitionend', function handler(e) {
-        if (e.propertyName !== 'height') return;
+        if (e.propertyName !== 'max-height') return;
         body.removeEventListener('transitionend', handler);
         const container = el.closest('.sidebar-content');
         if (container && el.getBoundingClientRect().bottom > container.getBoundingClientRect().bottom) {
@@ -347,29 +348,73 @@ function toggleGroup(id) {
 
 // ── Room Presets ─────────────────────────────────────────────
 
+/** Update the dimension sub-labels on each preset pill to match current unit system */
+function updatePresetDimLabels() {
+    document.querySelectorAll('.preset-pill[data-preset-len]').forEach(btn => {
+        const span = btn.querySelector('.preset-pill-dims');
+        if (!span) return;
+        const len = parseInt(btn.dataset.presetLen);
+        const wid = parseInt(btn.dataset.presetWid);
+        if (state.units === 'metric') {
+            const lenM = (len * 0.3048).toFixed(1);
+            const widM = (wid * 0.3048).toFixed(1);
+            span.textContent = `${lenM}×${widM} m`;
+        } else {
+            span.textContent = `${len}×${wid} ft`;
+        }
+    });
+}
+
 function applyPreset(len, wid, targetBtn) {
-    state.roomLength = len;
-    state.roomWidth = wid;
-
-    DOM['room-length'].value = len;
-    DOM['room-width'].value = wid;
-    DOM['val-room-length'].textContent = formatFtIn(len);
-    DOM['val-room-width'].textContent = formatFtIn(wid);
-
-    // Highlight the active preset pill
+    // Highlight the active preset pill immediately
     document.querySelectorAll('.preset-pill').forEach(p => p.classList.remove('active'));
     if (targetBtn) targetBtn.classList.add('active');
 
-    // Sync POV slider ranges to new room size (account for display wall)
-    if (state.viewMode === 'pov') {
-        const isNS = (state.displayWall === 'north' || state.displayWall === 'south');
-        DOM['viewer-dist'].max = isNS ? len : wid;
-        DOM['viewer-offset'].min = -(isNS ? wid : len) / 2;
-        DOM['viewer-offset'].max = (isNS ? wid : len) / 2;
+    const startLen = state.roomLength;
+    const startWid = state.roomWidth;
+
+    function syncPOVRanges(curLen, curWid) {
+        if (state.viewMode === 'pov') {
+            const isNS = (state.displayWall === 'north' || state.displayWall === 'south');
+            DOM['viewer-dist'].max = isNS ? curLen : curWid;
+            DOM['viewer-offset'].min = -(isNS ? curWid : curLen) / 2;
+            DOM['viewer-offset'].max = (isNS ? curWid : curLen) / 2;
+        }
     }
 
-    pushHistory('applied room preset');
-    render();
+    // Animate sliders from current values to target over 300ms
+    runAnimation(300, (t) => {
+        const e = easeInOut(t);
+        const curLen = startLen + (len - startLen) * e;
+        const curWid = startWid + (wid - startWid) * e;
+
+        state.roomLength = curLen;
+        state.roomWidth = curWid;
+
+        DOM['room-length'].value = curLen;
+        DOM['room-width'].value = curWid;
+        DOM['val-room-length'].textContent = formatFtIn(curLen);
+        DOM['val-room-width'].textContent = formatFtIn(curWid);
+        updateSliderTrack(DOM['room-length']);
+        updateSliderTrack(DOM['room-width']);
+        syncPOVRanges(curLen, curWid);
+
+        render();
+    }, () => {
+        // Snap to exact target values at end
+        state.roomLength = len;
+        state.roomWidth = wid;
+        DOM['room-length'].value = len;
+        DOM['room-width'].value = wid;
+        DOM['val-room-length'].textContent = formatFtIn(len);
+        DOM['val-room-width'].textContent = formatFtIn(wid);
+        updateSliderTrack(DOM['room-length']);
+        updateSliderTrack(DOM['room-width']);
+        syncPOVRanges(len, wid);
+
+        pushHistory('applied room preset');
+        render();
+    });
 }
 
 // ── Info Overlay ─────────────────────────────────────────────
@@ -416,7 +461,7 @@ function toggleMeetingMode() {
     const preview = DOM['meeting-camera-preview'];
     if (preview) {
         if (state.meetingMode) {
-            preview.style.display = '';
+            preview.classList.remove('meeting-mode-off');
             preview.style.opacity = '0';
             preview.style.transform = 'translateY(8px)';
             requestAnimationFrame(() => {
@@ -436,7 +481,10 @@ function toggleMeetingMode() {
             if (gearBtn) gearBtn.classList.remove('active');
             updateMeetingSettingsSummary();
         } else {
-            preview.style.display = 'none';
+            preview.classList.add('meeting-mode-off');
+            preview.style.opacity = '';
+            preview.style.transform = '';
+            preview.style.transition = '';
             preview.classList.remove('expanded');
             const tray = DOM['meeting-settings-tray'];
             if (tray) tray.classList.remove('expanded', 'hint');
@@ -445,18 +493,13 @@ function toggleMeetingMode() {
         }
     }
 
-    // Show/hide color legend with fade-in
+    // Show/hide seat status legend with fade transition
     const legend = document.getElementById('meeting-legend');
     if (legend) {
         if (state.meetingMode) {
-            legend.style.display = '';
-            legend.style.opacity = '0';
-            requestAnimationFrame(() => {
-                legend.style.transition = 'opacity 0.3s ease 0.1s';
-                legend.style.opacity = '1';
-            });
+            requestAnimationFrame(() => legend.classList.add('visible'));
         } else {
-            legend.style.display = 'none';
+            legend.classList.remove('visible');
         }
     }
 
@@ -586,4 +629,101 @@ function updateCenterModeOptions() {
     // Sync select value to state
     const cmVal = state.includeDualCenter ? 'dual' : (state.includeCenter ? 'single' : 'none');
     sel.value = cmVal;
+}
+
+// ── Export Preview Modal ──────────────────────────────────────
+
+/**
+ * Rebuild the filename preview bar from the current name input value and selected format.
+ * The room-name slug portion is rendered as a clickable span that focuses the name input.
+ */
+function updateExportFilenamePreview() {
+    const el = document.getElementById('export-filename-preview');
+    if (!el) return;
+    const rawName = document.getElementById('export-preview-name')?.value || '';
+    const format = document.querySelector('input[name="export-format"]:checked')?.value || 'png';
+    const ext = format === 'pdf' ? 'pdf' : 'png';
+    const date = new Date().toISOString().slice(0, 10);
+    const slug = rawName ? '-' + rawName.trim().replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-|-$/g, '') : '';
+
+    if (slug) {
+        el.innerHTML =
+            `<span class="ef-static">AV-Room-Layout</span>` +
+            `<span class="ef-name" id="ef-name-part" tabindex="0" role="button" title="Click to edit room name">${slug}</span>` +
+            `<span class="ef-static">-${date}.${ext}</span>`;
+    } else {
+        el.innerHTML =
+            `<span class="ef-static">AV-Room-Layout-${date}.${ext}</span>` +
+            `<span class="ef-add-name" id="ef-name-part" tabindex="0" role="button" title="Click to add room name">+name</span>`;
+    }
+
+    const namePart = document.getElementById('ef-name-part');
+    if (namePart) {
+        namePart.onclick = () => document.getElementById('export-preview-name')?.focus();
+        namePart.onkeydown = e => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                document.getElementById('export-preview-name')?.focus();
+            }
+        };
+    }
+}
+
+/**
+ * Show/hide the PNG thumbnail vs PDF page mockup based on the selected format radio,
+ * then refresh the filename extension in the preview bar.
+ */
+function updateExportFormatDisplay() {
+    const format = document.querySelector('input[name="export-format"]:checked')?.value || 'png';
+    const img = document.getElementById('export-preview-img');
+    const pdfMockup = document.getElementById('export-pdf-mockup');
+    if (img && pdfMockup) {
+        const isPDF = format === 'pdf';
+        img.style.display = (isPDF || img.dataset.noPreview === '1') ? 'none' : '';
+        pdfMockup.hidden = !isPDF;
+        pdfMockup.setAttribute('aria-hidden', String(!isPDF));
+    }
+    updateExportFilenamePreview();
+}
+
+/**
+ * Open the export preview dialog, pre-selecting the given format ('png' or 'pdf').
+ * Generates a thumbnail of the top-down view regardless of current view mode.
+ */
+function showExportPreview(format) {
+    const overlay = document.getElementById('export-preview-overlay');
+
+    // Pre-fill fields
+    document.getElementById('export-preview-name').value = state.roomName || '';
+    document.querySelectorAll('input[name="export-format"]').forEach(r => {
+        r.checked = r.value === format;
+    });
+    document.getElementById('export-incl-annotations').checked = true;
+    document.getElementById('export-incl-measurements').checked = true;
+
+    // Generate preview thumbnail (renders top-down view if needed)
+    const dataURL = generateExportPreviewDataURL();
+    const img = document.getElementById('export-preview-img');
+    if (dataURL) {
+        img.src = dataURL;
+        img.dataset.noPreview = '0';
+    } else {
+        img.src = '';
+        img.dataset.noPreview = '1';
+    }
+
+    // Update format display (thumbnail vs PDF mockup) and filename preview
+    updateExportFormatDisplay();
+
+    overlay.removeAttribute('hidden');
+    document.getElementById('export-preview-confirm').focus();
+
+    // If we temporarily rendered top-down for the preview, restore POV display
+    if (state.viewMode === 'pov') {
+        requestAnimationFrame(() => render());
+    }
+}
+
+function hideExportPreview() {
+    document.getElementById('export-preview-overlay').setAttribute('hidden', '');
 }

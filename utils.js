@@ -219,14 +219,32 @@ function invalidateLayoutCache() { _layoutCache = null; }
 let _renderPending = false;
 let _bgRenderPending = false;
 
+const _RENDER_BUDGET_MS = 32; // half of 60fps budget — warn if render exceeds this
+let _renderTimings = {};
+
+function _checkRenderBudget(label, t0) {
+    const total = performance.now() - t0;
+    if (total > _RENDER_BUDGET_MS) {
+        let slowest = '', slowestMs = 0;
+        for (const [k, v] of Object.entries(_renderTimings)) {
+            if (v > slowestMs) { slowest = k; slowestMs = v; }
+        }
+        console.warn(`[perf] ${label} took ${total.toFixed(1)}ms (>${_RENDER_BUDGET_MS}ms). Slowest: ${slowest} ${slowestMs.toFixed(1)}ms`);
+    }
+    _renderTimings = {};
+}
+
 function scheduleRender() {
     if (_renderPending) return;
     _renderPending = true;
     requestAnimationFrame(() => {
         if (_bgRenderPending) { _renderPending = false; return; }
         _renderPending = false;
-        if (state.viewMode === 'pov') render();
-        else renderForeground();
+        if (state.viewMode === 'pov') { render(); return; }
+        _renderTimings = {};
+        const _t0 = performance.now();
+        renderForeground();
+        _checkRenderBudget('scheduleRender', _t0);
     });
 }
 
@@ -236,9 +254,16 @@ function scheduleBackgroundRender() {
     _bgRenderPending = true;
     requestAnimationFrame(() => {
         _bgRenderPending = false;
+        _renderTimings = {};
+        const _t0 = performance.now();
         if (state.viewMode === 'pov') { render(); return; }
+        const _tBg = performance.now();
         renderBackground();
+        _renderTimings.background = performance.now() - _tBg;
+        const _tFg = performance.now();
         renderForeground();
+        _renderTimings.foreground = performance.now() - _tFg;
+        _checkRenderBudget('scheduleBackgroundRender', _t0);
     });
 }
 

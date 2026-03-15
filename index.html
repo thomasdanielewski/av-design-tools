@@ -25,6 +25,14 @@
             </div>
         </div>
         <div class="sidebar-scroll">
+            <!-- Room Identity -->
+            <div class="room-identity">
+                <input type="text" id="room-name-display" class="room-name-display" placeholder="Untitled Room" maxlength="80" aria-label="Room name" spellcheck="false">
+                <div class="room-notes-wrapper">
+                    <button class="room-notes-toggle" id="room-notes-toggle" aria-expanded="false" type="button">+ Add notes</button>
+                    <textarea id="room-notes" class="room-notes-area" rows="3" placeholder="e.g. Executive boardroom, Building A, Floor 3&#10;Needs PTZ camera for overflow seating" aria-label="Room notes" style="display:none"></textarea>
+                </div>
+            </div>
             <div class="expand-collapse-bar">
                 <button class="expand-collapse-btn" id="expand-all-btn" title="Expand all sections">Expand All</button>
                 <span class="expand-collapse-divider">·</span>
@@ -42,15 +50,15 @@
                 <div class="control-group-body">
                     <div class="room-presets">
                         <button class="preset-pill" data-preset-len="10" data-preset-wid="8"
-                            title="10×8 ft">Huddle</button>
+                            title="10×8 ft"><span class="preset-pill-name">Huddle</span><span class="preset-pill-dims">10×8 ft</span></button>
                         <button class="preset-pill" data-preset-len="14" data-preset-wid="12"
-                            title="14×12 ft">Small</button>
+                            title="14×12 ft"><span class="preset-pill-name">Small</span><span class="preset-pill-dims">14×12 ft</span></button>
                         <button class="preset-pill active" data-preset-len="20" data-preset-wid="15"
-                            title="20×15 ft">Medium</button>
+                            title="20×15 ft"><span class="preset-pill-name">Medium</span><span class="preset-pill-dims">20×15 ft</span></button>
                         <button class="preset-pill" data-preset-len="30" data-preset-wid="20"
-                            title="30×20 ft">Large</button>
+                            title="30×20 ft"><span class="preset-pill-name">Large</span><span class="preset-pill-dims">30×20 ft</span></button>
                         <button class="preset-pill" data-preset-len="40" data-preset-wid="24"
-                            title="40×24 ft">Boardroom</button>
+                            title="40×24 ft"><span class="preset-pill-name">Boardroom</span><span class="preset-pill-dims">40×24 ft</span></button>
                     </div>
                     <div class="control-row">
                         <div class="control-label"><label for="room-length">Length</label><span class="value" id="val-room-length"
@@ -475,9 +483,35 @@
                 </div>
             </div>
 
+            <!-- Room Summary Card -->
+            <div class="summary-card" id="summary-card" aria-label="Room summary">
+                <div class="summary-grid">
+                    <div class="summary-stat">
+                        <span class="summary-icon" aria-hidden="true">⬡</span>
+                        <span class="summary-label">Seats</span>
+                        <span class="summary-value" id="summary-capacity">—</span>
+                    </div>
+                    <div class="summary-stat">
+                        <span class="summary-icon" aria-hidden="true">⬜</span>
+                        <span class="summary-label">Area</span>
+                        <span class="summary-value" id="summary-area">—</span>
+                    </div>
+                    <div class="summary-stat">
+                        <span class="summary-icon" aria-hidden="true">◧</span>
+                        <span class="summary-label">Display</span>
+                        <span class="summary-value" id="summary-display">—</span>
+                    </div>
+                    <div class="summary-stat">
+                        <span class="summary-icon" aria-hidden="true">◈</span>
+                        <span class="summary-label">Device</span>
+                        <span class="summary-value" id="summary-device">—</span>
+                    </div>
+                </div>
+            </div>
+
             <!-- Actions -->
             <div class="control-group" style="border-bottom:none;padding-bottom:24px">
-                <input type="text" id="room-name" placeholder="Room / space name (optional)" maxlength="80">
+                <input type="text" id="room-name" placeholder="Room / space name (optional)" maxlength="80" style="display:none" aria-hidden="true" tabindex="-1">
                 <div class="action-btn-row" style="margin-top:8px">
                     <button class="download-btn" id="download-btn">↓ Layout</button>
                     <button class="download-btn" id="download-pdf-btn">↓ PDF</button>
@@ -511,6 +545,7 @@
                     <span id="history-badge" class="history-badge"></span>
                     <button class="redo-btn" id="redo-btn" title="Redo (Ctrl+Shift+Z)" disabled
                         data-action="redo">↪</button>
+                    <span id="undo-action-label" class="undo-action-label" aria-live="polite"></span>
                     <div id="history-panel" class="history-panel" style="display:none">
                         <ul id="history-list"></ul>
                     </div>
@@ -521,8 +556,19 @@
                     Measure</button>
                 <button class="undo-btn toolbar-btn" id="annotate-btn" title="Annotate (A)" data-action="toggle-annotate"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
                     Annotate</button>
-                <button class="undo-btn toolbar-btn" id="share-btn" title="Copy shareable link" data-action="share">🔗
-                    Share</button>
+                <button class="undo-btn toolbar-btn" id="share-btn" title="Copy shareable link" data-action="share">
+                    <span class="share-btn-icon" aria-hidden="true"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg></span>
+                    <span class="share-btn-label">Share</span>
+                </button>
+                <!-- Share fallback dialog (insecure context / clipboard blocked) -->
+                <dialog id="share-fallback-dialog" class="share-fallback-dialog">
+                    <p class="share-fallback-title">Copy link</p>
+                    <div class="share-fallback-row">
+                        <input id="share-fallback-input" class="share-fallback-input" type="text" readonly>
+                        <button id="share-fallback-copy-btn" class="share-fallback-copy-btn">Copy</button>
+                    </div>
+                    <button id="share-fallback-close-btn" class="share-fallback-close-btn">Close</button>
+                </dialog>
                 <button class="tips-btn" id="show-tips-btn" title="Show Tips">?</button>
                 <button class="theme-toggle" id="theme-toggle" title="Toggle light/dark mode"
                     aria-label="Toggle light/dark mode"><svg class="theme-icon theme-icon--moon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3a7 7 0 0 0 9.79 9.79z"/></svg><svg class="theme-icon theme-icon--sun" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg></button>
@@ -586,6 +632,7 @@
                 <canvas id="bg-canvas" aria-hidden="true"></canvas>
                 <canvas id="fg-canvas" tabindex="0" role="img" aria-label="Conference room layout diagram showing tables, displays, and AV equipment coverage areas"></canvas>
             </div>
+            <div id="canvas-undo-toast" class="canvas-undo-toast" aria-live="polite" aria-atomic="true"></div>
             <!-- Canvas View Mode Toggle -->
             <div class="canvas-view-toggle" id="view-mode-toggle" role="toolbar" aria-label="View mode">
                 <button class="cvt-btn toggle-btn active" data-val="top" data-action="set-view-mode" aria-pressed="true">Top</button>
@@ -601,9 +648,16 @@
                 <div class="zoom-divider" aria-hidden="true"></div>
                 <button class="zoom-btn" id="zoom-reset-btn" title="Reset zoom" aria-label="Reset zoom">⌂</button>
             </div>
+            <!-- Meeting mode seat status legend -->
+            <div class="meeting-legend" id="meeting-legend">
+                <div class="meeting-legend-item"><span class="meeting-legend-dot" style="background:#34D399"></span>Covered <span class="meeting-legend-count" id="legend-count-covered"></span></div>
+                <div class="meeting-legend-item"><span class="meeting-legend-dot" style="background:#FBBF24"></span>Out of Range <span class="meeting-legend-count" id="legend-count-outOfRange"></span></div>
+                <div class="meeting-legend-item"><span class="meeting-legend-dot" style="background:#F87171"></span>Blind Spot <span class="meeting-legend-count" id="legend-count-blindSpot"></span></div>
+                <div class="meeting-legend-item"><span class="meeting-legend-dot" style="background:#94949B"></span>Obstructed <span class="meeting-legend-count" id="legend-count-obstructed"></span></div>
+            </div>
         </div>
         <!-- Meeting Mode Camera Preview -->
-        <div class="meeting-camera-preview" id="meeting-camera-preview" style="display:none">
+        <div class="meeting-camera-preview meeting-mode-off" id="meeting-camera-preview">
             <div class="meeting-preview-header">
                 <span class="meeting-preview-title">Remote Participant View</span>
                 <div style="display:flex;align-items:center;gap:2px">
@@ -616,7 +670,37 @@
                     <button class="meeting-preview-close" data-action="toggle-meeting" title="Close meeting mode">&times;</button>
                 </div>
             </div>
+            <!-- Empty state shown when meeting mode is off -->
+            <div class="meeting-preview-empty-state" id="meeting-preview-empty-state">
+                <svg width="88" height="64" viewBox="0 0 88 64" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                    <!-- Dotted outer frame -->
+                    <rect x="3" y="3" width="82" height="58" rx="5" stroke="currentColor" stroke-width="1.5" stroke-dasharray="4 3" opacity="0.22"/>
+                    <!-- Corner brackets TL -->
+                    <path d="M3,16 L3,6 Q3,3 6,3 L16,3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity="0.45" fill="none"/>
+                    <!-- Corner brackets TR -->
+                    <path d="M72,3 L82,3 Q85,3 85,6 L85,16" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity="0.45" fill="none"/>
+                    <!-- Corner brackets BL -->
+                    <path d="M3,48 L3,58 Q3,61 6,61 L16,61" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity="0.45" fill="none"/>
+                    <!-- Corner brackets BR -->
+                    <path d="M72,61 L82,61 Q85,61 85,58 L85,48" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity="0.45" fill="none"/>
+                    <!-- Camera body -->
+                    <rect x="27" y="22" width="24" height="17" rx="3" stroke="currentColor" stroke-width="1.5" opacity="0.55" fill="none"/>
+                    <!-- Camera lens -->
+                    <circle cx="39" cy="30.5" r="5.5" stroke="currentColor" stroke-width="1.5" opacity="0.55"/>
+                    <circle cx="39" cy="30.5" r="2" stroke="currentColor" stroke-width="1" opacity="0.35"/>
+                    <!-- Camera viewfinder bump -->
+                    <path d="M51,22 L57,16 L62,16 L62,22" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" opacity="0.45" fill="none"/>
+                </svg>
+                <p class="meeting-empty-label">Enable Meeting Mode to<br>preview camera framing</p>
+                <button class="meeting-empty-btn" data-action="toggle-meeting">Enable</button>
+            </div>
             <canvas id="meeting-preview-canvas" width="960" height="540"></canvas>
+            <div class="meeting-coverage-bar" id="meeting-coverage-bar">
+                <span id="meeting-coverage-label">0 of 0 seats covered</span>
+                <div class="meeting-coverage-track">
+                    <div class="meeting-coverage-fill" id="meeting-coverage-fill"></div>
+                </div>
+            </div>
             <div class="meeting-settings-tray" id="meeting-settings-tray">
                 <div class="meeting-settings-summary" id="meeting-settings-summary">
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity:0.5;flex-shrink:0"><polyline points="6 9 12 15 18 9"/></svg>
@@ -670,13 +754,6 @@
                 <span class="meeting-info-stats">0 visible · 0 seated</span>
             </div>
         </div>
-        <!-- Meeting mode color legend -->
-        <div class="meeting-legend" id="meeting-legend" style="display:none">
-            <div class="meeting-legend-item"><span class="meeting-legend-dot" style="background:#34D399"></span>In View</div>
-            <div class="meeting-legend-item"><span class="meeting-legend-dot" style="background:#FBBF24"></span>Out of Range</div>
-            <div class="meeting-legend-item"><span class="meeting-legend-dot" style="background:#F87171"></span>Blind Spot</div>
-            <div class="meeting-legend-item"><span class="meeting-legend-dot" style="background:#94949B"></span>Obstructed</div>
-        </div>
         <div class="info-overlay" id="info-overlay">
             <button class="info-specs-tab" data-action="toggle-overlay">Specs ▸</button>
             <div class="info-overlay-header">
@@ -700,35 +777,118 @@
         </div>
     </main>
 
-    <!-- Keyboard Shortcut Help Dialog -->
-    <dialog id="shortcut-help" class="shortcut-dialog">
-        <div class="shortcut-dialog-header">
-            <h2>Keyboard Shortcuts</h2>
-            <button class="shortcut-close-btn" id="shortcut-close-btn">&times;</button>
+    <!-- Keyboard Shortcut Help Overlay -->
+    <div id="shortcut-help" class="shortcut-overlay" role="dialog" aria-modal="true" aria-label="Keyboard Shortcuts" hidden>
+        <div class="shortcut-card">
+            <div class="shortcut-dialog-header">
+                <h2>Keyboard Shortcuts</h2>
+                <button class="shortcut-close-btn" id="shortcut-close-btn" aria-label="Close shortcuts">&times;</button>
+            </div>
+            <div class="shortcut-grid">
+                <div class="shortcut-category">
+                    <h3 class="shortcut-category-title">View</h3>
+                    <div class="shortcut-rows">
+                        <div class="shortcut-row"><kbd>G</kbd><span>Toggle grid</span></div>
+                        <div class="shortcut-row"><kbd>V</kbd><span>Switch Top / POV view</span></div>
+                        <div class="shortcut-row"><kbd>+</kbd> <kbd>-</kbd><span>Zoom in / out</span></div>
+                        <div class="shortcut-row"><kbd>0</kbd><span>Reset zoom</span></div>
+                        <div class="shortcut-row"><kbd>Scroll</kbd><span>Zoom canvas</span></div>
+                        <div class="shortcut-row"><kbd>Space</kbd><span>Pan (hold + drag)</span></div>
+                    </div>
+                </div>
+                <div class="shortcut-category">
+                    <h3 class="shortcut-category-title">Tools</h3>
+                    <div class="shortcut-rows">
+                        <div class="shortcut-row"><kbd>A</kbd><span>Annotate mode</span></div>
+                        <div class="shortcut-row"><kbd>M</kbd><span>Measure mode</span></div>
+                        <div class="shortcut-row"><kbd>F</kbd><span>Meeting mode</span></div>
+                        <div class="shortcut-row"><kbd>?</kbd><span>Show this help</span></div>
+                    </div>
+                </div>
+                <div class="shortcut-category">
+                    <h3 class="shortcut-category-title">Editing</h3>
+                    <div class="shortcut-rows">
+                        <div class="shortcut-row"><kbd>Ctrl</kbd><kbd>Z</kbd><span>Undo</span></div>
+                        <div class="shortcut-row"><kbd>Ctrl</kbd><kbd>Y</kbd><span>Redo</span></div>
+                        <div class="shortcut-row"><kbd>Ctrl</kbd><kbd>D</kbd><span>Duplicate selected</span></div>
+                        <div class="shortcut-row"><kbd>Delete</kbd> <kbd>Backspace</kbd><span>Remove selected table (canvas focused)</span></div>
+                        <div class="shortcut-row"><kbd>Escape</kbd><span>Deselect / cancel</span></div>
+                    </div>
+                </div>
+                <div class="shortcut-category">
+                    <h3 class="shortcut-category-title">Navigation</h3>
+                    <div class="shortcut-rows">
+                        <div class="shortcut-row"><kbd>Tab</kbd> <kbd>Shift+Tab</kbd><span>Cycle through tables (canvas focused)</span></div>
+                        <div class="shortcut-row"><kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd><span>Nudge selected table 0.5 ft (canvas focused)</span></div>
+                        <div class="shortcut-row"><kbd>Shift</kbd><kbd>↑↓←→</kbd><span>Fine nudge 0.1 ft</span></div>
+                        <div class="shortcut-row"><kbd>Shift+Click</kbd><span>Multi-select tables</span></div>
+                    </div>
+                </div>
+            </div>
+            <p class="shortcut-contact">Questions? Contact <a href="mailto:thomas_danielewski@gensler.com">Thomas Danielewski</a></p>
         </div>
-        <table class="shortcut-table">
-            <thead><tr><th>Key</th><th>Action</th></tr></thead>
-            <tbody>
-                <tr><td><kbd>G</kbd></td><td>Toggle grid</td></tr>
-                <tr><td><kbd>V</kbd></td><td>Switch view (top / POV)</td></tr>
-                <tr><td><kbd>M</kbd></td><td>Toggle measure tool</td></tr>
-                <tr><td><kbd>T</kbd></td><td>Add table</td></tr>
-                <tr><td><kbd>F</kbd></td><td>Toggle meeting mode</td></tr>
-                <tr><td><kbd>Delete</kbd></td><td>Remove selected table or measurement</td></tr>
-                <tr><td><kbd>0</kbd></td><td>Reset zoom</td></tr>
-                <tr><td><kbd>+</kbd> / <kbd>=</kbd></td><td>Zoom in</td></tr>
-                <tr><td><kbd>-</kbd></td><td>Zoom out</td></tr>
-                <tr><td><kbd>Ctrl+Z</kbd></td><td>Undo</td></tr>
-                <tr><td><kbd>Ctrl+Shift+Z</kbd></td><td>Redo</td></tr>
-                <tr><td><kbd>Ctrl+D</kbd></td><td>Duplicate selected table</td></tr>
-                <tr><td><kbd>Arrow keys</kbd></td><td>Move selected table</td></tr>
-                <tr><td><kbd>Shift+Click</kbd></td><td>Multi-select tables (drag to move together)</td></tr>
-                <tr><td><kbd>Escape</kbd></td><td>Deselect / clear multi-selection</td></tr>
-                <tr><td><kbd>?</kbd></td><td>Show this help</td></tr>
-            </tbody>
-        </table>
-        <p class="shortcut-contact">Questions? Contact <a href="mailto:thomas_danielewski@gensler.com">Thomas Danielewski</a></p>
-    </dialog>
+    </div>
+
+    <!-- Export Preview Modal -->
+    <div id="export-preview-overlay" class="shortcut-overlay" role="dialog" aria-modal="true" aria-label="Export Preview" hidden>
+        <div class="export-preview-card">
+            <div class="shortcut-dialog-header">
+                <h2>Export Preview</h2>
+                <button class="shortcut-close-btn" id="export-preview-close" aria-label="Close dialog">&times;</button>
+            </div>
+            <div class="export-preview-body">
+                <div class="export-preview-left">
+                    <div class="export-preview-img-wrap">
+                        <img id="export-preview-img" alt="Room layout preview">
+                        <div class="export-pdf-mockup" id="export-pdf-mockup" hidden aria-hidden="true">
+                            <div class="export-pdf-page">
+                                <div class="export-pdf-img-area">
+                                    <span class="export-pdf-label">Room image</span>
+                                </div>
+                                <div class="export-pdf-text-area">
+                                    <span class="export-pdf-label">Summary</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="export-filename-preview" id="export-filename-preview" aria-live="polite"></div>
+                </div>
+                <div class="export-preview-options">
+                    <div class="export-preview-field">
+                        <label class="export-field-label" for="export-preview-name">Room name</label>
+                        <input type="text" class="export-preview-input" id="export-preview-name" maxlength="80" placeholder="Room / space name">
+                    </div>
+                    <div class="export-preview-field">
+                        <label class="export-field-label">Format</label>
+                        <div class="export-format-row">
+                            <label class="export-format-opt">
+                                <input type="radio" name="export-format" value="png">
+                                <span>PNG</span>
+                            </label>
+                            <label class="export-format-opt">
+                                <input type="radio" name="export-format" value="pdf">
+                                <span>PDF</span>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="export-preview-checks">
+                        <label class="export-check-row">
+                            <input type="checkbox" id="export-incl-annotations" checked>
+                            <span>Include annotations</span>
+                        </label>
+                        <label class="export-check-row">
+                            <input type="checkbox" id="export-incl-measurements" checked>
+                            <span>Include measurements</span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+            <div class="export-preview-actions">
+                <button class="secondary-btn" id="export-preview-cancel">Cancel</button>
+                <button class="download-btn" id="export-preview-confirm">↓ Export</button>
+            </div>
+        </div>
+    </div>
 
     <!-- Context Menu (right-click on canvas structural element) -->
     <div id="structural-context-menu" class="context-menu">

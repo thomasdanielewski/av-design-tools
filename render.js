@@ -26,6 +26,38 @@ function updateHeaderDOM(eq) {
     updateLegendState();
     debouncedSerializeToHash();
     checkRoomWarnings();
+    updateSummaryCard(eq);
+}
+
+/**
+ * Update the persistent summary card in the sidebar with current room metrics.
+ */
+function updateSummaryCard(eq) {
+    const capEl = document.getElementById('summary-capacity');
+    const areaEl = document.getElementById('summary-area');
+    const displayEl = document.getElementById('summary-display');
+    const deviceEl = document.getElementById('summary-device');
+    if (!capEl) return;
+
+    // Seating capacity
+    capEl.textContent = calcTotalCapacity();
+
+    // Room area
+    const areaSqFt = state.roomLength * state.roomWidth;
+    if (state.units === 'metric') {
+        const areaSqM = areaSqFt * 0.0929;
+        areaEl.textContent = areaSqM.toFixed(1) + ' m²';
+    } else {
+        areaEl.textContent = Math.round(areaSqFt) + ' sq ft';
+    }
+
+    // Display size + count
+    const countPrefix = state.displayCount > 1 ? state.displayCount + '× ' : '';
+    displayEl.textContent = countPrefix + state.displaySize + '"';
+
+    // Equipment model name (truncate if needed)
+    deviceEl.textContent = eq.name;
+    deviceEl.title = eq.name;
 }
 
 /**
@@ -78,13 +110,16 @@ function renderBackground() {
     bgCtx.fillStyle = cc().bg;
     bgCtx.fillRect(0, 0, canvasW, canvasH);
 
-    // Grid
+    // Room outline and front wall accent
+    drawRoom(bgCtx, rx, ry, rw, rl, ppf);
+
+    // Grid (drawn after room fill so dots are visible over the room interior)
     if (state.showGrid) {
         drawGrid(bgCtx, rx, ry, rw, rl, ppf);
     }
 
-    // Room outline and front wall accent
-    drawRoom(bgCtx, rx, ry, rw, rl, ppf);
+    // Wall compass labels (N/S/E/W)
+    drawWallLabels(bgCtx, rx, ry, rw, rl, ppf);
 
     // Structural elements (doors) on walls
     const wallThickBg = Math.max(5, ppf * 0.25);
@@ -100,8 +135,12 @@ function renderBackground() {
 /**
  * Render the foreground layer: coverage overlays, displays, equipment,
  * tables, and companion devices.
+ * @param {object} [opts]
+ * @param {boolean} [opts.skipAnnotations=false] - Omit annotation markup layer.
+ * @param {boolean} [opts.skipMeasurements=false] - Omit measurement dimension lines.
  */
-function renderForeground() {
+function renderForeground(opts = {}) {
+    const { skipAnnotations = false, skipMeasurements = false } = opts;
     if (state.viewMode === 'pov') return;
 
     const { dpr, ppf, canvasW, canvasH, ox, oy, rw, rl, rx, ry, wallThick } = getTopDownLayout();
@@ -130,6 +169,9 @@ function renderForeground() {
         isHoriz, dispRotation
     } = computeDevicePositions(state, eq, centerEq, micPodEq, layout);
 
+    // ── Sub-render: coverage overlays ──
+    const _tCov = performance.now();
+
     // Viewing angle overlay
     if (state.showViewAngle) {
         const hovered = isMouseInViewCone(dispX, dispY, rl, ppf);
@@ -150,6 +192,10 @@ function renderForeground() {
             drawCoverage(ctx, micPod2X, micPod2Y, micPodEq, 0);
         }
     }
+    _renderTimings.coverage = performance.now() - _tCov;
+
+    // ── Sub-render: displays + equipment ──
+    const _tEquip = performance.now();
 
     // Displays and equipment — use rotated drawing for E/W walls
     drawDisplaysTopDown(ctx, dispX, dispY, dispWidthPx, dispDepthPx, eq, eqWidthPx, eqDepthPx, dispRotation);
@@ -161,6 +207,10 @@ function renderForeground() {
     if (eq.type === 'bar') {
         drawMountBracket(ctx, dispX, dispY, mainDeviceX, mainDeviceY, eqWidthPx, isHoriz, dispRotation);
     }
+    _renderTimings.equipment = performance.now() - _tEquip;
+
+    // ── Sub-render: tables + chairs ──
+    const _tTables = performance.now();
 
     // Conference tables
     drawTable(ctx, ox, ry, wallThick, ppf);
@@ -217,12 +267,16 @@ function renderForeground() {
     if (drag.tableId !== null && state.showSnap && snapGuides.length > 0) {
         drawSnapGuides(ctx, snapGuides, rx, ry, rw, rl, wallThick);
     }
+    _renderTimings.tables = performance.now() - _tTables;
+
+    // ── Sub-render: annotations + measurements ──
+    const _tAnnot = performance.now();
 
     // Annotation markup (drawn on top of room content, behind measurements)
-    drawAnnotations(ctx, ppf);
+    if (!skipAnnotations) drawAnnotations(ctx, ppf);
 
     // Measurement dimension lines (drawn on top of room content)
-    drawMeasurements(ctx, ppf);
+    if (!skipMeasurements) drawMeasurements(ctx, ppf);
 
     // Measure tool: pulsing dot on first click + dashed preview line to cursor
     if (state.measureToolActive) {
@@ -371,7 +425,10 @@ function renderForeground() {
         }
     }
 
-    // ── Meeting mode overlays ──────────────────────────────────
+    _renderTimings.annotations = performance.now() - _tAnnot;
+
+    // ── Sub-render: meeting mode overlays ──
+    const _tMeeting = performance.now();
     if (state.meetingMode) {
         _meetingAutoInvalidate();
         const meetingData = getMeetingData();
@@ -397,6 +454,8 @@ function renderForeground() {
         }
     }
 
+    _renderTimings.meeting = performance.now() - _tMeeting;
+
     // Equipment hover tooltip (drawn last, on top of everything)
     drawEquipmentTooltip(ctx);
 
@@ -415,6 +474,8 @@ function renderForeground() {
  */
 let _renderErrorCount = 0;
 function render() {
+    const _t0 = performance.now();
+    _renderTimings = {};
     try {
         invalidateLayoutCache();
 
@@ -426,10 +487,17 @@ function render() {
             const container = document.querySelector('.canvas-container');
             const cw = container.clientWidth - 64;
             const ch = container.clientHeight - 64;
+            const _tPov = performance.now();
             renderPOV(cw, ch, dpr);
+            _renderTimings.pov = performance.now() - _tPov;
         } else {
+            const _tBg = performance.now();
             renderBackground();
+            _renderTimings.background = performance.now() - _tBg;
+
+            const _tFg = performance.now();
             renderForeground();
+            _renderTimings.foreground = performance.now() - _tFg;
         }
         _renderErrorCount = 0;
     } catch (err) {
@@ -441,4 +509,5 @@ function render() {
             showToast('Rendering error \u2014 try undo (Ctrl+Z)', 'error');
         }
     }
+    _checkRenderBudget('render', _t0);
 }

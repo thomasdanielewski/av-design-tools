@@ -118,7 +118,7 @@ function _drawCoverageArc(drawCtx, devX, devY, radius, facingAngle, arcDeg, fill
         drawCtx.beginPath();
         drawCtx.arc(devX, devY, radius, 0, Math.PI * 2);
         drawCtx.fill();
-        if (!gradientStops) {
+        if (strokeColor) {
             drawCtx.setLineDash(dashPattern);
             drawCtx.stroke();
             drawCtx.setLineDash([]);
@@ -131,21 +131,23 @@ function _drawCoverageArc(drawCtx, devX, devY, radius, facingAngle, arcDeg, fill
         drawCtx.closePath();
         drawCtx.fill();
 
-        if (!gradientStops) {
+        if (strokeColor) {
             drawCtx.setLineDash(dashPattern);
             drawCtx.beginPath();
             drawCtx.arc(devX, devY, radius, facingAngle - ha, facingAngle + ha);
             drawCtx.stroke();
 
-            // Radial edge lines
-            drawCtx.beginPath();
-            drawCtx.moveTo(devX, devY);
-            drawCtx.lineTo(devX + Math.cos(facingAngle - ha) * radius, devY + Math.sin(facingAngle - ha) * radius);
-            drawCtx.stroke();
-            drawCtx.beginPath();
-            drawCtx.moveTo(devX, devY);
-            drawCtx.lineTo(devX + Math.cos(facingAngle + ha) * radius, devY + Math.sin(facingAngle + ha) * radius);
-            drawCtx.stroke();
+            if (!gradientStops) {
+                // Radial edge lines (flat-fill style only)
+                drawCtx.beginPath();
+                drawCtx.moveTo(devX, devY);
+                drawCtx.lineTo(devX + Math.cos(facingAngle - ha) * radius, devY + Math.sin(facingAngle - ha) * radius);
+                drawCtx.stroke();
+                drawCtx.beginPath();
+                drawCtx.moveTo(devX, devY);
+                drawCtx.lineTo(devX + Math.cos(facingAngle + ha) * radius, devY + Math.sin(facingAngle + ha) * radius);
+                drawCtx.stroke();
+            }
             drawCtx.setLineDash([]);
         }
     }
@@ -161,24 +163,52 @@ function _drawCoverageArc(drawCtx, devX, devY, radius, facingAngle, arcDeg, fill
  * @param {number} facingAngle - Angle the device faces (radians)
  */
 function drawCoverage(drawCtx, devX, devY, device, facingAngle) {
+    // Mic drawn first so camera renders on top
     if (state.showMic) {
-        _drawCoverageArc(drawCtx, devX, devY, device.micRange * ppf_g, facingAngle,
+        const micR = device.micRange * ppf_g;
+        _drawCoverageArc(drawCtx, devX, devY, micR, facingAngle,
             device.micArc, null, null, 0, [], [
-                [0,   'rgba(74, 222, 128, 0.18)'],
-                [0.35, 'rgba(74, 222, 128, 0.10)'],
-                [0.7, 'rgba(74, 222, 128, 0.04)'],
-                [1,   'rgba(74, 222, 128, 0)']
+                [0,    'rgba(74, 222, 128, 0.20)'],
+                [0.4,  'rgba(74, 222, 128, 0.10)'],
+                [0.75, 'rgba(74, 222, 128, 0.04)'],
+                [1,    'rgba(74, 222, 128, 0)']
             ]);
+
+        // Concentric dashed rings at 25 / 50 / 75 / 100 % of range
+        drawCtx.strokeStyle = 'rgba(74, 222, 128, 0.25)';
+        drawCtx.lineWidth = 0.75;
+        drawCtx.setLineDash([3, 4]);
+        const fullCircle = device.micArc >= 315;
+        const ha = deg2rad(device.micArc / 2);
+        [0.25, 0.5, 0.75, 1.0].forEach(frac => {
+            drawCtx.beginPath();
+            if (fullCircle) {
+                drawCtx.arc(devX, devY, micR * frac, 0, Math.PI * 2);
+            } else {
+                drawCtx.arc(devX, devY, micR * frac, facingAngle - ha, facingAngle + ha);
+            }
+            drawCtx.stroke();
+        });
+        drawCtx.setLineDash([]);
     }
 
     if (state.showCamera && device.cameraFOV > 0) {
+        // Gradient "beam" fill + thin dashed boundary arc
         _drawCoverageArc(drawCtx, devX, devY, device.cameraRange * ppf_g, facingAngle,
-            device.cameraFOV, 'rgba(91, 156, 245, 0.08)', 'rgba(91, 156, 245, 0.20)', 1.2, [6, 3]);
+            device.cameraFOV, null, 'rgba(91, 156, 245, 0.30)', 1, [5, 4], [
+                [0,   'rgba(91, 156, 245, 0.12)'],
+                [0.5, 'rgba(91, 156, 245, 0.07)'],
+                [1,   'rgba(91, 156, 245, 0.02)']
+            ]);
 
         // Optional telephoto FOV overlay
         if (device.cameraFOVTele && device.cameraFOV < 315) {
             _drawCoverageArc(drawCtx, devX, devY, device.cameraRange * ppf_g, facingAngle,
-                device.cameraFOVTele, 'rgba(91, 156, 245, 0.04)', 'rgba(91, 156, 245, 0.12)', 1.2, [3, 5]);
+                device.cameraFOVTele, null, 'rgba(91, 156, 245, 0.18)', 1, [3, 5], [
+                    [0,   'rgba(91, 156, 245, 0.08)'],
+                    [0.5, 'rgba(91, 156, 245, 0.04)'],
+                    [1,   'rgba(91, 156, 245, 0.01)']
+                ]);
         }
     }
 }
@@ -186,37 +216,111 @@ function drawCoverage(drawCtx, devX, devY, device, facingAngle) {
 // ── Top-Down Drawing Sub-functions ───────────────────────────
 
 /**
- * Draw the floor grid (2-ft spacing) with axis labels.
+ * Draw the floor grid as hairline lines.
+ *
+ * Three density levels, visibility driven by effective screen px/ft:
+ *   - Major lines  every 2 ft / 1 m    — always shown when grid is on
+ *   - Minor lines  every 1 ft / 0.5 m  — shown at normal zoom (effPpf ≥ 12)
+ *   - Sub lines    every 0.5 ft / 0.25 m — shown only at high zoom (effPpf ≥ 38)
+ *   - 5 ft accent  every 5 ft (imperial) — most prominent landmark lines
+ *
+ * Lines are 0.5px wide and fade near room edges over a 40px gradient zone.
+ * Coarser levels paint on top of finer ones so accent lines read clearly.
  */
 function drawGrid(drawCtx, rx, ry, rw, rl, ppf) {
-    drawCtx.fillStyle = cc().gridDot;
+    const isMetric = state.units === 'metric';
 
-    for (let fy = 0; fy <= state.roomLength; fy += GRID_SPACING) {
-        for (let fx = 0; fx <= state.roomWidth; fx += GRID_SPACING) {
-            const x = rx + fx * ppf;
-            const y = ry + fy * ppf;
-            drawCtx.fillRect(x - 0.5, y - 0.5, 1, 1);
+    // Grid spacings in feet (unchanged)
+    const majorFt = isMetric ? (1 / 0.3048) : 2;        // 1 m  or 2 ft
+    const minorFt = isMetric ? (0.5 / 0.3048) : 1;      // 0.5 m or 1 ft
+    const subFt   = isMetric ? (0.25 / 0.3048) : 0.5;   // 0.25 m or 0.5 ft
+
+    const roomW = state.roomWidth;
+    const roomL = state.roomLength;
+
+    // Effective screen-space pixels per foot (canvas ppf × CSS viewport zoom)
+    const effPpf = ppf * viewportZoom;
+    const showMinor = effPpf >= 12;
+    const showSub   = effPpf >= 38;
+
+    // Edge-fade zone: lines ramp 0 → full opacity over 40 canvas px from each wall
+    const FADE_PX = 40;
+
+    const isDark = (document.documentElement.getAttribute('data-theme') || 'dark') === 'dark';
+    const rgb = isDark ? '255,255,255' : '30,32,40';
+
+    drawCtx.save();
+    drawCtx.lineWidth = 0.5;
+    drawCtx.setLineDash([]);
+
+    function drawGridLines(stepFt, baseAlpha) {
+        const nX = Math.round(roomW / stepFt);
+        const nY = Math.round(roomL / stepFt);
+
+        // Vertical lines — fade near left and right walls
+        for (let i = 0; i <= nX; i++) {
+            const fx = i * stepFt;
+            if (fx > roomW + 1e-6) break;
+            const cx = rx + fx * ppf;
+            const fade = Math.min(Math.min(cx - rx, (rx + rw) - cx) / FADE_PX, 1);
+            if (fade <= 0) continue;
+            drawCtx.strokeStyle = `rgba(${rgb},${baseAlpha * fade})`;
+            drawCtx.beginPath();
+            drawCtx.moveTo(cx, ry);
+            drawCtx.lineTo(cx, ry + rl);
+            drawCtx.stroke();
+        }
+
+        // Horizontal lines — fade near top and bottom walls
+        for (let j = 0; j <= nY; j++) {
+            const fy = j * stepFt;
+            if (fy > roomL + 1e-6) break;
+            const cy = ry + fy * ppf;
+            const fade = Math.min(Math.min(cy - ry, (ry + rl) - cy) / FADE_PX, 1);
+            if (fade <= 0) continue;
+            drawCtx.strokeStyle = `rgba(${rgb},${baseAlpha * fade})`;
+            drawCtx.beginPath();
+            drawCtx.moveTo(rx, cy);
+            drawCtx.lineTo(rx + rw, cy);
+            drawCtx.stroke();
         }
     }
 
-    // Axis labels
+    // Draw fine → coarse so coarser lines overwrite at intersections
+    if (showSub)   drawGridLines(subFt,   0.04);
+    if (showMinor) drawGridLines(minorFt, 0.07);
+                   drawGridLines(majorFt, 0.10);
+    // 5 ft accent lines (imperial) — major visual landmarks per user spec
+    if (!isMetric) drawGridLines(5,       0.14);
+
+    drawCtx.restore();
+
+    // Axis labels — major intervals only, just outside the room boundary
+    drawCtx.save();
     drawCtx.font = `500 ${Math.max(9, ppf * 0.4)}px 'JetBrains Mono', monospace`;
     drawCtx.fillStyle = cc().gridAxis;
 
-    const isMetric = state.units === 'metric';
+    const nLabelX = Math.round(roomW / majorFt);
     drawCtx.textAlign = 'center';
     drawCtx.textBaseline = 'top';
-    for (let f = GRID_SPACING; f < state.roomWidth; f += GRID_SPACING) {
+    for (let i = 1; i < nLabelX; i++) {
+        const f = i * majorFt;
+        if (f >= roomW - 1e-6) break;
         const label = isMetric ? formatMetric(convertToMetric(f)) : f + "'";
         drawCtx.fillText(label, rx + f * ppf, ry + rl + 5);
     }
 
+    const nLabelY = Math.round(roomL / majorFt);
     drawCtx.textAlign = 'right';
     drawCtx.textBaseline = 'middle';
-    for (let f = GRID_SPACING; f < state.roomLength; f += GRID_SPACING) {
+    for (let j = 1; j < nLabelY; j++) {
+        const f = j * majorFt;
+        if (f >= roomL - 1e-6) break;
         const label = isMetric ? formatMetric(convertToMetric(f)) : f + "'";
         drawCtx.fillText(label, rx - 6, ry + f * ppf);
     }
+
+    drawCtx.restore();
 }
 
 /**
@@ -648,12 +752,11 @@ function drawChairsForTable(drawCtx, chairs, ppf, alpha) {
     if (ppf <= 0) return;
     const cw = CHAIR_WIDTH * ppf;
     const cd = CHAIR_DEPTH * ppf;
+    // More rounded corners for a seat-cushion-from-above look
+    const cr = Math.min(cw, cd) * 0.28;
 
     drawCtx.save();
     drawCtx.globalAlpha = alpha;
-    drawCtx.fillStyle = cc().chairFill;
-    drawCtx.strokeStyle = cc().chairStroke;
-    drawCtx.lineWidth = 1;
 
     for (const chair of chairs) {
         const cx = chair.x * ppf;
@@ -664,14 +767,18 @@ function drawChairsForTable(drawCtx, chairs, ppf, alpha) {
         // angle is the outward normal; adding π/2 maps local Y- to that direction.
         drawCtx.rotate(chair.angle + Math.PI / 2);
 
-        // Seat: rounded rectangle
-        roundRect(drawCtx, -cw / 2, -cd / 2, cw, cd, 3);
+        // Seat: rounded rect with slightly darker fill than table surface
+        drawCtx.fillStyle = cc().chairSeat;
+        drawCtx.strokeStyle = cc().chairStroke;
+        drawCtx.lineWidth = 0.75;
+        roundRect(drawCtx, -cw / 2, -cd / 2, cw, cd, cr);
         drawCtx.fill();
         drawCtx.stroke();
 
-        // Backrest indicator: small arc on the outer edge (Y- side, away from table)
+        // Backrest: thicker arc on the outer edge (Y- side, away from table)
+        drawCtx.lineWidth = 1.8;
         drawCtx.beginPath();
-        drawCtx.arc(0, -cd / 2, cw * 0.32, Math.PI * 0.15, Math.PI * 0.85);
+        drawCtx.arc(0, -cd / 2, cw * 0.38, Math.PI * 0.12, Math.PI * 0.88);
         drawCtx.stroke();
 
         drawCtx.restore();
@@ -763,6 +870,35 @@ function drawTable(drawCtx, ox, ry, wallThick, ppf) {
         drawCtx.translate(tcx, tcy);
         drawCtx.rotate(angle);
         drawCtx.globalAlpha = (isSelected || isMultiSelected) ? 1.0 : 0.55;
+
+        // ── Soft glow for selected / multi-selected tables ─────────────
+        if (isSelected || isMultiSelected) {
+            const glowColor = isMultiSelected ? 'rgba(167, 139, 250, 0.80)' : 'rgba(91, 156, 245, 0.80)';
+            const gi = 6;
+            drawCtx.save();
+            drawCtx.shadowColor = glowColor;
+            drawCtx.shadowBlur = 16;
+            drawCtx.fillStyle = isMultiSelected ? 'rgba(167, 139, 250, 0.15)' : 'rgba(91, 156, 245, 0.15)';
+            if (t.shape === 'rectangular') {
+                roundRect(drawCtx, x0 - gi, y0 - gi, tw + gi * 2, tl + gi * 2, 10);
+                drawCtx.fill();
+            } else if (t.shape === 'oval') {
+                drawCtx.beginPath();
+                drawCtx.ellipse(0, 0, tw / 2 + gi, tl / 2 + gi, 0, 0, Math.PI * 2);
+                drawCtx.fill();
+            } else if (t.shape === 'circle') {
+                drawCtx.beginPath();
+                drawCtx.arc(0, 0, Math.min(tw, tl) / 2 + gi, 0, Math.PI * 2);
+                drawCtx.fill();
+            } else if (t.shape === 'd-shape') {
+                drawCtx.beginPath();
+                drawCtx.ellipse(0, 0, tw / 2 + gi, tl / 2 + gi, 0, 0, Math.PI * 2);
+                drawCtx.fill();
+            }
+            drawCtx.restore();
+        }
+
+        // ── Table fill + outer stroke ───────────────────────────────────
         drawCtx.fillStyle = cc().surface;
         drawCtx.strokeStyle = isMultiSelected ? '#a78bfa' : cc().tableStroke;
         drawCtx.lineWidth = isMultiSelected ? 2.5 : (isSelected ? 1.5 : 1);
@@ -788,6 +924,22 @@ function drawTable(drawCtx, ox, ry, wallThick, ppf) {
             drawCtx.fill(); drawCtx.stroke();
         }
 
+        // ── Subtle inner shadow (1px inset stroke at low opacity) ───────
+        drawCtx.strokeStyle = cc().tableInnerShadow;
+        drawCtx.lineWidth = 1;
+        if (t.shape === 'rectangular') {
+            roundRect(drawCtx, x0 + 0.5, y0 + 0.5, tw - 1, tl - 1, 5.5);
+            drawCtx.stroke();
+        } else if (t.shape === 'oval') {
+            drawCtx.beginPath();
+            drawCtx.ellipse(0, 0, tw / 2 - 0.5, tl / 2 - 0.5, 0, 0, Math.PI * 2);
+            drawCtx.stroke();
+        } else if (t.shape === 'circle') {
+            drawCtx.beginPath();
+            drawCtx.arc(0, 0, Math.min(tw, tl) / 2 - 0.5, 0, Math.PI * 2);
+            drawCtx.stroke();
+        }
+
         // Chairs around the table
         const chairs = getChairPositions(t);
         drawChairsForTable(drawCtx, chairs, ppf, (isSelected || isMultiSelected) ? 1.0 : 0.55);
@@ -803,35 +955,28 @@ function drawTable(drawCtx, ox, ry, wallThick, ppf) {
             drawCtx.fillText(`T${t.id}`, 0, 0);
         }
 
-        // Overlap warning: red tint + dashed border + ⚠ icon
+        // ── Overlap warning: dashed border + ⚠ icon (no red fill) ──────
         if (t.id === drag.tableId && drag.tableOverlap) {
             drawCtx.globalAlpha = 1.0;
-            drawCtx.fillStyle = 'rgba(239, 68, 68, 0.22)';
-            drawCtx.strokeStyle = 'rgba(239, 68, 68, 0.75)';
-            drawCtx.lineWidth = 2;
-            drawCtx.setLineDash([4, 3]);
+            drawCtx.strokeStyle = 'rgba(239, 68, 68, 0.70)';
+            drawCtx.lineWidth = 1.5;
+            drawCtx.setLineDash([5, 3]);
             if (t.shape === 'rectangular') {
-                roundRect(drawCtx, x0, y0, tw, tl, 6); drawCtx.fill();
                 roundRect(drawCtx, x0, y0, tw, tl, 6); drawCtx.stroke();
             } else if (t.shape === 'oval') {
-                drawCtx.beginPath(); drawCtx.ellipse(0, 0, tw / 2, tl / 2, 0, 0, Math.PI * 2); drawCtx.fill();
                 drawCtx.beginPath(); drawCtx.ellipse(0, 0, tw / 2, tl / 2, 0, 0, Math.PI * 2); drawCtx.stroke();
             } else if (t.shape === 'circle') {
-                drawCtx.beginPath(); drawCtx.arc(0, 0, Math.min(tw, tl) / 2, 0, Math.PI * 2); drawCtx.fill();
                 drawCtx.beginPath(); drawCtx.arc(0, 0, Math.min(tw, tl) / 2, 0, Math.PI * 2); drawCtx.stroke();
             } else if (t.shape === 'd-shape') {
-                drawCtx.beginPath(); drawCtx.moveTo(x0, y0); drawCtx.lineTo(x0 + tw, y0);
-                drawCtx.lineTo(x0 + tw, y0 + tl - tw / 2); drawCtx.arc(0, y0 + tl - tw / 2, tw / 2, 0, Math.PI);
-                drawCtx.lineTo(x0, y0); drawCtx.fill();
                 drawCtx.beginPath(); drawCtx.moveTo(x0, y0); drawCtx.lineTo(x0 + tw, y0);
                 drawCtx.lineTo(x0 + tw, y0 + tl - tw / 2); drawCtx.arc(0, y0 + tl - tw / 2, tw / 2, 0, Math.PI);
                 drawCtx.lineTo(x0, y0); drawCtx.stroke();
             }
             drawCtx.setLineDash([]);
-            // Warning icon
-            const warnSz = Math.max(14, ppf * 0.42);
+            // Warning icon at center
+            const warnSz = Math.max(12, ppf * 0.35);
             drawCtx.font = `bold ${warnSz}px sans-serif`;
-            drawCtx.fillStyle = 'rgba(239, 68, 68, 0.95)';
+            drawCtx.fillStyle = 'rgba(239, 68, 68, 0.88)';
             drawCtx.textAlign = 'center';
             drawCtx.textBaseline = 'middle';
             drawCtx.fillText('⚠', 0, 0);
@@ -839,20 +984,6 @@ function drawTable(drawCtx, ox, ry, wallThick, ppf) {
 
         drawCtx.globalAlpha = 1.0;
         drawCtx.restore();
-
-        // Selection ring for multi-table mode
-        if (isSelected && state.tables.length > 1) {
-            drawCtx.save();
-            drawCtx.translate(tcx, tcy);
-            drawCtx.rotate(angle);
-            drawCtx.strokeStyle = cc().selectionRing;
-            drawCtx.lineWidth = 1.5;
-            drawCtx.setLineDash([3, 3]);
-            roundRect(drawCtx, x0 - 4, y0 - 4, tw + 8, tl + 8, 8);
-            drawCtx.stroke();
-            drawCtx.setLineDash([]);
-            drawCtx.restore();
-        }
 
         // Rotation handle — stem + dot extending from the front (top edge) of the selected table
         if (isSelected) {
@@ -1121,6 +1252,44 @@ function drawMicPod(drawCtx, micPodX, micPodY, micPodEq, ppf, dualLabel) {
 }
 
 /**
+ * Draw N/S/E/W compass labels at the midpoint of each room wall,
+ * positioned just outside the room outline. The active display wall
+ * label is highlighted in the brand accent color.
+ * Only shown in top-down view (caller is responsible for this guard).
+ */
+function drawWallLabels(drawCtx, rx, ry, rw, rl, ppf) {
+    const dw = state.displayWall;
+    const theme = document.documentElement.getAttribute('data-theme') || 'dark';
+    const accentColor = state.brand === 'logitech'
+        ? (theme === 'dark' ? '#14B8A6' : '#0D9488')
+        : (theme === 'dark' ? '#7C3AED' : '#6D28D9');
+
+    const fontSize = Math.min(13, Math.max(10, ppf * 0.38));
+    drawCtx.save();
+    drawCtx.font = `600 ${fontSize}px 'JetBrains Mono', monospace`;
+    drawCtx.textAlign = 'center';
+    drawCtx.textBaseline = 'middle';
+
+    const GAP = Math.max(10, ppf * 0.28);
+
+    const walls = [
+        { label: 'N', x: rx + rw / 2, y: ry - GAP, key: 'north'  },
+        { label: 'S', x: rx + rw / 2, y: ry + rl + GAP, key: 'south' },
+        { label: 'W', x: rx - GAP,    y: ry + rl / 2,   key: 'west'  },
+        { label: 'E', x: rx + rw + GAP, y: ry + rl / 2, key: 'east'  },
+    ];
+
+    for (const wall of walls) {
+        const isActive = wall.key === dw;
+        drawCtx.globalAlpha = isActive ? 0.85 : 0.40;
+        drawCtx.fillStyle = isActive ? accentColor : cc().label;
+        drawCtx.fillText(wall.label, wall.x, wall.y);
+    }
+
+    drawCtx.restore();
+}
+
+/**
  * Draw room-width and room-length dimension labels.
  */
 function drawDimensionLabels(drawCtx, ox, oy, rx, ry, rl, ppf) {
@@ -1144,6 +1313,7 @@ function drawDimensionLabels(drawCtx, ox, oy, rx, ry, rl, ppf) {
 
 /**
  * Draw the visual scale bar in the bottom-left corner of the room.
+ * Design: thin line + end ticks, text pill only behind the label.
  */
 function drawScaleBar(drawCtx, rx, ry, rl, ppf) {
     let barFt = SCALE_BAR_CANDIDATES.find(f => f * ppf >= 50) || 20;
@@ -1152,44 +1322,51 @@ function drawScaleBar(drawCtx, rx, ry, rl, ppf) {
     const margin = 16;
     const bx = rx + margin;
     const by = ry + rl - margin - 1;
-    const tickH = 5;
+    const tickH = 4;
     const barLabel = state.units === 'metric'
         ? formatMetric(convertToMetric(barFt))
         : `${barFt} ft`;
 
-    // Background pill for legibility
-    const pillW = barPx + 2;
-    const pillH = tickH * 2 + 14;
+    // Measure text for pill sizing
+    drawCtx.font = `600 10px 'JetBrains Mono', monospace`;
+    const textW = drawCtx.measureText(barLabel).width;
+
+    const labelX = bx + barPx / 2;
+    const labelBaseline = by - tickH - 4;
+
+    // Subtle pill behind the text only
+    const pPadX = 5, pPadY = 3;
+    const pW = textW + pPadX * 2;
+    const pH = 10 + pPadY * 2;
     drawCtx.fillStyle = cc().scaleBarPill;
-    roundRect(drawCtx, bx - 4, by - tickH - 7, pillW + 8, pillH, 4);
+    roundRect(drawCtx, labelX - pW / 2, labelBaseline - pH + pPadY, pW, pH, 3);
     drawCtx.fill();
 
-    // End ticks and horizontal bar
-    drawCtx.strokeStyle = cc().label;
-    drawCtx.lineWidth = 1.5;
-    drawCtx.setLineDash([]);
-
-    drawCtx.beginPath(); drawCtx.moveTo(bx, by - tickH); drawCtx.lineTo(bx, by + tickH); drawCtx.stroke();
-    drawCtx.beginPath(); drawCtx.moveTo(bx + barPx, by - tickH); drawCtx.lineTo(bx + barPx, by + tickH); drawCtx.stroke();
-    drawCtx.beginPath(); drawCtx.moveTo(bx, by); drawCtx.lineTo(bx + barPx, by); drawCtx.stroke();
-
-    // Half-way tick for bars >= 4 ft
-    if (barFt >= 4) {
-        const halfPx = barPx / 2;
-        drawCtx.strokeStyle = cc().scaleBarHalf;
-        drawCtx.lineWidth = 1;
-        drawCtx.beginPath();
-        drawCtx.moveTo(bx + halfPx, by - tickH * 0.55);
-        drawCtx.lineTo(bx + halfPx, by + tickH * 0.55);
-        drawCtx.stroke();
-    }
-
-    // Label centred above bar
-    drawCtx.font = `600 10px 'JetBrains Mono', monospace`;
+    // Label
     drawCtx.fillStyle = cc().label;
     drawCtx.textAlign = 'center';
     drawCtx.textBaseline = 'bottom';
-    drawCtx.fillText(barLabel, bx + barPx / 2, by - tickH - 2);
+    drawCtx.fillText(barLabel, labelX, labelBaseline);
+
+    // Thin horizontal bar line + end ticks
+    drawCtx.strokeStyle = cc().label;
+    drawCtx.lineWidth = 1;
+    drawCtx.setLineDash([]);
+
+    drawCtx.beginPath();
+    drawCtx.moveTo(bx, by);
+    drawCtx.lineTo(bx + barPx, by);
+    drawCtx.stroke();
+
+    drawCtx.beginPath();
+    drawCtx.moveTo(bx, by - tickH);
+    drawCtx.lineTo(bx, by + tickH);
+    drawCtx.stroke();
+
+    drawCtx.beginPath();
+    drawCtx.moveTo(bx + barPx, by - tickH);
+    drawCtx.lineTo(bx + barPx, by + tickH);
+    drawCtx.stroke();
 }
 
 /**
@@ -1658,6 +1835,44 @@ function _meetingColors(status) {
 }
 
 /**
+ * Draw a subtle floor-plan chair outline behind a meeting avatar.
+ * Context must already be translated to the seat center.
+ * @param {CanvasRenderingContext2D} drawCtx
+ * @param {number} ppf - pixels per foot
+ * @param {number} seatAngle - outward-facing angle from getSeatsInRoomSpace (radians)
+ * @param {{ fill: string, stroke: string }} statusColors - meeting status color pair
+ */
+function _drawMeetingChairOutline(drawCtx, ppf, seatAngle, statusColors) {
+    const cw = CHAIR_WIDTH * ppf;
+    const cd = CHAIR_DEPTH * ppf;
+
+    drawCtx.save();
+    // Rotate so Y- faces away from table (same convention as drawChairsForTable)
+    drawCtx.rotate(seatAngle + Math.PI / 2);
+
+    // Seat cushion — very faint fill, thin status-coloured stroke
+    drawCtx.globalAlpha = 0.13;
+    drawCtx.fillStyle = statusColors.fill;
+    roundRect(drawCtx, -cw / 2, -cd / 2, cw, cd, 3);
+    drawCtx.fill();
+
+    drawCtx.globalAlpha = 0.38;
+    drawCtx.strokeStyle = statusColors.stroke;
+    drawCtx.lineWidth = 0.9;
+    roundRect(drawCtx, -cw / 2, -cd / 2, cw, cd, 3);
+    drawCtx.stroke();
+
+    // Backrest arc — slightly bolder to read as the chair back
+    drawCtx.globalAlpha = 0.45;
+    drawCtx.beginPath();
+    drawCtx.arc(0, -cd / 2, cw * 0.32, Math.PI * 0.15, Math.PI * 0.85);
+    drawCtx.stroke();
+
+    drawCtx.globalAlpha = 1;
+    drawCtx.restore();
+}
+
+/**
  * Draw meeting avatars (head + shoulder silhouettes) on occupied seats.
  * Modern clean style with subtle depth, participant colors, and smooth edges.
  * Coordinates are in room-space feet; this function converts to canvas pixels.
@@ -1679,6 +1894,11 @@ function drawMeetingAvatars(drawCtx, occupiedSeats, ppf, rx, ry, wallThick) {
 
         drawCtx.save();
         drawCtx.translate(cx, cy);
+
+        // Chair outline behind avatar — rotated to face the table
+        if (seat.angle != null) {
+            _drawMeetingChairOutline(drawCtx, ppf, seat.angle, statusColors);
+        }
 
         // Soft ambient glow for covered seats
         if (seat.status === SEAT_STATUS.covered) {

@@ -109,7 +109,13 @@
       "Bash(grep -l \"displayElev\\\\|elevation\" *.js)",
       "Bash(grep -n \"const.*ANNOTATION\\\\|const.*COLORS\\\\|drawAnnotation\" \"C:\\\\Users\\\\Thomas\\\\Documents\\\\GitHub\\\\av-design-tools\"/*.js)",
       "Bash(grep -n \"const.*ANNOTATION\\\\|const.*COLORS\\\\|drawAnnotation\" /c/Users/Thomas/Documents/GitHub/av-design-tools/*.js)",
-      "Bash(grep -n \"fgCanvas.addEventListener\\\\|canvas.addEventListener\\\\|mousemove\\\\|mousedown\\\\|mouseup\" /c/Users/Thomas/Documents/GitHub/av-design-tools/*.js)"
+      "Bash(grep -n \"fgCanvas.addEventListener\\\\|canvas.addEventListener\\\\|mousemove\\\\|mousedown\\\\|mouseup\" /c/Users/Thomas/Documents/GitHub/av-design-tools/*.js)",
+      "Bash(grep -r \"Framing Mode\\\\|Camera Zone\\\\|Blind Spot\\\\|Seat Status\" C:UsersThomasDocumentsGitHubav-design-tools --include=*.js --include=*.html)",
+      "Bash(grep -n \"function renderMeetingPreviewPanel\\\\|renderMeetingPreviewPanel.*=\" \"C:\\\\Users\\\\Thomas\\\\Documents\\\\GitHub\\\\av-design-tools\"/*.js)",
+      "Bash(find . -maxdepth 1 -name \"*.js\" -type f -exec wc -l {} +)",
+      "Bash(grep -n \"meeting-camera-preview.*display\\\\|display.*meeting-camera\\\\|meeting.*preview.*style.display\" /c/Users/Thomas/Documents/GitHub/av-design-tools/*.js)",
+      "Bash(grep -n \"const HASH_KEYS\\\\|const EQUIPMENT\" *.js)",
+      "Bash(grep -n \"^const DOM\\\\|^let DOM\" *.js)"
     ]
   }
 }

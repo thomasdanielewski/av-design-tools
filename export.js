@@ -1,9 +1,55 @@
 // ── Download / Export / Import ────────────────────────────────
 
-function downloadLayout() {
+/**
+ * Render the top-down view to bgCanvas/fgCanvas at reduced resolution and
+ * return a JPEG data URL for use as a preview thumbnail.
+ * Safe to call regardless of current viewMode.
+ */
+function generateExportPreviewDataURL() {
+    // If in POV mode, temporarily switch to render top-down canvases
+    const wasPOV = state.viewMode === 'pov';
+    if (wasPOV) {
+        state.viewMode = 'top';
+        renderBackground();
+        renderForeground();
+        state.viewMode = 'pov';
+        // Caller should call render() after showing the modal to restore POV display
+    }
+
+    const srcW = bgCanvas.width;
+    const srcH = bgCanvas.height;
+    if (srcW < 1 || srcH < 1) return '';
+
+    const maxW = 480;
+    const scale = Math.min(1, maxW / srcW);
+    const pw = Math.max(1, Math.round(srcW * scale));
+    const ph = Math.max(1, Math.round(srcH * scale));
+
+    const previewCanvas = document.createElement('canvas');
+    previewCanvas.width = pw;
+    previewCanvas.height = ph;
+    const pCtx = previewCanvas.getContext('2d');
+    pCtx.imageSmoothingEnabled = true;
+    pCtx.imageSmoothingQuality = 'high';
+    pCtx.fillStyle = cc().exportBg;
+    pCtx.fillRect(0, 0, pw, ph);
+    pCtx.drawImage(bgCanvas, 0, 0, pw, ph);
+    pCtx.drawImage(fgCanvas, 0, 0, pw, ph);
+
+    return previewCanvas.toDataURL('image/jpeg', 0.85);
+}
+
+function downloadLayout(opts = {}) {
+    const { includeAnnotations = true, includeMeasurements = true, roomName } = opts;
     const btn = DOM['download-btn'] || document.getElementById('download-btn');
     if (btn) { btn.classList.add('btn-loading'); btn.disabled = true; }
+    const needsFilter = state.viewMode !== 'pov' && (!includeAnnotations || !includeMeasurements);
     try {
+    // Re-render foreground with filter flags if any layers are suppressed
+    if (needsFilter) {
+        renderForeground({ skipAnnotations: !includeAnnotations, skipMeasurements: !includeMeasurements });
+    }
+
     // Build an offscreen canvas at full physical resolution
     const exportCanvas = document.createElement('canvas');
     exportCanvas.width = canvas.width;
@@ -20,7 +66,8 @@ function downloadLayout() {
 
     // 3. Trigger the download at full quality
     const timestamp = new Date().toISOString().slice(0, 10);
-    const nameSlug = state.roomName ? '-' + state.roomName.trim().replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-|-$/g, '') : '';
+    const exportName = roomName !== undefined ? roomName : state.roomName;
+    const nameSlug = exportName ? '-' + exportName.trim().replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-|-$/g, '') : '';
     const l = document.createElement('a');
     l.download = `AV-Room-Layout${nameSlug}-${timestamp}.png`;
     l.href = exportCanvas.toDataURL('image/png');
@@ -29,18 +76,27 @@ function downloadLayout() {
         console.error('PNG export failed:', err);
         showToast('PNG export failed: ' + err.message, 'error');
     } finally {
+        // Always restore the display canvas if it was re-rendered with filters
+        if (needsFilter) renderForeground();
         if (btn) { btn.classList.remove('btn-loading'); btn.disabled = false; }
     }
 }
 
-function downloadPDF() {
+function downloadPDF(opts = {}) {
+    const { includeAnnotations = true, includeMeasurements = true, roomName } = opts;
     const btn = DOM['download-pdf-btn'] || document.getElementById('download-pdf-btn');
     if (btn) { btn.classList.add('btn-loading'); btn.disabled = true; }
+    const needsFilter = state.viewMode !== 'pov' && (!includeAnnotations || !includeMeasurements);
     try {
     // Check jsPDF availability
     if (!window.jspdf) {
         showToast('PDF library failed to load. Check your internet connection and refresh.', 'error');
         return;
+    }
+
+    // Re-render foreground with filter flags if any layers are suppressed
+    if (needsFilter) {
+        renderForeground({ skipAnnotations: !includeAnnotations, skipMeasurements: !includeMeasurements });
     }
 
     // 1. Build composite canvas (same pattern as downloadLayout)
@@ -60,10 +116,10 @@ function downloadPDF() {
     // Page dimensions: A4 landscape = 297 × 210 mm
     const pageW = 297;
     const pageH = 210;
-    const margin = 10;
+    const margin = 6;
 
     // 3. Embed image scaled to fit with margins, leaving room below for text
-    const textAreaH = 72; // mm reserved for summary text at bottom
+    const textAreaH = 38; // mm reserved for summary text at bottom
     const imgAreaH = pageH - margin * 2 - textAreaH;
     const imgAreaW = pageW - margin * 2;
 
@@ -97,32 +153,38 @@ function downloadPDF() {
     const capacityStr = String(calcTotalCapacity());
 
     const textX = margin;
-    let textY = margin + imgAreaH + margin + 4;
-    const lineH = 6;
+    let textY = margin + imgAreaH + margin + 2;
+    const lineH = 5;
 
-    doc.setFontSize(13);
+    const exportName = roomName !== undefined ? roomName : state.roomName;
+    doc.setFontSize(11);
     doc.setFont('helvetica', 'bold');
-    const title = state.roomName ? `AV Room Layout — ${state.roomName}` : 'AV Room Layout';
+    const title = exportName ? `AV Room Layout — ${exportName}` : 'AV Room Layout';
     doc.text(title, textX, textY);
-    doc.setFontSize(9);
+    doc.setFontSize(8);
     doc.setFont('helvetica', 'normal');
-    textY += lineH + 1;
+    textY += lineH;
     doc.text(`Room Dimensions:  ${dimStr}`, textX, textY); textY += lineH;
     doc.text(`Video Bar:  ${eq.name}`, textX, textY); textY += lineH;
     doc.text(`Display:  ${dispStr}`, textX, textY); textY += lineH;
     doc.text(`Companion Devices:  ${companionStr}`, textX, textY); textY += lineH;
-    doc.text(`Total Seating Capacity:  ${capacityStr}`, textX, textY); textY += lineH;
-
-    doc.text(`Date:  ${timestamp}`, textX, textY);
+    doc.text(`Total Seating Capacity:  ${capacityStr}    Date:  ${timestamp}`, textX, textY);
+    if (state.roomNotes) {
+        textY += lineH;
+        const notesTrunc = state.roomNotes.replace(/\n/g, '  ·  ').slice(0, 200);
+        doc.text(`Notes:  ${notesTrunc}`, textX, textY);
+    }
 
     // 5. Save
-    const nameSlug = state.roomName ? '-' + state.roomName.trim().replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-|-$/g, '') : '';
+    const nameSlug = exportName ? '-' + exportName.trim().replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-|-$/g, '') : '';
     const fileDate = new Date().toISOString().slice(0, 10);
     doc.save(`AV-Room-Layout${nameSlug}-${fileDate}.pdf`);
     } catch (err) {
         console.error('PDF export failed:', err);
         showToast('PDF export failed: ' + err.message, 'error');
     } finally {
+        // Always restore the display canvas if it was re-rendered with filters
+        if (needsFilter) renderForeground();
         if (btn) { btn.classList.remove('btn-loading'); btn.disabled = false; }
     }
 }

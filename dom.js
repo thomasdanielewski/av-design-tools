@@ -78,6 +78,26 @@ cacheDOMRefs();
 
 // ── Toast Notification System ────────────────────────────────
 // Replaces alert() with a styled, auto-dismissing notification.
+const _toastActive = [];
+const _TOAST_MAX = 3;
+const _TOAST_DURATIONS = { success: 3000, error: 5000, warning: 5000 };
+const _TOAST_ICONS = {
+    success: `<svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="1.5,6.5 4.5,9.5 10.5,2.5"/></svg>`,
+    error:   `<svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="2.5" y1="2.5" x2="9.5" y2="9.5"/><line x1="9.5" y1="2.5" x2="2.5" y2="9.5"/></svg>`,
+    warning: `<svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 1.5 L10.8 10 L1.2 10 Z"/><line x1="6" y1="4.8" x2="6" y2="7.5"/><circle cx="6" cy="9" r="0.7" fill="currentColor" stroke="none"/></svg>`,
+    info:    `<svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="6" cy="6" r="4.5"/><line x1="6" y1="5.5" x2="6" y2="8.5"/><circle cx="6" cy="3.5" r="0.6" fill="currentColor" stroke="none"/></svg>`,
+};
+
+function _dismissToast(toast) {
+    if (!toast.parentNode) return;
+    clearTimeout(toast._toastTimer);
+    const idx = _toastActive.indexOf(toast);
+    if (idx !== -1) _toastActive.splice(idx, 1);
+    toast.classList.remove('toast-visible');
+    toast.addEventListener('transitionend', () => toast.remove(), { once: true });
+    setTimeout(() => { if (toast.parentNode) toast.remove(); }, 500);
+}
+
 function showToast(message, type = 'info') {
     let container = document.getElementById('toast-container');
     if (!container) {
@@ -87,19 +107,24 @@ function showToast(message, type = 'info') {
         container.setAttribute('aria-live', 'polite');
         document.body.appendChild(container);
     }
+    // Enforce max — dismiss oldest when a 4th toast would appear
+    if (_toastActive.length >= _TOAST_MAX) {
+        _dismissToast(_toastActive[0]);
+    }
+    const duration = _TOAST_DURATIONS[type] ?? 4000;
+    const icon = _TOAST_ICONS[type] ?? _TOAST_ICONS.info;
     const toast = document.createElement('div');
     toast.className = `toast toast-${type}`;
-    const icons = { error: '✕', success: '✓', info: 'ℹ' };
-    toast.innerHTML = `<span class="toast-icon">${icons[type] || icons.info}</span><span>${message}</span>`;
+    toast.style.setProperty('--toast-duration', `${duration}ms`);
+    toast.innerHTML = `<span class="toast-icon">${icon}</span><span class="toast-message">${message}</span><div class="toast-progress"></div>`;
     container.appendChild(toast);
-    // Trigger entrance animation
-    requestAnimationFrame(() => toast.classList.add('toast-visible'));
-    setTimeout(() => {
-        toast.classList.remove('toast-visible');
-        toast.addEventListener('transitionend', () => toast.remove());
-        // Fallback cleanup if transitionend never fires (e.g., prefers-reduced-motion)
-        setTimeout(() => { if (toast.parentNode) toast.remove(); }, 500);
-    }, TOAST_DURATION);
+    _toastActive.push(toast);
+    // Two RAFs: first triggers slide-in, second starts the progress bar
+    requestAnimationFrame(() => {
+        toast.classList.add('toast-visible');
+        requestAnimationFrame(() => toast.classList.add('toast-ticking'));
+    });
+    toast._toastTimer = setTimeout(() => _dismissToast(toast), duration);
 }
 
 // ── Dynamic Slider Track Fill ────────────────────────────────
@@ -117,5 +142,56 @@ function initSliderTracks() {
     document.querySelectorAll('input[type="range"]').forEach(inp => {
         updateSliderTrack(inp);
         inp.addEventListener('input', () => updateSliderTrack(inp));
+    });
+}
+
+// ── Slider Drag Tooltip ──────────────────────────────────────
+// Shows a floating tooltip above the thumb while dragging any sidebar slider.
+function initSliderTooltip() {
+    const tip = document.createElement('div');
+    tip.id = 'slider-tooltip';
+    document.body.appendChild(tip);
+
+    let hideTimer = null;
+    let active = null;
+
+    function getBadgeText(slider) {
+        const badge = document.querySelector(`.value[data-slider="${slider.id}"]`);
+        return badge ? badge.textContent.trim() : slider.value;
+    }
+
+    function positionTip(slider) {
+        const min = parseFloat(slider.min) || 0;
+        const max = parseFloat(slider.max) || 100;
+        const pct = (parseFloat(slider.value) - min) / (max - min);
+        const thumbW = 20;
+        const rect = slider.getBoundingClientRect();
+        // Thumb center x: accounts for thumb being constrained within track ends
+        const x = rect.left + pct * (rect.width - thumbW) + thumbW / 2;
+        // Position bottom of tooltip (+ arrow) 6px above top of thumb
+        const y = rect.top + rect.height / 2 - thumbW / 2 - 6;
+        tip.style.left = x + 'px';
+        tip.style.top = y + 'px';
+        tip.textContent = getBadgeText(slider);
+    }
+
+    function show(slider) {
+        clearTimeout(hideTimer);
+        active = slider;
+        positionTip(slider);
+        tip.classList.add('visible');
+    }
+
+    function hide() {
+        active = null;
+        hideTimer = setTimeout(() => tip.classList.remove('visible'), 300);
+    }
+
+    document.querySelectorAll('.sidebar input[type="range"]').forEach(slider => {
+        slider.addEventListener('mousedown', () => show(slider));
+        slider.addEventListener('touchstart', () => show(slider), { passive: true });
+        slider.addEventListener('input', () => { if (active === slider) positionTip(slider); });
+        slider.addEventListener('mouseup', hide);
+        slider.addEventListener('touchend', hide);
     });
 }

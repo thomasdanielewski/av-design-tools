@@ -62,6 +62,7 @@ const HASH_KEYS = {
     mt: 'measureToolActive',
     ms: 'measurements',
     rn: 'roomName',
+    rno: 'roomNotes',
     an: 'annotations'
 };
 

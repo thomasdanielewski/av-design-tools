@@ -265,8 +265,28 @@ function renderPOVWalls(p) {
         { x: p.rHW, yIn: p.ceilHI, z: p.roomDepth }, { x: p.rHW, yIn: p.ceilHI, z: 0 }
     ], defaultWallFill, wallStroke, 0);
 
-    // Wall ambient occlusion
+    // Baseboards — 3-inch-tall darker stripe at wall-floor junction
     const isDark = p.isDark;
+    const bbFill = isDark ? 'rgba(10,10,14,0.55)' : 'rgba(100,98,94,0.30)';
+    const BB_H = 3; // inches
+    drawPoly([
+        { x: -p.rHW, yIn: 0, z: 0 }, { x: p.rHW, yIn: 0, z: 0 },
+        { x: p.rHW, yIn: BB_H, z: 0 }, { x: -p.rHW, yIn: BB_H, z: 0 }
+    ], bbFill, 'none', 0);
+    drawPoly([
+        { x: -p.rHW, yIn: 0, z: p.roomDepth }, { x: p.rHW, yIn: 0, z: p.roomDepth },
+        { x: p.rHW, yIn: BB_H, z: p.roomDepth }, { x: -p.rHW, yIn: BB_H, z: p.roomDepth }
+    ], bbFill, 'none', 0);
+    drawPoly([
+        { x: -p.rHW, yIn: 0, z: 0 }, { x: -p.rHW, yIn: 0, z: p.roomDepth },
+        { x: -p.rHW, yIn: BB_H, z: p.roomDepth }, { x: -p.rHW, yIn: BB_H, z: 0 }
+    ], bbFill, 'none', 0);
+    drawPoly([
+        { x: p.rHW, yIn: 0, z: 0 }, { x: p.rHW, yIn: 0, z: p.roomDepth },
+        { x: p.rHW, yIn: BB_H, z: p.roomDepth }, { x: p.rHW, yIn: BB_H, z: 0 }
+    ], bbFill, 'none', 0);
+
+    // Wall ambient occlusion
     const aoA = isDark ? 0.30 : 0.12;
     const applyWallAO = (wv) => {
         const pts = clipAndProject(wv);
@@ -366,27 +386,35 @@ function renderPOVCeiling(p) {
     }
     ctx.restore();
 
-    // Ceiling light indicators
-    const lgInner = isDark ? 'rgba(255,250,210,0.30)' : 'rgba(255,230,100,0.22)';
-    const lgDot   = isDark ? 'rgba(255,255,225,0.60)' : 'rgba(200,175,80,0.65)';
+    // Ceiling light panels (LED troffers) — 1ft × 2ft rectangles on 4ft grid
+    const panelFill  = isDark ? 'rgba(255,255,240,0.15)' : 'rgba(255,255,220,0.15)';
+    const glowColor  = isDark ? 'rgba(255,250,210,0.18)' : 'rgba(255,240,180,0.14)';
     ctx.save();
     const lightSp = 4;
     const lx0 = Math.ceil(-p.rHW / lightSp) * lightSp;
     for (let xg = lx0; xg < p.rHW; xg += lightSp) {
         for (let zg = lightSp; zg < p.roomDepth; zg += lightSp) {
-            const lp = proj(xg, p.ceilHI, zg);
-            if (!lp) continue;
-            const gr = 9;
-            const lg = ctx.createRadialGradient(lp.x, lp.y, 0, lp.x, lp.y, gr);
-            lg.addColorStop(0, lgInner);
-            lg.addColorStop(1, 'rgba(255,250,200,0)');
-            ctx.fillStyle = lg;
+            // Panel rectangle on ceiling (1ft wide × 2ft long)
+            drawPoly([
+                { x: xg - 0.5, yIn: p.ceilHI, z: zg - 1 },
+                { x: xg + 0.5, yIn: p.ceilHI, z: zg - 1 },
+                { x: xg + 0.5, yIn: p.ceilHI, z: zg + 1 },
+                { x: xg - 0.5, yIn: p.ceilHI, z: zg + 1 }
+            ], panelFill, 'none', 0);
+
+            // Soft radial glow cast below panel onto floor/tables
+            const fp = proj(xg, 0, zg);
+            if (!fp) continue;
+            const edgeP = proj(xg + 1.5, 0, zg);
+            if (!edgeP) continue;
+            const glowR = Math.abs(edgeP.x - fp.x);
+            if (glowR < 2) continue;
+            const glowGrad = ctx.createRadialGradient(fp.x, fp.y, 0, fp.x, fp.y, glowR);
+            glowGrad.addColorStop(0, glowColor);
+            glowGrad.addColorStop(1, 'rgba(255,250,200,0)');
+            ctx.fillStyle = glowGrad;
             ctx.beginPath();
-            ctx.arc(lp.x, lp.y, gr, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.fillStyle = lgDot;
-            ctx.beginPath();
-            ctx.arc(lp.x, lp.y, 1.5, 0, Math.PI * 2);
+            ctx.arc(fp.x, fp.y, glowR, 0, Math.PI * 2);
             ctx.fill();
         }
     }
@@ -553,15 +581,27 @@ function renderPOVTables(p) {
 function renderPOVSeating(p) {
     if (state.seatingDensity === 'none') return;
 
-    const seatFill = 'rgba(128,128,128,0.15)';
+    const isDark = p.isDark;
     const seatStroke = 'none';
     const SEATED_EYE = 48;
-    const HEAD_R_IN = 4.5;
+    const HEAD_W_IN = 4.5;   // horizontal half-width of head oval
+    const HEAD_H_IN = 5.8;   // vertical half-height (taller than wide)
     const SHOULDER_W_IN = 18;
-    const SHOULDER_H_IN = 10;
     const NECK_H_IN = 3;
-    const TORSO_TOP_IN = SEATED_EYE - HEAD_R_IN - NECK_H_IN;
-    const TORSO_BOT_IN = TORSO_TOP_IN - SHOULDER_H_IN;
+    const TORSO_TOP_IN = SEATED_EYE - HEAD_W_IN - NECK_H_IN;
+    const TORSO_BOT_IN = TORSO_TOP_IN - 14;
+
+    // Depth fog: persons at back wall are FOG_STRENGTH times more transparent
+    const FOG_STRENGTH = 0.52;
+
+    // Build seat-status lookup from meeting data (tableId:seatIdx → status)
+    const meetingData = state.meetingMode ? getMeetingData() : null;
+    const seatStatusMap = new Map();
+    if (meetingData) {
+        for (const s of meetingData.classified) {
+            seatStatusMap.set(`${s.tableId}:${s.seatIdx}`, s.status);
+        }
+    }
 
     state.tables.forEach(t => {
         const chairs = getChairPositions(t);
@@ -570,12 +610,35 @@ function renderPOVSeating(p) {
         const tAngle = (t.rotation + rotOffset) * Math.PI / 180;
         const cosT = Math.cos(tAngle), sinT = Math.sin(tAngle);
 
-        chairs.forEach(ch => {
+        chairs.forEach((ch, chIdx) => {
             const wx = tPX + ch.x * cosT - ch.y * sinT;
             const wz = tPZ + ch.x * sinT + ch.y * cosT;
             const faceAngle = ch.angle + tAngle;
             const cosF = Math.cos(faceAngle), sinF = Math.sin(faceAngle);
             const shHW = (SHOULDER_W_IN / 2) / 12;
+
+            // Depth fog factor (0 = at viewer, 1 = at back wall)
+            const depthPast = Math.max(0, wz - p.vd);
+            const maxDepth = Math.max(1, p.roomDepth - p.vd);
+            const fogT = Math.min(1, depthPast / maxDepth);
+            const seatAlpha = (0.15 * (1 - fogT * FOG_STRENGTH)).toFixed(3);
+
+            // Seat-status tint: green=covered, amber=out-of-range, red=blind spot/obstructed
+            let r, g, b;
+            if (state.meetingMode) {
+                const status = seatStatusMap.get(`${t.id}:${chIdx}`);
+                if (status === SEAT_STATUS.covered) {
+                    r = 80;  g = 185; b = 80;    // green
+                } else if (status === SEAT_STATUS.blindSpot || status === SEAT_STATUS.obstructed) {
+                    r = 210; g = 60;  b = 60;    // red
+                } else {
+                    r = 210; g = 155; b = 45;    // amber (outOfRange / null)
+                }
+            } else {
+                // Neutral: desaturated bg-base for dark mode, warm gray for light mode
+                r = isDark ? 32 : 208; g = isDark ? 34 : 203; b = isDark ? 42 : 196;
+            }
+            const seatFill = `rgba(${r},${g},${b},${seatAlpha})`;
 
             function pt(heightIn, lateralFt) {
                 return {
@@ -585,31 +648,47 @@ function renderPOVSeating(p) {
                 };
             }
 
-            const bodyProfile = [
-                [TORSO_BOT_IN,           shHW * 0.65],
-                [TORSO_BOT_IN + 2.5,     shHW * 0.72],
-                [TORSO_BOT_IN + 5,       shHW * 0.82],
-                [TORSO_TOP_IN - 3,       shHW * 0.94],
-                [TORSO_TOP_IN - 1,       shHW * 0.99],
-                [TORSO_TOP_IN,           shHW],
-                [TORSO_TOP_IN + 0.5,     shHW * 0.88],
-                [TORSO_TOP_IN + 1,       shHW * 0.68],
-                [TORSO_TOP_IN + 1.5,     shHW * 0.48],
-                [TORSO_TOP_IN + 2,       shHW * 0.35],
-                [TORSO_TOP_IN + NECK_H_IN, shHW * 0.25],
-            ];
+            // Thin floor shadow ellipse at 0.1 opacity (drawn before silhouette)
+            const floorPt = proj(wx, 0, wz);
+            if (floorPt) {
+                const sL = proj(wx - 0.50, 0, wz);
+                const sR = proj(wx + 0.50, 0, wz);
+                const sF = proj(wx, 0, wz - 0.32);
+                const sB = proj(wx, 0, wz + 0.32);
+                if (sL && sR && sF && sB) {
+                    const rx = Math.abs(sR.x - sL.x) / 2;
+                    const ry = Math.abs(sB.y - sF.y) / 2;
+                    if (rx > 1 && ry > 0.5) {
+                        const sa = (0.10 * (1 - fogT * 0.4)).toFixed(3);
+                        ctx.save();
+                        ctx.fillStyle = `rgba(0,0,0,${sa})`;
+                        ctx.beginPath();
+                        ctx.ellipse(floorPt.x, floorPt.y, rx, ry, 0, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.restore();
+                    }
+                }
+            }
 
+            // Body: 3-point profile → 6-vertex trapezoid (waist → shoulders → neck)
+            // Neck width must be ≥ head oval width at same height (~0.32×shHW) so they merge visually.
+            const bodyProfile = [
+                [TORSO_BOT_IN,             shHW * 0.55],  // waist/lap — narrow
+                [TORSO_TOP_IN,             shHW * 0.90],  // shoulder — slightly sub-full for balance
+                [TORSO_TOP_IN + NECK_H_IN, shHW * 0.42],  // neck — wide enough to merge with head oval
+            ];
             const bodyVerts = [];
             for (const [y, hw] of bodyProfile) bodyVerts.push(pt(y, hw));
             for (let i = bodyProfile.length - 1; i >= 0; i--) bodyVerts.push(pt(bodyProfile[i][0], -bodyProfile[i][1]));
             drawPoly(bodyVerts, seatFill, seatStroke, 0);
 
+            // Head: oval (HEAD_H_IN tall × HEAD_W_IN wide), 12 points
             const headVerts = [];
-            for (let i = 0; i < 16; i++) {
-                const a = (2 * Math.PI * i) / 16;
+            for (let i = 0; i < 12; i++) {
+                const a = (2 * Math.PI * i) / 12;
                 headVerts.push(pt(
-                    SEATED_EYE + HEAD_R_IN * Math.sin(a),
-                    (HEAD_R_IN * Math.cos(a)) / 12
+                    SEATED_EYE + HEAD_H_IN * Math.sin(a),
+                    (HEAD_W_IN * Math.cos(a)) / 12
                 ));
             }
             drawPoly(headVerts, seatFill, seatStroke, 0);
@@ -1238,6 +1317,22 @@ function renderPOVOverlays(p) {
     }
 }
 
+function renderPOVGroundGradient(p) {
+    const gradH = p.ch * 0.24;
+    const g = ctx.createLinearGradient(0, p.ch, 0, p.ch - gradH);
+    if (p.isDark) {
+        g.addColorStop(0,   'rgba(0,0,0,0.32)');
+        g.addColorStop(0.5, 'rgba(0,0,0,0.10)');
+        g.addColorStop(1,   'rgba(0,0,0,0)');
+    } else {
+        g.addColorStop(0,   'rgba(0,0,0,0.10)');
+        g.addColorStop(0.5, 'rgba(0,0,0,0.03)');
+        g.addColorStop(1,   'rgba(0,0,0,0)');
+    }
+    ctx.fillStyle = g;
+    ctx.fillRect(0, p.ch - gradH, p.cw, gradH);
+}
+
 // ── Main orchestrator ─────────────────────────────────────────
 
 function renderPOV(cw, ch, dpr) {
@@ -1358,6 +1453,7 @@ function renderPOV(cw, ch, dpr) {
     renderPOVSeating(params);
     renderPOVCompanions(params);
     renderPOVStructural(params);
+    renderPOVGroundGradient(params);
     renderPOVOverlays(params);
 
     // Update DOM

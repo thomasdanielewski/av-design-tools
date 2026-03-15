@@ -63,6 +63,8 @@ const CANVAS_THEME = {
         centerScreen: 'rgba(91, 156, 245, 0.08)',
         chairFill: 'rgba(160, 162, 170, 0.18)',
         chairStroke: 'rgba(160, 162, 170, 0.30)',
+        chairSeat: 'rgba(28, 30, 42, 0.88)',
+        tableInnerShadow: 'rgba(255,255,255,0.05)',
         snapGuide: 'rgba(91, 156, 245, 0.65)',   // grid snap guide line
         alignGuide: 'rgba(255, 120, 50, 0.85)',  // alignment guide line
         // Meeting mode — modern muted palette
@@ -138,6 +140,8 @@ const CANVAS_THEME = {
         centerScreen: 'rgba(91, 156, 245, 0.08)',
         chairFill: 'rgba(100, 102, 110, 0.15)',
         chairStroke: 'rgba(100, 102, 110, 0.28)',
+        chairSeat: 'rgba(196, 198, 210, 0.75)',
+        tableInnerShadow: 'rgba(0,0,0,0.08)',
         snapGuide: 'rgba(80, 120, 200, 0.70)',   // grid snap guide line
         alignGuide: 'rgba(220, 90, 20, 0.90)',   // alignment guide line
         // Meeting mode — modern muted palette

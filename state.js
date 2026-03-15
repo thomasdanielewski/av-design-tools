@@ -32,6 +32,7 @@ const state = {
     annotateToolActive: false,
     annotateToolType: null,
     roomName: '',
+    roomNotes: '',
     // Meeting mode
     meetingMode: false,
     meetingParticipants: 0,        // 0 = auto (fill all seats)
@@ -125,12 +126,65 @@ function applyHistorySnapshot(entry) {
     updateUndoRedoBtns();
 }
 
+let _undoLabelTimer = null;
+function showUndoLabel(text) {
+    const el = document.getElementById('undo-action-label');
+    if (!el) return;
+    clearTimeout(_undoLabelTimer);
+    el.textContent = text;
+    el.classList.remove('undo-action-label--fade');
+    // Force reflow so re-triggering the animation works
+    void el.offsetWidth;
+    el.classList.add('undo-action-label--visible');
+    _undoLabelTimer = setTimeout(() => {
+        el.classList.add('undo-action-label--fade');
+        el.addEventListener('transitionend', () => {
+            el.classList.remove('undo-action-label--visible', 'undo-action-label--fade');
+        }, { once: true });
+    }, 1500);
+}
+
+let _canvasToastTimer = null;
+function showCanvasUndoToast(text) {
+    const el = document.getElementById('canvas-undo-toast');
+    if (!el) return;
+    clearTimeout(_canvasToastTimer);
+    el.textContent = text;
+    el.classList.remove('canvas-undo-toast--fade');
+    void el.offsetWidth;
+    el.classList.add('canvas-undo-toast--visible');
+    _canvasToastTimer = setTimeout(() => {
+        el.classList.add('canvas-undo-toast--fade');
+        el.addEventListener('transitionend', () => {
+            el.classList.remove('canvas-undo-toast--visible', 'canvas-undo-toast--fade');
+        }, { once: true });
+    }, 1000);
+}
+
+function flashCanvas() {
+    [bgCanvas, canvas].forEach(c => {
+        c.style.transition = 'opacity 0.05s linear';
+        c.style.opacity = '0.85';
+    });
+    setTimeout(() => {
+        [bgCanvas, canvas].forEach(c => {
+            c.style.transition = 'opacity 0.1s linear';
+            c.style.opacity = '1';
+        });
+        setTimeout(() => {
+            [bgCanvas, canvas].forEach(c => { c.style.transition = ''; });
+        }, 100);
+    }, 50);
+}
+
 function undo() {
     if (historyIndex <= 0) return;
     const desc = history[historyIndex].desc;
     historyIndex--;
     applyHistorySnapshot(history[historyIndex]);
-    if (desc) showToast('Undo: ' + desc);
+    showUndoLabel('Undo: ' + (desc || 'action'));
+    showCanvasUndoToast('Undo' + (desc ? ': ' + desc : ''));
+    flashCanvas();
 }
 
 function redo() {
@@ -138,7 +192,9 @@ function redo() {
     historyIndex++;
     applyHistorySnapshot(history[historyIndex]);
     const desc = history[historyIndex].desc;
-    if (desc) showToast('Redo: ' + desc);
+    showUndoLabel('Redo: ' + (desc || 'action'));
+    showCanvasUndoToast('Redo' + (desc ? ': ' + desc : ''));
+    flashCanvas();
 }
 
 // ── Valid Ranges for Hash Deserialization ────────────────────
@@ -201,6 +257,7 @@ function serializeToHash() {
         if (sk === 'measurements') continue; // handled separately below
         if (sk === 'annotations') continue; // handled separately below
         if (sk === 'roomName') { if (state.roomName) params.set(k, encodeURIComponent(state.roomName)); continue; }
+        if (sk === 'roomNotes') { if (state.roomNotes) params.set(k, encodeURIComponent(state.roomNotes)); continue; }
         const v = state[sk];
         if (typeof v === 'boolean') params.set(k, v ? '1' : '0');
         else params.set(k, v);
@@ -249,7 +306,8 @@ function loadFromHash() {
             if (sk === 'micPod2PosY') { state.micPod2Pos.y = parseFloat(raw); continue; }
             if (sk === 'measurements') continue; // handled separately below
             if (sk === 'annotations') continue; // handled separately below
-            if (sk === 'roomName') { state.roomName = decodeURIComponent(raw); if (DOM['room-name']) DOM['room-name'].value = state.roomName; continue; }
+            if (sk === 'roomName') { state.roomName = decodeURIComponent(raw); if (DOM['room-name']) DOM['room-name'].value = state.roomName; const nd = document.getElementById('room-name-display'); if (nd) nd.value = state.roomName; continue; }
+            if (sk === 'roomNotes') { state.roomNotes = decodeURIComponent(raw); continue; }
             if (typeof state[sk] === 'boolean') { state[sk] = raw === '1'; continue; }
             if (typeof state[sk] === 'number') {
                 const range = VALID_RANGES[sk];
@@ -311,13 +369,59 @@ function loadFromHash() {
 
 function copyShareLink() {
     serializeToHash();
-    navigator.clipboard.writeText(window.location.href).then(() => {
+    const url = window.location.href;
+    const truncated = url.length > 50 ? url.slice(0, 47) + '…' : url;
+
+    function animateBtn() {
         const btn = DOM['share-btn'];
-        const orig = btn.textContent;
-        btn.textContent = '✓ Copied!';
-        btn.style.color = 'var(--accent)';
-        showToast('Share link copied to clipboard', 'success');
-        setTimeout(() => { btn.textContent = orig; btn.style.color = ''; }, 2000);
+        const iconSpan = btn.querySelector('.share-btn-icon');
+        const labelSpan = btn.querySelector('.share-btn-label');
+        if (!iconSpan || !labelSpan) return;
+        // Swap to checkmark
+        const origIcon = iconSpan.innerHTML;
+        iconSpan.innerHTML = `<svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="1.5,7 5,10.5 11.5,2.5"/></svg>`;
+        labelSpan.textContent = 'Copied!';
+        btn.classList.add('share-btn--copied');
+        // Pulse animation
+        btn.classList.remove('share-btn--pulse');
+        void btn.offsetWidth; // reflow to restart animation
+        btn.classList.add('share-btn--pulse');
+        setTimeout(() => {
+            iconSpan.innerHTML = origIcon;
+            labelSpan.textContent = 'Share';
+            btn.classList.remove('share-btn--copied', 'share-btn--pulse');
+        }, 2000);
+    }
+
+    function showFallback() {
+        const dialog = document.getElementById('share-fallback-dialog');
+        const input = document.getElementById('share-fallback-input');
+        const copyBtn = document.getElementById('share-fallback-copy-btn');
+        const closeBtn = document.getElementById('share-fallback-close-btn');
+        if (!dialog) return;
+        input.value = url;
+        dialog.showModal();
+        input.select();
+        copyBtn.onclick = () => {
+            input.select();
+            document.execCommand('copy');
+            copyBtn.textContent = 'Copied!';
+            setTimeout(() => { copyBtn.textContent = 'Copy'; }, 1500);
+        };
+        closeBtn.onclick = () => dialog.close();
+        dialog.addEventListener('click', e => { if (e.target === dialog) dialog.close(); }, { once: true });
+    }
+
+    if (!navigator.clipboard) {
+        showFallback();
+        return;
+    }
+
+    navigator.clipboard.writeText(url).then(() => {
+        animateBtn();
+        showToast(`Link copied to clipboard — ${truncated}`, 'success');
+    }).catch(() => {
+        showFallback();
     });
 }
 
@@ -412,13 +516,26 @@ function syncUIFromState() {
 
     // Meeting mode UI sync
     if (DOM['meeting-mode-btn']) DOM['meeting-mode-btn'].classList.toggle('active', state.meetingMode);
-    if (DOM['meeting-camera-preview']) DOM['meeting-camera-preview'].style.display = state.meetingMode ? '' : 'none';
+    if (DOM['meeting-camera-preview']) DOM['meeting-camera-preview'].classList.toggle('meeting-mode-off', !state.meetingMode);
     if (DOM['info-overlay']) DOM['info-overlay'].style.display = state.meetingMode ? 'none' : '';
     const meetingLegend = document.getElementById('meeting-legend');
-    if (meetingLegend) meetingLegend.style.display = state.meetingMode ? '' : 'none';
+    if (meetingLegend) meetingLegend.classList.toggle('visible', !!state.meetingMode);
     if (state.meetingMode && typeof updateFramingModeOptions === 'function') updateFramingModeOptions();
     if (typeof invalidateMeetingCache === 'function') invalidateMeetingCache();
     if (typeof updateMeetingSettingsSummary === 'function') updateMeetingSettingsSummary();
+
+    // Room identity sync
+    const nameDisplay = document.getElementById('room-name-display');
+    if (nameDisplay) nameDisplay.value = state.roomName || '';
+    const notesArea = document.getElementById('room-notes');
+    const notesToggle = document.getElementById('room-notes-toggle');
+    if (notesArea && notesToggle) {
+        notesArea.value = state.roomNotes || '';
+        const hasNotes = !!state.roomNotes;
+        notesArea.style.display = hasNotes ? 'block' : 'none';
+        notesToggle.textContent = hasNotes ? '− Hide notes' : '+ Add notes';
+        notesToggle.setAttribute('aria-expanded', hasNotes ? 'true' : 'false');
+    }
 
     // Annotation UI sync
     if (typeof syncAnnotateNextId === 'function') syncAnnotateNextId();
@@ -434,4 +551,7 @@ function syncUIFromState() {
             b.classList.toggle('active', isActive);
             b.setAttribute('aria-pressed', isActive);
         });
+
+    // Preset pill dimension labels
+    if (typeof updatePresetDimLabels === 'function') updatePresetDimLabels();
 }

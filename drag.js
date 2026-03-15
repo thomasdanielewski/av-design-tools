@@ -269,7 +269,7 @@ function hitTestAll(metrics) {
 
     // Tables first (most common interaction target)
     for (const t of state.tables) {
-        if (isPointInTableHitbox(mx, my, t, ox, ry, wt, ppf)) return { target: true, type: 'table' };
+        if (isPointInTableHitbox(mx, my, t, ox, ry, wt, ppf)) return { target: true, type: 'table', table: t };
     }
 
     // Display
@@ -364,10 +364,26 @@ canvas.addEventListener('mousemove', e => {
         const selT = getSelectedTable();
         const onRotateHandle = selT ? isPointOnRotateHandle(mx, my, selT, ox, ry, wt, ppf) : false;
 
+        // Kebab context-menu button (pointer cursor)
+        const onKebab = _ctxBtnPos &&
+            (mx - _ctxBtnPos.x) ** 2 + (my - _ctxBtnPos.y) ** 2 <= _ctxBtnPos.r ** 2;
+
         let onTarget = false;
+        let onTableCenter = false;
         if (!onRotateHandle) {
             const hit = hitTestAll({ mx, my, ppf, ox, oy, rw, rl, rx, ry, wt, cX, cY, c2X, c2Y, mpX, mpY, mp2X, mp2Y, dispOx, dispY, dispWidthPx, dispDepthPx, eqWidthPx, eqDepthPx, mainDeviceX, mainDeviceY, isHoriz });
             onTarget = hit.target;
+            if (hit.type === 'table' && hit.table) {
+                const t = hit.table;
+                const tcx = ox + t.x * ppf;
+                const tcy = ry + wt + t.dist * ppf + (t.length * ppf) / 2;
+                const angle = -(t.rotation * Math.PI / 180);
+                const dx = mx - tcx, dy = my - tcy;
+                const lx = dx * Math.cos(angle) - dy * Math.sin(angle);
+                const ly = dx * Math.sin(angle) + dy * Math.cos(angle);
+                onTableCenter = Math.abs(lx) <= t.width * ppf * 0.28 &&
+                                Math.abs(ly) <= t.length * ppf * 0.28;
+            }
         }
 
         // Annotation hover tracking (for hover-only delete buttons)
@@ -386,11 +402,14 @@ canvas.addEventListener('mousemove', e => {
         canvas.style.cursor = state.annotateToolActive ? 'crosshair'
             : state.measureToolActive ? 'crosshair'
             : onRotateHandle ? 'crosshair'
+            : onKebab ? 'pointer'
             : onTarget === 'delete' ? 'pointer'
             : onTarget === 'measure' ? 'grab'
             : annHandleCursor ? annHandleCursor
             : _hoveredAnnotationId ? 'grab'
-            : onTarget ? 'grab' : '';
+            : onTableCenter ? 'move'
+            : onTarget ? 'grab'
+            : 'crosshair';
 
         // Equipment hover detection for tooltips (generous padding since devices are thin in top-down)
         let newHover = null;
@@ -1944,7 +1963,7 @@ canvas.addEventListener('mouseup', (e) => {
     }
 
     resetDrag();
-    canvas.style.cursor = state.annotateToolActive ? 'crosshair' : (drag.spaceDown ? 'grab' : '');
+    canvas.style.cursor = state.annotateToolActive ? 'crosshair' : (drag.spaceDown ? 'grab' : 'crosshair');
     serializeToHash();
 });
 
