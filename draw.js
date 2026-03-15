@@ -1686,15 +1686,16 @@ function _meetingColors(status) {
 
 /**
  * Draw meeting avatars (head + shoulder silhouettes) on occupied seats.
- * Uses participant-specific colors within status-appropriate outlines.
+ * Modern clean style with subtle depth, participant colors, and smooth edges.
  * Coordinates are in room-space feet; this function converts to canvas pixels.
  */
 function drawMeetingAvatars(drawCtx, occupiedSeats, ppf, rx, ry, wallThick) {
     const headR = ppf * 0.28;
-    const shoulderW = ppf * 0.52;
-    const shoulderH = ppf * 0.20;
+    const shoulderW = ppf * 0.46;
+    const shoulderH = ppf * 0.17;
 
     const { camX, camY } = getCameraRoomPosition();
+    const isDark = document.documentElement.getAttribute('data-theme') !== 'light';
 
     for (const seat of occupiedSeats) {
         const cx = rx + seat.roomX * ppf;
@@ -1703,68 +1704,139 @@ function drawMeetingAvatars(drawCtx, occupiedSeats, ppf, rx, ry, wallThick) {
         const statusColors = _meetingColors(seat.status);
         const pColor = _getParticipantColor(seat.seatIdx, seat.tableId);
 
-        // Angle from seat toward camera
-        const angleToCamera = Math.atan2(camY - seat.roomY, camX - seat.roomX);
-
         drawCtx.save();
         drawCtx.translate(cx, cy);
 
-        // Glow ring for covered seats
+        // Soft ambient glow for covered seats
         if (seat.status === SEAT_STATUS.covered) {
+            const glowGrad = drawCtx.createRadialGradient(0, 0, headR * 0.5, 0, 0, headR + 8);
+            glowGrad.addColorStop(0, isDark ? 'rgba(52, 211, 153, 0.10)' : 'rgba(16, 185, 129, 0.08)');
+            glowGrad.addColorStop(1, 'rgba(52, 211, 153, 0)');
             drawCtx.beginPath();
-            drawCtx.arc(0, 0, headR + 4, 0, Math.PI * 2);
-            drawCtx.fillStyle = 'rgba(74, 222, 128, 0.08)';
+            drawCtx.arc(0, 0, headR + 8, 0, Math.PI * 2);
+            drawCtx.fillStyle = glowGrad;
             drawCtx.fill();
         }
 
-        // Drop shadow
+        // Drop shadow — softer and offset
         drawCtx.beginPath();
-        drawCtx.arc(1.5, 2, headR * 1.15, 0, Math.PI * 2);
-        drawCtx.fillStyle = 'rgba(0,0,0,0.12)';
+        drawCtx.arc(1, 1.5, headR * 1.05, 0, Math.PI * 2);
+        drawCtx.fillStyle = 'rgba(0,0,0,0.10)';
         drawCtx.fill();
 
-        // Shoulders (arc below head)
+        // Shoulders — smooth bezier curves for a cleaner silhouette
         drawCtx.beginPath();
-        drawCtx.ellipse(0, headR + shoulderH * 0.2, shoulderW, shoulderH, 0, Math.PI, 0);
-        drawCtx.fillStyle = statusColors.fill;
+        const shTopY = headR * 0.55;
+        const shBotY = headR + shoulderH;
+        drawCtx.moveTo(-shoulderW * 0.3, shTopY);
+        drawCtx.bezierCurveTo(-shoulderW * 0.6, shTopY, -shoulderW, shTopY + shoulderH * 0.2, -shoulderW, shBotY);
+        drawCtx.lineTo(shoulderW, shBotY);
+        drawCtx.bezierCurveTo(shoulderW, shTopY + shoulderH * 0.2, shoulderW * 0.6, shTopY, shoulderW * 0.3, shTopY);
+        drawCtx.closePath();
+        drawCtx.fillStyle = seat.status === SEAT_STATUS.covered ? pColor.bg : statusColors.fill;
+        drawCtx.globalAlpha = 0.85;
         drawCtx.fill();
+        drawCtx.globalAlpha = 1;
         drawCtx.strokeStyle = statusColors.stroke;
-        drawCtx.lineWidth = 1.5;
+        drawCtx.lineWidth = 1;
         drawCtx.stroke();
 
-        // Head circle with participant color fill
+        // Head circle — gradient fill for depth
         drawCtx.beginPath();
         drawCtx.arc(0, 0, headR, 0, Math.PI * 2);
-        // Use participant color for covered seats, status color otherwise
         if (seat.status === SEAT_STATUS.covered) {
-            drawCtx.fillStyle = pColor.bg;
+            const headGrad = drawCtx.createRadialGradient(-headR * 0.2, -headR * 0.2, 0, 0, 0, headR);
+            headGrad.addColorStop(0, _lightenColor(pColor.bg, 0.12));
+            headGrad.addColorStop(1, pColor.bg);
+            drawCtx.fillStyle = headGrad;
         } else {
             drawCtx.fillStyle = statusColors.fill;
         }
         drawCtx.fill();
         drawCtx.strokeStyle = statusColors.stroke;
-        drawCtx.lineWidth = 2;
+        drawCtx.lineWidth = 1.5;
         drawCtx.stroke();
 
-        // Facing direction indicator (small wedge toward camera)
-        const faceX = Math.cos(angleToCamera) * headR * 0.65;
-        const faceY = Math.sin(angleToCamera) * headR * 0.65;
-        drawCtx.beginPath();
-        drawCtx.arc(faceX, faceY, headR * 0.18, 0, Math.PI * 2);
-        drawCtx.fillStyle = 'rgba(255,255,255,0.7)';
-        drawCtx.fill();
+        // Subtle specular highlight on head
+        if (headR > 5) {
+            const hlGrad = drawCtx.createRadialGradient(-headR * 0.28, -headR * 0.28, 0, 0, 0, headR);
+            hlGrad.addColorStop(0, 'rgba(255,255,255,0.20)');
+            hlGrad.addColorStop(0.5, 'rgba(255,255,255,0.05)');
+            hlGrad.addColorStop(1, 'rgba(255,255,255,0)');
+            drawCtx.beginPath();
+            drawCtx.arc(0, 0, headR, 0, Math.PI * 2);
+            drawCtx.fillStyle = hlGrad;
+            drawCtx.fill();
+        }
+
+        // Initials on the avatar
+        if (headR > 8 && seat.status === SEAT_STATUS.covered) {
+            const name = pColor.name || '';
+            const initials = name.split(' ').map(w => w[0]).join('').toUpperCase();
+            if (initials) {
+                drawCtx.font = `600 ${Math.max(6, headR * 0.68)}px 'DM Sans', sans-serif`;
+                drawCtx.fillStyle = 'rgba(255,255,255,0.90)';
+                drawCtx.textAlign = 'center';
+                drawCtx.textBaseline = 'middle';
+                drawCtx.fillText(initials, 0, 0.5);
+            }
+        }
 
         drawCtx.restore();
     }
 }
 
+/** Lighten a hex color by a factor (0-1) */
+function _lightenColor(hex, factor) {
+    if (!hex || !hex.startsWith('#')) return hex;
+    const r = Math.min(255, parseInt(hex.slice(1, 3), 16) + Math.round(255 * factor));
+    const g = Math.min(255, parseInt(hex.slice(3, 5), 16) + Math.round(255 * factor));
+    const b = Math.min(255, parseInt(hex.slice(5, 7), 16) + Math.round(255 * factor));
+    return `rgb(${r}, ${g}, ${b})`;
+}
+
 /**
- * Draw blind spot overlay — semi-transparent wash over areas outside camera FOV.
- * Uses hatching pattern for better visibility and clearer communication.
+ * Draw blind spot overlay — soft diagonal hatching over areas outside camera FOV.
+ * Uses an offscreen canvas with destination-out compositing to avoid erasing
+ * foreground content. Modern subtle hatching replaces the old flat wash.
  */
-// Cached offscreen canvas for blind spot compositing
 let _blindSpotCanvas = null;
 let _blindSpotCtx = null;
+let _blindSpotPatternDark = null;
+let _blindSpotPatternLight = null;
+
+function _getBlindSpotPattern(isDark) {
+    const cached = isDark ? _blindSpotPatternDark : _blindSpotPatternLight;
+    if (cached) return cached;
+
+    const size = 8;
+    const patCanvas = document.createElement('canvas');
+    patCanvas.width = size;
+    patCanvas.height = size;
+    const pCtx = patCanvas.getContext('2d');
+
+    // Diagonal lines pattern — subtle and modern
+    pCtx.strokeStyle = isDark ? 'rgba(220, 80, 80, 0.12)' : 'rgba(180, 50, 40, 0.08)';
+    pCtx.lineWidth = 0.8;
+    pCtx.beginPath();
+    pCtx.moveTo(0, size);
+    pCtx.lineTo(size, 0);
+    pCtx.stroke();
+    // Wrap-around line for seamless tiling
+    pCtx.beginPath();
+    pCtx.moveTo(-size * 0.5, size * 0.5);
+    pCtx.lineTo(size * 0.5, -size * 0.5);
+    pCtx.stroke();
+    pCtx.beginPath();
+    pCtx.moveTo(size * 0.5, size * 1.5);
+    pCtx.lineTo(size * 1.5, size * 0.5);
+    pCtx.stroke();
+
+    const pattern = pCtx.createPattern(patCanvas, 'repeat');
+    if (isDark) _blindSpotPatternDark = pattern;
+    else _blindSpotPatternLight = pattern;
+    return pattern;
+}
 
 function drawBlindSpotOverlay(drawCtx, rx, ry, rw, rl, wallThick, ppf) {
     const eq = EQUIPMENT[state.videoBar];
@@ -1779,8 +1851,6 @@ function drawBlindSpotOverlay(drawCtx, rx, ry, rw, rl, wallThick, ppf) {
     const camPxY = ry + wallThick + camY * ppf;
     const isDark = document.documentElement.getAttribute('data-theme') !== 'light';
 
-    // Use an offscreen canvas so the destination-out cutout doesn't erase
-    // existing foreground content (tables, chairs, equipment).
     const cw = drawCtx.canvas.width;
     const ch = drawCtx.canvas.height;
     if (!_blindSpotCanvas || _blindSpotCanvas.width !== cw || _blindSpotCanvas.height !== ch) {
@@ -1799,9 +1869,16 @@ function drawBlindSpotOverlay(drawCtx, rx, ry, rw, rl, wallThick, ppf) {
     offCtx.rect(rx, ry + wallThick, rw, rl - 2 * wallThick);
     offCtx.clip();
 
-    // Fill entire room with blind spot wash
-    offCtx.fillStyle = isDark ? 'rgba(239, 68, 68, 0.10)' : 'rgba(217, 42, 29, 0.08)';
+    // Layer 1: Very subtle flat tint
+    offCtx.fillStyle = isDark ? 'rgba(200, 60, 60, 0.04)' : 'rgba(180, 50, 40, 0.03)';
     offCtx.fillRect(rx, ry + wallThick, rw, rl - 2 * wallThick);
+
+    // Layer 2: Diagonal hatching pattern for clear visual distinction
+    const pattern = _getBlindSpotPattern(isDark);
+    if (pattern) {
+        offCtx.fillStyle = pattern;
+        offCtx.fillRect(rx, ry + wallThick, rw, rl - 2 * wallThick);
+    }
 
     // Cut out the camera's visible wedge
     offCtx.globalCompositeOperation = 'destination-out';
@@ -1812,15 +1889,36 @@ function drawBlindSpotOverlay(drawCtx, rx, ry, rw, rl, wallThick, ppf) {
     offCtx.fillStyle = 'rgba(0,0,0,1)';
     offCtx.fill();
 
+    // Also cut out companion camera (Neat Center / Logitech Sight) visible areas
+    const companions = getCompanionCamerasRoomSpace();
+    for (const comp of companions) {
+        const compHalfFOV = (comp.eq.cameraFOV / 2) * Math.PI / 180;
+        const compRange = comp.eq.cameraRange * state.meetingCameraZoneDepth;
+        const compRangePx = compRange * ppf;
+        const compPxX = rx + comp.x * ppf;
+        const compPxY = ry + wallThick + comp.y * ppf;
+
+        offCtx.beginPath();
+        if (comp.eq.cameraFOV >= 315) {
+            // Full circle for 360° / near-360° devices
+            offCtx.arc(compPxX, compPxY, compRangePx, 0, Math.PI * 2);
+        } else {
+            offCtx.moveTo(compPxX, compPxY);
+            offCtx.arc(compPxX, compPxY, compRangePx, -compHalfFOV, compHalfFOV);
+            offCtx.closePath();
+        }
+        offCtx.fill();
+    }
+
     offCtx.restore();
 
-    // Composite the blind spot overlay onto the main canvas
     drawCtx.drawImage(_blindSpotCanvas, 0, 0);
 }
 
 /**
- * Draw the camera zone boundary arc (dashed line at framing boundary distance).
- * Includes subtle fill within the active zone and clear FOV edge lines.
+ * Draw the camera zone boundary — modern gradient cone with soft edge fade.
+ * Replaces the old dashed-arc style with a smooth radial gradient fill
+ * and clean, minimal FOV edge lines.
  */
 function drawCameraZoneBoundary(drawCtx, rx, ry, rw, rl, wallThick, ppf) {
     const eq = EQUIPMENT[state.videoBar];
@@ -1842,61 +1940,196 @@ function drawCameraZoneBoundary(drawCtx, rx, ry, rw, rl, wallThick, ppf) {
     drawCtx.rect(rx, ry + wallThick, rw, rl - 2 * wallThick);
     drawCtx.clip();
 
-    // Visible zone fill — gentle green tint to show "good" area
+    // ── Gradient cone fill ────────────────────────────────
+    // Radial gradient fading from camera outward — gives depth and softness
+    const zoneGrad = drawCtx.createRadialGradient(camPxX, camPxY, 0, camPxX, camPxY, rangePx);
+    if (isDark) {
+        zoneGrad.addColorStop(0, 'rgba(99, 179, 237, 0.09)');
+        zoneGrad.addColorStop(0.4, 'rgba(99, 179, 237, 0.05)');
+        zoneGrad.addColorStop(0.75, 'rgba(99, 179, 237, 0.025)');
+        zoneGrad.addColorStop(1, 'rgba(99, 179, 237, 0)');
+    } else {
+        zoneGrad.addColorStop(0, 'rgba(59, 130, 196, 0.07)');
+        zoneGrad.addColorStop(0.4, 'rgba(59, 130, 196, 0.04)');
+        zoneGrad.addColorStop(0.75, 'rgba(59, 130, 196, 0.02)');
+        zoneGrad.addColorStop(1, 'rgba(59, 130, 196, 0)');
+    }
     drawCtx.beginPath();
     drawCtx.moveTo(camPxX, camPxY);
     drawCtx.arc(camPxX, camPxY, rangePx, facingAngle - halfFOV, facingAngle + halfFOV);
     drawCtx.closePath();
-    drawCtx.fillStyle = isDark ? 'rgba(74, 222, 128, 0.04)' : 'rgba(34, 180, 100, 0.04)';
+    drawCtx.fillStyle = zoneGrad;
     drawCtx.fill();
 
-    // Dashed arc at zone boundary
+    // ── Soft boundary arc ─────────────────────────────────
+    // Smooth solid arc (no dashes) with gentle opacity
     drawCtx.beginPath();
     drawCtx.arc(camPxX, camPxY, rangePx, facingAngle - halfFOV, facingAngle + halfFOV);
-    drawCtx.strokeStyle = isDark ? 'rgba(74, 222, 128, 0.40)' : 'rgba(34, 180, 100, 0.45)';
-    drawCtx.lineWidth = 1.8;
-    drawCtx.setLineDash([8, 5]);
+    drawCtx.strokeStyle = isDark ? 'rgba(99, 179, 237, 0.22)' : 'rgba(59, 130, 196, 0.22)';
+    drawCtx.lineWidth = 1.2;
     drawCtx.stroke();
-    drawCtx.setLineDash([]);
 
-    // Radial lines at FOV edges
+    // Inner glow arc at ~70% range for depth
+    drawCtx.beginPath();
+    drawCtx.arc(camPxX, camPxY, rangePx * 0.7, facingAngle - halfFOV, facingAngle + halfFOV);
+    drawCtx.strokeStyle = isDark ? 'rgba(99, 179, 237, 0.06)' : 'rgba(59, 130, 196, 0.05)';
+    drawCtx.lineWidth = 0.8;
+    drawCtx.stroke();
+
+    // ── FOV edge lines ────────────────────────────────────
+    // Clean gradient lines from camera to arc edge
     const fovEdges = [facingAngle - halfFOV, facingAngle + halfFOV];
     for (const angle of fovEdges) {
+        const edgeX = camPxX + Math.cos(angle) * rangePx;
+        const edgeY = camPxY + Math.sin(angle) * rangePx;
+        const edgeGrad = drawCtx.createLinearGradient(camPxX, camPxY, edgeX, edgeY);
+        if (isDark) {
+            edgeGrad.addColorStop(0, 'rgba(99, 179, 237, 0.30)');
+            edgeGrad.addColorStop(0.5, 'rgba(99, 179, 237, 0.12)');
+            edgeGrad.addColorStop(1, 'rgba(99, 179, 237, 0.03)');
+        } else {
+            edgeGrad.addColorStop(0, 'rgba(59, 130, 196, 0.28)');
+            edgeGrad.addColorStop(0.5, 'rgba(59, 130, 196, 0.10)');
+            edgeGrad.addColorStop(1, 'rgba(59, 130, 196, 0.02)');
+        }
         drawCtx.beginPath();
         drawCtx.moveTo(camPxX, camPxY);
-        drawCtx.lineTo(camPxX + Math.cos(angle) * rangePx, camPxY + Math.sin(angle) * rangePx);
-        drawCtx.strokeStyle = cc().cameraZoneBoundary;
+        drawCtx.lineTo(edgeX, edgeY);
+        drawCtx.strokeStyle = edgeGrad;
+        drawCtx.lineWidth = 1;
+        drawCtx.stroke();
+    }
+
+    // ── Camera icon ───────────────────────────────────────
+    const camR = 7;
+
+    // Subtle outer glow ring
+    const camGlow = drawCtx.createRadialGradient(camPxX, camPxY, camR * 0.5, camPxX, camPxY, camR + 10);
+    camGlow.addColorStop(0, isDark ? 'rgba(99, 179, 237, 0.20)' : 'rgba(59, 130, 196, 0.16)');
+    camGlow.addColorStop(1, 'rgba(99, 179, 237, 0)');
+    drawCtx.beginPath();
+    drawCtx.arc(camPxX, camPxY, camR + 10, 0, Math.PI * 2);
+    drawCtx.fillStyle = camGlow;
+    drawCtx.fill();
+
+    // Camera body — clean circle with subtle border
+    drawCtx.beginPath();
+    drawCtx.arc(camPxX, camPxY, camR, 0, Math.PI * 2);
+    const camFill = drawCtx.createRadialGradient(camPxX - 1, camPxY - 1, 0, camPxX, camPxY, camR);
+    if (isDark) {
+        camFill.addColorStop(0, 'rgba(120, 190, 245, 0.85)');
+        camFill.addColorStop(1, 'rgba(80, 155, 230, 0.75)');
+    } else {
+        camFill.addColorStop(0, 'rgba(80, 150, 220, 0.80)');
+        camFill.addColorStop(1, 'rgba(50, 115, 190, 0.70)');
+    }
+    drawCtx.fillStyle = camFill;
+    drawCtx.fill();
+    drawCtx.strokeStyle = isDark ? 'rgba(140, 200, 255, 0.50)' : 'rgba(50, 115, 190, 0.50)';
+    drawCtx.lineWidth = 1;
+    drawCtx.stroke();
+
+    // Inner lens dot
+    drawCtx.beginPath();
+    drawCtx.arc(camPxX, camPxY, 2.2, 0, Math.PI * 2);
+    drawCtx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+    drawCtx.fill();
+
+    // Lens direction indicator — subtle triangle pointing at facing angle
+    const triDist = camR + 4;
+    const triSize = 3;
+    const triX = camPxX + Math.cos(facingAngle) * triDist;
+    const triY = camPxY + Math.sin(facingAngle) * triDist;
+    const perpAngle = facingAngle + Math.PI / 2;
+    drawCtx.beginPath();
+    drawCtx.moveTo(triX + Math.cos(facingAngle) * triSize, triY + Math.sin(facingAngle) * triSize);
+    drawCtx.lineTo(triX + Math.cos(perpAngle) * triSize * 0.6, triY + Math.sin(perpAngle) * triSize * 0.6);
+    drawCtx.lineTo(triX - Math.cos(perpAngle) * triSize * 0.6, triY - Math.sin(perpAngle) * triSize * 0.6);
+    drawCtx.closePath();
+    drawCtx.fillStyle = isDark ? 'rgba(120, 190, 245, 0.55)' : 'rgba(60, 130, 200, 0.50)';
+    drawCtx.fill();
+
+    drawCtx.restore();
+
+    // ── Companion device (Neat Center / Logitech Sight) zones ──
+    const companions = getCompanionCamerasRoomSpace();
+    for (const comp of companions) {
+        const compHalfFOV = (comp.eq.cameraFOV / 2) * Math.PI / 180;
+        const compRange = comp.eq.cameraRange * state.meetingCameraZoneDepth;
+        const compRangePx = compRange * ppf;
+        const compPxX = rx + comp.x * ppf;
+        const compPxY = ry + wallThick + comp.y * ppf;
+        const isFullCircle = comp.eq.cameraFOV >= 315;
+
+        drawCtx.save();
+        // Clip to room interior
+        drawCtx.beginPath();
+        drawCtx.rect(rx, ry + wallThick, rw, rl - 2 * wallThick);
+        drawCtx.clip();
+
+        // Soft gradient fill
+        const compGrad = drawCtx.createRadialGradient(compPxX, compPxY, 0, compPxX, compPxY, compRangePx);
+        if (isDark) {
+            compGrad.addColorStop(0, 'rgba(99, 179, 237, 0.07)');
+            compGrad.addColorStop(0.5, 'rgba(99, 179, 237, 0.03)');
+            compGrad.addColorStop(1, 'rgba(99, 179, 237, 0)');
+        } else {
+            compGrad.addColorStop(0, 'rgba(59, 130, 196, 0.06)');
+            compGrad.addColorStop(0.5, 'rgba(59, 130, 196, 0.025)');
+            compGrad.addColorStop(1, 'rgba(59, 130, 196, 0)');
+        }
+        drawCtx.beginPath();
+        if (isFullCircle) {
+            drawCtx.arc(compPxX, compPxY, compRangePx, 0, Math.PI * 2);
+        } else {
+            drawCtx.moveTo(compPxX, compPxY);
+            drawCtx.arc(compPxX, compPxY, compRangePx, -compHalfFOV, compHalfFOV);
+            drawCtx.closePath();
+        }
+        drawCtx.fillStyle = compGrad;
+        drawCtx.fill();
+
+        // Boundary circle/arc
+        drawCtx.beginPath();
+        if (isFullCircle) {
+            drawCtx.arc(compPxX, compPxY, compRangePx, 0, Math.PI * 2);
+        } else {
+            drawCtx.arc(compPxX, compPxY, compRangePx, -compHalfFOV, compHalfFOV);
+        }
+        drawCtx.strokeStyle = isDark ? 'rgba(99, 179, 237, 0.15)' : 'rgba(59, 130, 196, 0.15)';
         drawCtx.lineWidth = 1;
         drawCtx.setLineDash([4, 4]);
         drawCtx.stroke();
         drawCtx.setLineDash([]);
+
+        // Small device icon at companion position
+        const compR = 5;
+        drawCtx.beginPath();
+        drawCtx.arc(compPxX, compPxY, compR, 0, Math.PI * 2);
+        drawCtx.fillStyle = isDark ? 'rgba(99, 179, 237, 0.55)' : 'rgba(59, 130, 196, 0.50)';
+        drawCtx.fill();
+        drawCtx.strokeStyle = isDark ? 'rgba(140, 200, 255, 0.40)' : 'rgba(50, 115, 190, 0.40)';
+        drawCtx.lineWidth = 0.8;
+        drawCtx.stroke();
+
+        // Inner dot
+        drawCtx.beginPath();
+        drawCtx.arc(compPxX, compPxY, 1.5, 0, Math.PI * 2);
+        drawCtx.fillStyle = 'rgba(255, 255, 255, 0.80)';
+        drawCtx.fill();
+
+        drawCtx.restore();
     }
-
-    // Camera icon at camera position (larger, more visible)
-    drawCtx.beginPath();
-    drawCtx.arc(camPxX, camPxY, 4.5, 0, Math.PI * 2);
-    drawCtx.fillStyle = isDark ? 'rgba(91, 156, 245, 0.70)' : 'rgba(60, 110, 200, 0.65)';
-    drawCtx.fill();
-    drawCtx.strokeStyle = isDark ? 'rgba(91, 156, 245, 0.90)' : 'rgba(60, 110, 200, 0.85)';
-    drawCtx.lineWidth = 1.5;
-    drawCtx.stroke();
-
-    // Small camera lens inner dot
-    drawCtx.beginPath();
-    drawCtx.arc(camPxX, camPxY, 1.5, 0, Math.PI * 2);
-    drawCtx.fillStyle = '#fff';
-    drawCtx.fill();
-
-    drawCtx.restore();
 }
 
 /**
  * Draw seat status indicator dots on all classified seats.
- * Uses ring style for unoccupied seats to distinguish from avatars.
+ * Modern minimal style — clean filled dots with subtle inner icons.
  */
 function drawSeatStatusIndicators(drawCtx, classifiedSeats, occupiedSeats, ppf, rx, ry, wallThick) {
     const dotR = ppf * 0.13;
     const occupiedSet = new Set(occupiedSeats.map(s => `${s.tableId}:${s.seatIdx}`));
+    const isDark = document.documentElement.getAttribute('data-theme') !== 'light';
 
     for (const seat of classifiedSeats) {
         const key = `${seat.tableId}:${seat.seatIdx}`;
@@ -1906,23 +2139,62 @@ function drawSeatStatusIndicators(drawCtx, classifiedSeats, occupiedSeats, ppf, 
         const cy = ry + wallThick + seat.roomY * ppf;
         const colors = _meetingColors(seat.status);
 
-        // Subtle fill circle
+        // Subtle ambient shadow
         drawCtx.beginPath();
-        drawCtx.arc(cx, cy, dotR, 0, Math.PI * 2);
-        drawCtx.fillStyle = colors.fill;
+        drawCtx.arc(cx + 0.5, cy + 0.5, dotR + 1.5, 0, Math.PI * 2);
+        drawCtx.fillStyle = 'rgba(0,0,0,0.06)';
         drawCtx.fill();
 
-        // Ring indicator
+        // Main dot — gradient fill for depth
+        drawCtx.beginPath();
+        drawCtx.arc(cx, cy, dotR, 0, Math.PI * 2);
+        const dotGrad = drawCtx.createRadialGradient(cx - dotR * 0.25, cy - dotR * 0.25, 0, cx, cy, dotR);
+        dotGrad.addColorStop(0, colors.stroke);
+        dotGrad.addColorStop(1, colors.fill);
+        drawCtx.fillStyle = dotGrad;
+        drawCtx.fill();
+
+        // Clean thin border
         drawCtx.beginPath();
         drawCtx.arc(cx, cy, dotR, 0, Math.PI * 2);
         drawCtx.strokeStyle = colors.stroke;
-        drawCtx.lineWidth = 1.5;
+        drawCtx.lineWidth = 1;
         drawCtx.stroke();
 
-        // Tiny center dot
-        drawCtx.beginPath();
-        drawCtx.arc(cx, cy, dotR * 0.25, 0, Math.PI * 2);
-        drawCtx.fillStyle = colors.stroke;
-        drawCtx.fill();
+        // Inner icon — clean line art
+        if (dotR > 3.5) {
+            drawCtx.lineWidth = Math.max(0.8, dotR * 0.18);
+            drawCtx.lineCap = 'round';
+            drawCtx.lineJoin = 'round';
+            const iconColor = isDark ? 'rgba(255,255,255,0.75)' : 'rgba(255,255,255,0.85)';
+            drawCtx.strokeStyle = iconColor;
+
+            if (seat.status === SEAT_STATUS.covered) {
+                // Checkmark
+                const s = dotR * 0.32;
+                drawCtx.beginPath();
+                drawCtx.moveTo(cx - s, cy + s * 0.05);
+                drawCtx.lineTo(cx - s * 0.2, cy + s * 0.55);
+                drawCtx.lineTo(cx + s, cy - s * 0.45);
+                drawCtx.stroke();
+            } else if (seat.status === SEAT_STATUS.blindSpot) {
+                // X mark
+                const s = dotR * 0.24;
+                drawCtx.beginPath();
+                drawCtx.moveTo(cx - s, cy - s);
+                drawCtx.lineTo(cx + s, cy + s);
+                drawCtx.moveTo(cx + s, cy - s);
+                drawCtx.lineTo(cx - s, cy + s);
+                drawCtx.stroke();
+            } else {
+                // Minus for out-of-range/obstructed
+                drawCtx.beginPath();
+                drawCtx.moveTo(cx - dotR * 0.28, cy);
+                drawCtx.lineTo(cx + dotR * 0.28, cy);
+                drawCtx.stroke();
+            }
+            drawCtx.lineCap = 'butt';
+            drawCtx.lineJoin = 'miter';
+        }
     }
 }

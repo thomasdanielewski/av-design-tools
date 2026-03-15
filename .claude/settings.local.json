@@ -71,7 +71,22 @@
       "WebFetch(domain:support.neat.no)",
       "WebFetch(domain:www.logitech.com)",
       "WebSearch",
-      "Bash(taskkill //PID 1371740 //F)"
+      "Bash(taskkill //PID 1371740 //F)",
+      "Bash(grep -n \"DOM\\\\[''meeting\" /c/Users/Thomas/Documents/GitHub/av-design-tools/*.js)",
+      "Bash(node -c meeting.js)",
+      "Bash(for f:*)",
+      "Bash(do echo:*)",
+      "Bash(node -c \"$f\")",
+      "Bash(node -c \"C:\\\\Users\\\\Thomas\\\\Documents\\\\GitHub\\\\av-design-tools\\\\state.js\")",
+      "Bash(node -c \"C:\\\\Users\\\\Thomas\\\\Documents\\\\GitHub\\\\av-design-tools\\\\meeting.js\")",
+      "Bash(npm install:*)",
+      "Bash(lsof -ti:3000)",
+      "Bash(xargs -r kill)",
+      "Bash(fuser -k 3000/tcp)",
+      "Bash(taskkill //PID 259044 //F)",
+      "Bash(wc -l \"C:\\\\Users\\\\Thomas\\\\Documents\\\\GitHub\\\\av-design-tools\"/*.js)",
+      "Bash(find \"C:\\\\Users\\\\Thomas\\\\Documents\\\\GitHub\\\\av-design-tools\" -maxdepth 1 -name \"*.js\" -exec wc -l {} +)",
+      "Bash(grep -n \"const EQUIPMENT\\\\|const HASH_KEYS\\\\|const CHAIR\\\\|const GRID\" /c/Users/Thomas/Documents/GitHub/av-design-tools/*.js)"
     ]
   }
 }

@@ -423,13 +423,38 @@ function toggleMeetingMode() {
     const cg = DOM['cg-meeting'];
     if (cg) cg.style.display = state.meetingMode ? '' : 'none';
 
-    // Show/hide camera preview panel
+    // Show/hide camera preview panel with fade-in
     const preview = DOM['meeting-camera-preview'];
-    if (preview) preview.style.display = state.meetingMode ? '' : 'none';
+    if (preview) {
+        if (state.meetingMode) {
+            preview.style.display = '';
+            preview.style.opacity = '0';
+            preview.style.transform = 'translateY(8px)';
+            requestAnimationFrame(() => {
+                preview.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
+                preview.style.opacity = '1';
+                preview.style.transform = 'translateY(0)';
+            });
+        } else {
+            preview.style.display = 'none';
+            preview.classList.remove('expanded');
+        }
+    }
 
-    // Show/hide color legend
+    // Show/hide color legend with fade-in
     const legend = document.getElementById('meeting-legend');
-    if (legend) legend.style.display = state.meetingMode ? '' : 'none';
+    if (legend) {
+        if (state.meetingMode) {
+            legend.style.display = '';
+            legend.style.opacity = '0';
+            requestAnimationFrame(() => {
+                legend.style.transition = 'opacity 0.3s ease 0.1s';
+                legend.style.opacity = '1';
+            });
+        } else {
+            legend.style.display = 'none';
+        }
+    }
 
     // Hide info-overlay (specs panel) when meeting mode is active to avoid overlap
     const infoOverlay = DOM['info-overlay'];
@@ -448,6 +473,23 @@ function toggleMeetingMode() {
 
     if (!_suppressHistory) pushHistory(state.meetingMode ? 'enabled meeting mode' : 'disabled meeting mode');
     scheduleRender();
+}
+
+/** Toggle expanded state of meeting preview panel */
+function toggleMeetingExpand() {
+    const panel = DOM['meeting-camera-preview'];
+    if (!panel) return;
+    panel.classList.toggle('expanded');
+
+    // The CSS width transition takes ~400ms — schedule re-renders during and
+    // after the transition so the canvas resizes smoothly to the new panel size.
+    if (state.meetingMode) {
+        invalidateMeetingCache();
+        scheduleRender();
+        // Re-render mid-transition and at end to catch the final width
+        setTimeout(() => { invalidateMeetingCache(); scheduleRender(); }, 200);
+        setTimeout(() => { invalidateMeetingCache(); scheduleRender(); }, 420);
+    }
 }
 
 /** Rebuild the framing mode <select> options for the current brand */

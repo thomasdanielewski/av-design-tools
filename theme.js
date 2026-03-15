@@ -65,17 +65,17 @@ const CANVAS_THEME = {
         chairStroke: 'rgba(160, 162, 170, 0.30)',
         snapGuide: 'rgba(91, 156, 245, 0.65)',   // grid snap guide line
         alignGuide: 'rgba(255, 120, 50, 0.85)',  // alignment guide line
-        // Meeting mode
-        avatarCovered: 'rgba(74, 222, 128, 0.40)',
-        avatarOutOfRange: 'rgba(251, 191, 36, 0.40)',
-        avatarBlindSpot: 'rgba(239, 68, 68, 0.40)',
-        avatarObstructed: 'rgba(120, 120, 120, 0.40)',
-        avatarStrokeCovered: 'rgba(74, 222, 128, 0.70)',
-        avatarStrokeOutOfRange: 'rgba(251, 191, 36, 0.70)',
-        avatarStrokeBlindSpot: 'rgba(239, 68, 68, 0.70)',
-        avatarStrokeObstructed: 'rgba(120, 120, 120, 0.60)',
-        blindSpotWash: 'rgba(239, 68, 68, 0.10)',
-        cameraZoneBoundary: 'rgba(91, 156, 245, 0.40)',
+        // Meeting mode — modern muted palette
+        avatarCovered: 'rgba(52, 211, 153, 0.35)',
+        avatarOutOfRange: 'rgba(251, 191, 36, 0.30)',
+        avatarBlindSpot: 'rgba(248, 113, 113, 0.35)',
+        avatarObstructed: 'rgba(148, 148, 155, 0.30)',
+        avatarStrokeCovered: 'rgba(52, 211, 153, 0.60)',
+        avatarStrokeOutOfRange: 'rgba(251, 191, 36, 0.55)',
+        avatarStrokeBlindSpot: 'rgba(248, 113, 113, 0.60)',
+        avatarStrokeObstructed: 'rgba(148, 148, 155, 0.45)',
+        blindSpotWash: 'rgba(220, 80, 80, 0.06)',
+        cameraZoneBoundary: 'rgba(99, 179, 237, 0.30)',
         frameGuide: 'rgba(255, 255, 255, 0.60)',
     },
     light: {
@@ -140,17 +140,17 @@ const CANVAS_THEME = {
         chairStroke: 'rgba(100, 102, 110, 0.28)',
         snapGuide: 'rgba(80, 120, 200, 0.70)',   // grid snap guide line
         alignGuide: 'rgba(220, 90, 20, 0.90)',   // alignment guide line
-        // Meeting mode
-        avatarCovered: 'rgba(34, 180, 100, 0.35)',
-        avatarOutOfRange: 'rgba(217, 162, 20, 0.35)',
-        avatarBlindSpot: 'rgba(217, 42, 29, 0.35)',
-        avatarObstructed: 'rgba(100, 100, 100, 0.35)',
-        avatarStrokeCovered: 'rgba(34, 180, 100, 0.65)',
-        avatarStrokeOutOfRange: 'rgba(217, 162, 20, 0.65)',
-        avatarStrokeBlindSpot: 'rgba(217, 42, 29, 0.65)',
-        avatarStrokeObstructed: 'rgba(100, 100, 100, 0.55)',
-        blindSpotWash: 'rgba(217, 42, 29, 0.08)',
-        cameraZoneBoundary: 'rgba(80, 120, 200, 0.45)',
+        // Meeting mode — modern muted palette
+        avatarCovered: 'rgba(16, 185, 129, 0.30)',
+        avatarOutOfRange: 'rgba(202, 155, 20, 0.28)',
+        avatarBlindSpot: 'rgba(220, 60, 50, 0.30)',
+        avatarObstructed: 'rgba(120, 120, 126, 0.28)',
+        avatarStrokeCovered: 'rgba(16, 185, 129, 0.55)',
+        avatarStrokeOutOfRange: 'rgba(202, 155, 20, 0.50)',
+        avatarStrokeBlindSpot: 'rgba(220, 60, 50, 0.55)',
+        avatarStrokeObstructed: 'rgba(120, 120, 126, 0.40)',
+        blindSpotWash: 'rgba(180, 50, 40, 0.05)',
+        cameraZoneBoundary: 'rgba(59, 130, 196, 0.35)',
         frameGuide: 'rgba(0, 0, 0, 0.50)',
     }
 };

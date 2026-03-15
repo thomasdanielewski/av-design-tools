@@ -409,6 +409,9 @@ document.querySelectorAll('[data-action="toggle-meeting"]').forEach(btn => {
     btn.addEventListener('click', toggleMeetingMode);
 });
 
+// ── Meeting preview expand button ───────────────────────────
+document.getElementById('meeting-expand-btn')?.addEventListener('click', toggleMeetingExpand);
+
 // ── Keyboard shortcuts for undo/redo ─────────────────────────
 document.addEventListener('keydown', e => {
     if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
