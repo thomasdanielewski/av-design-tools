@@ -41,7 +41,21 @@
       "Bash(node -e \"const fs=require\\(''fs''\\);const code=fs.readFileSync\\(''draw.js'',''utf8''\\);console.log\\(JSON.stringify\\(code.substring\\(1820,1950\\)\\)\\)\")",
       "Bash(node -e \"const fs=require\\(''fs''\\);const code=fs.readFileSync\\(''draw.js'',''utf8''\\);const lines=code.split\\(''\\\\n''\\);console.log\\(''L48:'',lines[47].trim\\(\\)\\);console.log\\(''L49:'',lines[48].trim\\(\\)\\);console.log\\(''L80:'',lines[79].trim\\(\\)\\);console.log\\(''L81:'',lines[80].trim\\(\\)\\)\")",
       "Bash(curl -L \"https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.2/jspdf.umd.min.js\" -o \"C:/Users/Thomas/Documents/GitHub/av-design-tools/jspdf.umd.min.js\")",
-      "Bash(curl -L https://unpkg.com/jspdf@2.5.2/dist/jspdf.umd.min.js -o C:/Users/Thomas/Documents/GitHub/av-design-tools/jspdf.umd.min.js -w '\\\\nHTTP %{http_code}, size %{size_download}')"
+      "Bash(curl -L https://unpkg.com/jspdf@2.5.2/dist/jspdf.umd.min.js -o C:/Users/Thomas/Documents/GitHub/av-design-tools/jspdf.umd.min.js -w '\\\\nHTTP %{http_code}, size %{size_download}')",
+      "Bash(grep -n \"function updateSliderTrack\\\\|function flashBadge\\\\|const updateSliderTrack\\\\|const flashBadge\" /c/Users/Thomas/Documents/GitHub/av-design-tools/*.js)",
+      "Bash(grep -E \"\\\\.js$|\\\\.css$|\\\\.html$\")",
+      "Bash(grep -n \"renderTableList\\\\|renderElementList\" /c/Users/Thomas/Documents/GitHub/av-design-tools/*.js)",
+      "Bash(grep -n \"addEventListener.*table-list\\\\|addEventListener.*element-list\\\\|querySelector.*table-pill\\\\|querySelector.*element-pill\" /c/Users/Thomas/Documents/GitHub/av-design-tools/*.js)",
+      "Bash(grep -rn \"classList\\\\|className\\\\|\\\\.remove\\\\|\\\\.add\" /c/Users/Thomas/Documents/GitHub/av-design-tools/*.js)",
+      "Bash(grep -En \"^\\\\}[[:space:]]*$|^[a-z].*\\\\{\" style.css)",
+      "Bash(for class:*)",
+      "Bash(do)",
+      "Bash(if grep:*)",
+      "Bash(then)",
+      "Bash(echo \"$class: FOUND in CSS\")",
+      "Bash(else)",
+      "Bash(echo \"$class: MISSING in CSS\")",
+      "Bash(fi)"
     ]
   }
 }

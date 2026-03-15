@@ -69,9 +69,21 @@ function renderElementList() {
         const btn = document.createElement('button');
         btn.className = 'element-pill ' + el.type + (el.id === state.selectedElementId ? ' active' : '');
         const wallLabel = { north: 'N', south: 'S', east: 'E', west: 'W' }[el.wall];
-        btn.textContent = `Door · ${wallLabel}`;
-        btn.title = `door on ${el.wall} wall, ${formatFtIn(el.width)} wide`;
         btn.dataset.elementId = el.id;
+        btn.title = `door on ${el.wall} wall, ${formatFtIn(el.width)} wide`;
+
+        const label = document.createElement('span');
+        label.className = 'pill-label';
+        label.textContent = `Door · ${wallLabel}`;
+
+        const kebab = document.createElement('span');
+        kebab.className = 'pill-kebab';
+        kebab.textContent = '\u22EE';
+        kebab.title = 'Actions';
+        kebab.dataset.kebabElement = el.id;
+
+        btn.appendChild(label);
+        btn.appendChild(kebab);
         container.appendChild(btn);
     });
     if (DOM['remove-element-btn']) {

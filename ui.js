@@ -311,41 +311,24 @@ function setUnits(u) {
 // ── Collapsible Control Groups ───────────────────────────────
 
 function collapseGroup(el) {
-    const body = el.querySelector('.control-group-body');
     // Move focus out of collapsing body to prevent focus trap
-    if (body.contains(document.activeElement)) {
+    const body = el.querySelector('.control-group-body');
+    if (body && body.contains(document.activeElement)) {
         el.querySelector('.control-group-title')?.focus();
     }
-    body.style.overflow = 'hidden';
-    body.style.maxHeight = body.scrollHeight + 'px';
-    body.style.opacity = '1';
-    requestAnimationFrame(() => requestAnimationFrame(() => {
-        body.style.maxHeight = '0';
-        body.style.opacity = '0';
-        body.style.pointerEvents = 'none';
-        el.style.paddingBottom = '0';
-        el.setAttribute('aria-expanded', 'false');
-    }));
+    el.setAttribute('aria-expanded', 'false');
 }
 
 function expandGroup(el) {
-    const body = el.querySelector('.control-group-body');
-    body.style.pointerEvents = '';
-    body.style.opacity = '1';
-    el.style.paddingBottom = '';
     el.setAttribute('aria-expanded', 'true');
-    body.style.maxHeight = body.scrollHeight + 'px';
-    body.addEventListener('transitionend', function handler(e) {
-        if (e.propertyName !== 'max-height') return;
-        body.style.maxHeight = 'none';
-        body.style.overflow = 'visible';
-        body.removeEventListener('transitionend', handler);
-        setTimeout(() => {
-            const container = el.closest('.sidebar-content');
-            if (container && el.getBoundingClientRect().bottom > container.getBoundingClientRect().bottom) {
-                el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-            }
-        }, 100);
+    // Scroll into view after transition if needed
+    el.querySelector('.control-group-body')?.addEventListener('transitionend', function handler(e) {
+        if (e.propertyName !== 'grid-template-rows') return;
+        e.currentTarget.removeEventListener('transitionend', handler);
+        const container = el.closest('.sidebar-content');
+        if (container && el.getBoundingClientRect().bottom > container.getBoundingClientRect().bottom) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
     });
 }
 
@@ -359,23 +342,13 @@ function initGroups() {
     document.querySelectorAll('.control-group[aria-expanded]').forEach(el => {
         const body = el.querySelector('.control-group-body');
         if (!body) return;
-        // Suppress transitions so the initial state is instant (no flash on load).
-        body.style.transition = 'none';
-        if (el.getAttribute('aria-expanded') === 'true') {
-            body.style.maxHeight = 'none';
-            body.style.opacity = '1';
-            body.style.pointerEvents = '';
-            body.style.overflow = 'visible';
-        } else {
-            body.style.maxHeight = '0';
-            body.style.opacity = '0';
-            body.style.pointerEvents = 'none';
-            el.style.paddingBottom = '0';
+        // Wrap inner contents in .control-group-body-inner for CSS grid transition
+        if (!body.querySelector('.control-group-body-inner')) {
+            const inner = document.createElement('div');
+            inner.className = 'control-group-body-inner';
+            while (body.firstChild) inner.appendChild(body.firstChild);
+            body.appendChild(inner);
         }
-        // Force a synchronous reflow so the browser commits the state above,
-        // then immediately re-enable transitions for future interactions.
-        void body.offsetHeight;
-        body.style.transition = '';
     });
 }
 

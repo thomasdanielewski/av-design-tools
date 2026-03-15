@@ -75,9 +75,21 @@ function renderTableList() {
         const btn = document.createElement('button');
         btn.className = 'table-pill' + (t.id === state.selectedTableId ? ' active' : '');
         const shapeLabel = { rectangular: 'Rect', oval: 'Oval', circle: 'Circle', 'd-shape': 'D' }[t.shape] || t.shape;
-        btn.textContent = `T${t.id} · ${shapeLabel}`;
-        btn.title = `${t.shape} ${formatFtIn(t.length)} × ${formatFtIn(t.width)}`;
         btn.dataset.tableId = t.id;
+        btn.title = `${t.shape} ${formatFtIn(t.length)} × ${formatFtIn(t.width)}`;
+
+        const label = document.createElement('span');
+        label.className = 'pill-label';
+        label.textContent = `T${t.id} · ${shapeLabel}`;
+
+        const kebab = document.createElement('span');
+        kebab.className = 'pill-kebab';
+        kebab.textContent = '\u22EE';
+        kebab.title = 'Actions';
+        kebab.dataset.kebabTable = t.id;
+
+        btn.appendChild(label);
+        btn.appendChild(kebab);
         container.appendChild(btn);
     });
     if (DOM['remove-table-btn']) DOM['remove-table-btn'].disabled = state.tables.length <= 1;

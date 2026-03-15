@@ -495,10 +495,22 @@ body {
 }
 
 .control-group-body {
+    display: grid;
+    grid-template-rows: 0fr;
+    transition: grid-template-rows 0.4s var(--ease-out);
+}
+.control-group[aria-expanded="true"] > .control-group-body {
+    grid-template-rows: 1fr;
+}
+.control-group-body > .control-group-body-inner {
+    min-height: 0;
     overflow: hidden;
-    transition:
-        max-height 0.4s var(--ease-out),
-        opacity 0.3s var(--ease-out);
+}
+.control-group[aria-expanded="false"] {
+    padding-bottom: 0;
+}
+.control-group[aria-expanded="false"] > .control-group-body {
+    pointer-events: none;
 }
 
 
@@ -1149,7 +1161,10 @@ input[type="number"]::placeholder {
 }
 
 .table-pill {
-    padding: 5px 12px;
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    padding: 5px 6px 5px 12px;
     background: transparent;
     border: 1px solid var(--border-default);
     border-radius: 100px;
@@ -1249,14 +1264,67 @@ input[type="number"]::placeholder {
 }
 
 .empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: var(--space-md) var(--space-sm);
+    margin-top: var(--space-sm);
+    border: 1px dashed var(--border-default);
+    background: rgba(0, 0, 0, 0.02);
+    border-radius: var(--radius-sm);
+    text-align: center;
+    cursor: default;
+    transition: border-color 0.2s var(--ease-out), background 0.2s var(--ease-out);
+}
+
+.empty-state:hover {
+    border-color: var(--text-tertiary);
+    background: rgba(0, 0, 0, 0.04);
+}
+
+.empty-state-icon {
+    color: var(--text-tertiary);
+    opacity: 0.5;
+    transition: opacity 0.2s var(--ease-out);
+}
+
+.empty-state:hover .empty-state-icon {
+    opacity: 0.8;
+}
+
+.empty-state-text {
     color: var(--text-tertiary);
     font-size: var(--text-sm);
-    text-align: center;
-    padding: var(--space-md) var(--space-sm);
+    margin: 0;
+    line-height: 1.45;
+}
+
+.empty-state-hint {
+    font-size: var(--text-xs);
+    color: var(--text-tertiary);
+    opacity: 0;
+    transition: opacity 0.2s var(--ease-out);
+}
+
+.empty-state:hover .empty-state-hint {
+    opacity: 0.7;
+}
+
+.empty-state-hint kbd {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    background: rgba(0, 0, 0, 0.06);
+    border: 1px solid var(--border-default);
+    border-radius: 4px;
+    padding: 0 4px;
 }
 
 .element-pill {
-    padding: 5px 12px;
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    padding: 5px 6px 5px 12px;
     background: transparent;
     border: 1px solid var(--border-default);
     border-radius: 100px;
@@ -1295,6 +1363,40 @@ input[type="number"]::placeholder {
 .element-pill.window::before {
     content: "▫ ";
     font-size: 10px;
+}
+
+/* ── Pill kebab menu button ─────────────────────────────────── */
+.pill-label {
+    pointer-events: none;
+}
+
+.pill-kebab {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    font-size: 13px;
+    line-height: 1;
+    color: var(--text-tertiary);
+    opacity: 0;
+    transition: opacity 0.15s var(--ease-out), background 0.1s;
+    pointer-events: none;
+    flex-shrink: 0;
+}
+
+.table-pill:hover .pill-kebab,
+.element-pill:hover .pill-kebab,
+.table-pill.active .pill-kebab,
+.element-pill.active .pill-kebab {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.pill-kebab:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--text-primary);
 }
 
 /* ══════════════════════════════════════════════════════════════

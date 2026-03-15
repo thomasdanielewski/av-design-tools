@@ -145,6 +145,20 @@ document.querySelectorAll('[data-toggle-group]').forEach(el => {
 
 // ── Delegated pill listeners (single listener per container) ─
 document.getElementById('table-list').addEventListener('click', e => {
+    // Kebab menu button opens context menu anchored below it
+    const kebab = e.target.closest('.pill-kebab[data-kebab-table]');
+    if (kebab) {
+        e.stopPropagation();
+        const id = parseInt(kebab.dataset.kebabTable, 10);
+        selectTable(id);
+        _ctxTargetTableId = id;
+        const deleteBtn = _ctxMenu.querySelector('[data-action="ctx-delete"]');
+        if (deleteBtn) deleteBtn.disabled = state.tables.length <= 1;
+        const rect = kebab.getBoundingClientRect();
+        hideContextMenu();
+        _showMenuAt(_ctxMenu, rect.left, rect.bottom + 4);
+        return;
+    }
     const pill = e.target.closest('.table-pill');
     if (!pill) return;
     selectTable(parseInt(pill.dataset.tableId, 10));
@@ -152,6 +166,21 @@ document.getElementById('table-list').addEventListener('click', e => {
 });
 
 document.getElementById('element-list').addEventListener('click', e => {
+    // Kebab menu button opens structural context menu anchored below it
+    const kebab = e.target.closest('.pill-kebab[data-kebab-element]');
+    if (kebab) {
+        e.stopPropagation();
+        const id = parseInt(kebab.dataset.kebabElement, 10);
+        selectElement(id);
+        _sctxTargetElementId = id;
+        const el = state.structuralElements.find(s => s.id === id);
+        const flipBtn = _sctxMenu.querySelector('[data-action="sctx-flip"]');
+        if (flipBtn) flipBtn.style.display = (el && el.type === 'door') ? '' : 'none';
+        const rect = kebab.getBoundingClientRect();
+        hideContextMenu();
+        _showMenuAt(_sctxMenu, rect.left, rect.bottom + 4);
+        return;
+    }
     const pill = e.target.closest('.element-pill');
     if (!pill) return;
     selectElement(parseInt(pill.dataset.elementId, 10));
