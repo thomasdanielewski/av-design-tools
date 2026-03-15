@@ -16,6 +16,40 @@
 <body>
     <a href="#fg-canvas" class="skip-link">Skip to canvas</a>
     <aside class="sidebar" aria-label="Controls">
+        <!-- Icon strip: persistent section navigator -->
+        <nav class="sidebar-icon-strip" aria-label="Section navigation">
+            <button class="icon-strip-btn active" data-nav-target="cg-room" data-tip="Room Dimensions" aria-label="Room Dimensions">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 3H3v18"/><path d="M21 3v4"/><path d="M21 3h-4"/><path d="M3 21h4"/><path d="M3 21v-4"/><line x1="9" y1="3" x2="9" y2="5"/><line x1="15" y1="3" x2="15" y2="5"/><line x1="3" y1="9" x2="5" y2="9"/><line x1="3" y1="15" x2="5" y2="15"/></svg>
+            </button>
+            <button class="icon-strip-btn" data-nav-target="cg-structural" data-tip="Structural" aria-label="Structural Elements">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18"/><path d="M3 21h7"/><path d="M10 21V9"/><path d="M10 9H3"/><circle cx="7" cy="15" r="1" fill="currentColor" stroke="none"/></svg>
+            </button>
+            <button class="icon-strip-btn" data-nav-target="cg-table" data-tip="Tables" aria-label="Tables &amp; Seating">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="3" rx="1"/><line x1="5" y1="11" x2="5" y2="19"/><line x1="19" y1="11" x2="19" y2="19"/></svg>
+            </button>
+            <button class="icon-strip-btn" data-nav-target="cg-display" data-tip="Display" aria-label="Display">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+            </button>
+            <button class="icon-strip-btn" data-nav-target="cg-equipment" data-tip="Equipment" aria-label="AV Equipment">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+            </button>
+            <button class="icon-strip-btn" data-nav-target="cg-overlays" data-tip="Overlays" aria-label="Coverage Overlays">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+            </button>
+            <button class="icon-strip-btn" data-nav-target="pov-controls" data-tip="POV" aria-label="POV Settings">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
+            <button class="icon-strip-btn" data-nav-target="cg-annotations" data-tip="Annotations" aria-label="Annotations">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="17" y1="10" x2="3" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="14" x2="3" y2="14"/><line x1="17" y1="18" x2="3" y2="18"/></svg>
+            </button>
+            <button class="icon-strip-btn" data-nav-target="meeting-mode" data-tip="Meeting" aria-label="Meeting Mode">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            </button>
+            <button class="icon-strip-btn" data-nav-target="cg-export" data-tip="Export" aria-label="Export &amp; Actions">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            </button>
+        </nav>
+        <div class="sidebar-main">
         <div class="sidebar-header">
             <h1><span class="icon">◇</span> AV Room Planner</h1>
             <p>Conference room visualization tool</p>
@@ -47,6 +81,7 @@
                         stroke-linecap="round" stroke-linejoin="round">
                         <polyline points="6 9 12 15 18 9"></polyline>
                     </svg></div>
+                <p class="group-desc">Set room size, ceiling height, and presets</p>
                 <div class="control-group-body">
                     <div class="room-presets">
                         <button class="preset-pill" data-preset-len="10" data-preset-wid="8"
@@ -88,6 +123,7 @@
                         stroke-linecap="round" stroke-linejoin="round">
                         <polyline points="6 9 12 15 18 9"></polyline>
                     </svg></div>
+                <p class="group-desc">Add doors and windows for clearance checks</p>
                 <div class="control-group-body">
                     <div class="structural-manager">
                         <div class="structural-manager-header">
@@ -147,6 +183,7 @@
                         stroke-linecap="round" stroke-linejoin="round">
                         <polyline points="6 9 12 15 18 9"></polyline>
                     </svg></div>
+                <p class="group-desc">Add text labels, shapes, and measurements</p>
                 <div class="control-group-body">
                     <div class="annotation-tools">
                         <button class="arr-pill" data-annotate="text" title="Text label">Text</button>
@@ -211,6 +248,7 @@
                         stroke-linecap="round" stroke-linejoin="round">
                         <polyline points="6 9 12 15 18 9"></polyline>
                     </svg></div>
+                <p class="group-desc">Shape, size, and position of conference tables</p>
                 <div class="control-group-body">
                     <div class="control-row">
                         <div class="control-label"><label for="table-shape">Shape</label></div>
@@ -304,6 +342,7 @@
                         stroke-linecap="round" stroke-linejoin="round">
                         <polyline points="6 9 12 15 18 9"></polyline>
                     </svg></div>
+                <p class="group-desc">Screen size, count, and mounting position</p>
                 <div class="control-group-body">
                     <div class="control-row">
                         <div class="control-label"><label>Display Wall</label></div>
@@ -353,11 +392,13 @@
                         stroke-linecap="round" stroke-linejoin="round">
                         <polyline points="6 9 12 15 18 9"></polyline>
                     </svg></div>
+                <p class="group-desc">Brand, device model, and companion placement</p>
                 <div class="control-group-body">
                     <div class="brand-toggle" id="brand-toggle">
                         <button class="brand-btn neat-btn active" data-val="neat" data-action="set-brand">neat.</button>
                         <button class="brand-btn logi-btn" data-val="logitech" data-action="set-brand">logitech</button>
                     </div>
+                    <div class="brand-desc" id="brand-desc"></div>
                     <div class="control-row">
                         <div class="control-label"><label for="video-bar">Video Bar</label></div>
                         <select id="video-bar"></select>
@@ -406,6 +447,7 @@
                         stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                         <polyline points="6 9 12 15 18 9"></polyline>
                     </svg></div>
+                <p class="group-desc">Toggle camera FOV, mic range, and grid</p>
                 <div class="control-group-body">
                     <div class="check-row">
                         <span style="display:flex;align-items:center">Viewing Angle (60°)
@@ -443,6 +485,7 @@
                         stroke-linecap="round" stroke-linejoin="round">
                         <polyline points="6 9 12 15 18 9"></polyline>
                     </svg></div>
+                <p class="group-desc">First-person perspective controls</p>
                 <div class="control-group-body">
                     <div class="control-row">
                         <div class="control-label"><label>Perspective</label></div>
@@ -510,7 +553,7 @@
             </div>
 
             <!-- Actions -->
-            <div class="control-group" style="border-bottom:none;padding-bottom:24px">
+            <div class="control-group" id="cg-export" style="border-bottom:none;padding-bottom:24px">
                 <input type="text" id="room-name" placeholder="Room / space name (optional)" maxlength="80" style="display:none" aria-hidden="true" tabindex="-1">
                 <div class="action-btn-row" style="margin-top:8px">
                     <button class="download-btn" id="download-btn">↓ Layout</button>
@@ -525,6 +568,7 @@
                 <button class="secondary-btn reset-btn" id="reset-defaults-btn" title="Reset all settings to defaults" style="margin-top:8px;width:100%">⟲ Reset to Defaults</button>
             </div>
         </div>
+        </div><!-- /.sidebar-main -->
     </aside>
 
     <main class="main">
@@ -541,25 +585,43 @@
             </div>
             <div style="display:flex;align-items:center;gap:14px">
                 <div class="undo-redo-group" style="position:relative">
-                    <button class="undo-btn" id="undo-btn" title="Undo (Ctrl+Z)" disabled data-action="undo">↩</button>
+                    <div class="tooltip-container toolbar-tooltip">
+                        <button class="undo-btn" id="undo-btn" title="Undo (Ctrl+Z)" disabled data-action="undo">↩</button>
+                        <div class="tooltip-text"><strong>Undo</strong><br>Undo last action <kbd>Ctrl+Z</kbd></div>
+                    </div>
                     <span id="history-badge" class="history-badge"></span>
-                    <button class="redo-btn" id="redo-btn" title="Redo (Ctrl+Shift+Z)" disabled
-                        data-action="redo">↪</button>
+                    <div class="tooltip-container toolbar-tooltip">
+                        <button class="redo-btn" id="redo-btn" title="Redo (Ctrl+Shift+Z)" disabled
+                            data-action="redo">↪</button>
+                        <div class="tooltip-text"><strong>Redo</strong><br>Redo last undone action <kbd>Ctrl+Y</kbd></div>
+                    </div>
                     <span id="undo-action-label" class="undo-action-label" aria-live="polite"></span>
                     <div id="history-panel" class="history-panel" style="display:none">
                         <ul id="history-list"></ul>
                     </div>
                 </div>
-                <button class="undo-btn toolbar-btn meeting-mode-btn" id="meeting-mode-btn" title="Meeting Mode (F)" data-action="toggle-meeting"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="15" rx="2" ry="2"/><polyline points="17 2 12 7 7 2"/></svg>
-                    Meeting</button>
-                <button class="undo-btn toolbar-btn measure-btn" id="measure-btn" title="Measure (M)" data-action="toggle-measure"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h20"/><path d="M6 8v8"/><path d="M10 10v4"/><path d="M14 10v4"/><path d="M18 8v8"/></svg>
-                    Measure</button>
-                <button class="undo-btn toolbar-btn" id="annotate-btn" title="Annotate (A)" data-action="toggle-annotate"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
-                    Annotate</button>
-                <button class="undo-btn toolbar-btn" id="share-btn" title="Copy shareable link" data-action="share">
-                    <span class="share-btn-icon" aria-hidden="true"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg></span>
-                    <span class="share-btn-label">Share</span>
-                </button>
+                <div class="tooltip-container toolbar-tooltip">
+                    <button class="undo-btn toolbar-btn meeting-mode-btn" id="meeting-mode-btn" title="Meeting Mode (F)" data-action="toggle-meeting"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="15" rx="2" ry="2"/><polyline points="17 2 12 7 7 2"/></svg>
+                        Meeting</button>
+                    <div class="tooltip-text"><strong>Meeting Mode</strong><br>Analyze camera coverage and mic reach for seated participants <kbd>F</kbd></div>
+                </div>
+                <div class="tooltip-container toolbar-tooltip">
+                    <button class="undo-btn toolbar-btn measure-btn" id="measure-btn" title="Measure (M)" data-action="toggle-measure"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h20"/><path d="M6 8v8"/><path d="M10 10v4"/><path d="M14 10v4"/><path d="M18 8v8"/></svg>
+                        Measure</button>
+                    <div class="tooltip-text"><strong>Measure</strong><br>Draw dimension lines between points <kbd>M</kbd></div>
+                </div>
+                <div class="tooltip-container toolbar-tooltip">
+                    <button class="undo-btn toolbar-btn" id="annotate-btn" title="Annotate (A)" data-action="toggle-annotate"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                        Annotate</button>
+                    <div class="tooltip-text"><strong>Annotate</strong><br>Add text, shapes, arrows, and zones <kbd>A</kbd></div>
+                </div>
+                <div class="tooltip-container toolbar-tooltip">
+                    <button class="undo-btn toolbar-btn" id="share-btn" title="Copy shareable link" data-action="share">
+                        <span class="share-btn-icon" aria-hidden="true"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg></span>
+                        <span class="share-btn-label">Share</span>
+                    </button>
+                    <div class="tooltip-text"><strong>Share</strong><br>Copy a shareable URL to clipboard</div>
+                </div>
                 <!-- Share fallback dialog (insecure context / clipboard blocked) -->
                 <dialog id="share-fallback-dialog" class="share-fallback-dialog">
                     <p class="share-fallback-title">Copy link</p>
@@ -569,9 +631,15 @@
                     </div>
                     <button id="share-fallback-close-btn" class="share-fallback-close-btn">Close</button>
                 </dialog>
-                <button class="tips-btn" id="show-tips-btn" title="Show Tips">?</button>
+                <div class="tooltip-container toolbar-tooltip">
+                    <button class="tips-btn" id="show-tips-btn" title="Show Tips">?</button>
+                    <div class="tooltip-text"><strong>Help</strong><br>View keyboard shortcuts <kbd>?</kbd></div>
+                </div>
+                <div class="tooltip-container toolbar-tooltip">
                 <button class="theme-toggle" id="theme-toggle" title="Toggle light/dark mode"
                     aria-label="Toggle light/dark mode"><svg class="theme-icon theme-icon--moon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3a7 7 0 0 0 9.79 9.79z"/></svg><svg class="theme-icon theme-icon--sun" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg></button>
+                    <div class="tooltip-text"><strong>Theme</strong><br>Switch between dark and light mode</div>
+                </div>
                 <div class="legend">
                     <div class="legend-item" id="legend-camera" title="Toggle Camera FOV overlay"
                         data-action="toggle-legend" data-legend="camera">
@@ -633,9 +701,13 @@
                 <canvas id="fg-canvas" tabindex="0" role="img" aria-label="Conference room layout diagram showing tables, displays, and AV equipment coverage areas"></canvas>
             </div>
             <div id="canvas-undo-toast" class="canvas-undo-toast" aria-live="polite" aria-atomic="true"></div>
+            <div id="mode-label-toast" class="mode-label-toast" aria-live="polite" aria-atomic="true">
+                <span class="mode-label-icon" id="mode-label-icon"></span>
+                <span class="mode-label-text" id="mode-label-text"></span>
+            </div>
             <!-- Canvas View Mode Toggle -->
             <div class="canvas-view-toggle" id="view-mode-toggle" role="toolbar" aria-label="View mode">
-                <button class="cvt-btn toggle-btn active" data-val="top" data-action="set-view-mode" aria-pressed="true">Top</button>
+                <button class="cvt-btn toggle-btn active" data-val="top" data-action="set-view-mode" aria-pressed="true">Top-Down</button>
                 <div class="cvt-divider"></div>
                 <button class="cvt-btn toggle-btn" data-val="pov" data-action="set-view-mode" aria-pressed="false">POV</button>
             </div>
@@ -765,13 +837,54 @@
         <!-- Onboarding Overlay -->
         <div id="onboarding-overlay" class="onboarding-overlay" style="display:none">
             <div class="onboarding-card">
-                <h2>AV Room Planner</h2>
-                <ul class="onboarding-tips">
-                    <li>Drag tables to reposition</li>
-                    <li>Right-click tables for more options</li>
-                    <li>Use sidebar to configure room &amp; equipment</li>
-                    <li>Press <kbd>?</kbd> for keyboard shortcuts</li>
-                </ul>
+                <h2>Welcome to AV Room Planner</h2>
+                <p class="onboarding-subtitle">Follow these steps to design your space</p>
+                <ol class="onboarding-steps">
+                    <li class="onboarding-step">
+                        <span class="onboarding-step-num">1</span>
+                        <div class="onboarding-step-body">
+                            <span class="onboarding-step-icon" aria-hidden="true">⬡</span>
+                            <div class="onboarding-step-text">
+                                <strong>Set your room</strong>
+                                <span>Configure room dimensions and shape</span>
+                            </div>
+                        </div>
+                        <button class="onboarding-show-me" data-step="room">Show me</button>
+                    </li>
+                    <li class="onboarding-step">
+                        <span class="onboarding-step-num">2</span>
+                        <div class="onboarding-step-body">
+                            <span class="onboarding-step-icon" aria-hidden="true">◧</span>
+                            <div class="onboarding-step-text">
+                                <strong>Place equipment</strong>
+                                <span>Choose brand and position displays</span>
+                            </div>
+                        </div>
+                        <button class="onboarding-show-me" data-step="equipment">Show me</button>
+                    </li>
+                    <li class="onboarding-step">
+                        <span class="onboarding-step-num">3</span>
+                        <div class="onboarding-step-body">
+                            <span class="onboarding-step-icon" aria-hidden="true">⬤</span>
+                            <div class="onboarding-step-text">
+                                <strong>Analyze coverage</strong>
+                                <span>Use meeting mode to check camera/mic reach</span>
+                            </div>
+                        </div>
+                        <button class="onboarding-show-me" data-step="meeting">Show me</button>
+                    </li>
+                    <li class="onboarding-step">
+                        <span class="onboarding-step-num">4</span>
+                        <div class="onboarding-step-body">
+                            <span class="onboarding-step-icon" aria-hidden="true">↓</span>
+                            <div class="onboarding-step-text">
+                                <strong>Export &amp; share</strong>
+                                <span>Download or share your design</span>
+                            </div>
+                        </div>
+                        <button class="onboarding-show-me" data-step="export">Show me</button>
+                    </li>
+                </ol>
                 <button class="onboarding-dismiss" id="onboarding-dismiss">Got it</button>
             </div>
         </div>
@@ -825,7 +938,10 @@
                     </div>
                 </div>
             </div>
-            <p class="shortcut-contact">Questions? Contact <a href="mailto:thomas_danielewski@gensler.com">Thomas Danielewski</a></p>
+            <div class="shortcut-footer">
+                <p class="shortcut-contact">Questions? Contact <a href="mailto:thomas_danielewski@gensler.com">Thomas Danielewski</a></p>
+                <button class="shortcut-tour-btn" id="shortcut-tour-btn">↺ Take a tour</button>
+            </div>
         </div>
     </div>
 

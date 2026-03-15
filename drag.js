@@ -3,6 +3,16 @@
 /** Tracks which annotation the mouse is hovering over (for hover-only delete buttons) */
 let _hoveredAnnotationId = null;
 
+/** Tracks which table the mouse is hovering over (for hover highlight outline) */
+let _hoveredTableId = null;
+
+/** Snap flash state: briefly show grid lines near table when it snaps */
+let _snapFlashGuides = [];  // array of { axis, ft, isAlign, startTime }
+const SNAP_FLASH_DURATION = 200; // ms
+
+/** Drop distance label state: shows how far a table moved after drag ends */
+let _dropLabel = null; // { x, y, text, startTime } in canvas px
+
 /** Freehand annotation drawing state */
 let _freehandPoints = null; // array of {x, y} in room-feet while drawing
 
@@ -370,9 +380,13 @@ canvas.addEventListener('mousemove', e => {
 
         let onTarget = false;
         let onTableCenter = false;
+        const prevHoveredTable = _hoveredTableId;
         if (!onRotateHandle) {
             const hit = hitTestAll({ mx, my, ppf, ox, oy, rw, rl, rx, ry, wt, cX, cY, c2X, c2Y, mpX, mpY, mp2X, mp2Y, dispOx, dispY, dispWidthPx, dispDepthPx, eqWidthPx, eqDepthPx, mainDeviceX, mainDeviceY, isHoriz });
             onTarget = hit.target;
+            // Track hovered table for highlight outline
+            _hoveredTableId = (hit.type === 'table' && hit.table && !state.annotateToolActive && !state.measureToolActive)
+                ? hit.table.id : null;
             if (hit.type === 'table' && hit.table) {
                 const t = hit.table;
                 const tcx = ox + t.x * ppf;
@@ -384,6 +398,8 @@ canvas.addEventListener('mousemove', e => {
                 onTableCenter = Math.abs(lx) <= t.width * ppf * 0.28 &&
                                 Math.abs(ly) <= t.length * ppf * 0.28;
             }
+        } else {
+            _hoveredTableId = null;
         }
 
         // Annotation hover tracking (for hover-only delete buttons)
@@ -468,7 +484,7 @@ canvas.addEventListener('mousemove', e => {
                 Math.abs(hoveredEquipment.x - newHover.x) > 2 || Math.abs(hoveredEquipment.y - newHover.y) > 2));
         hoveredEquipment = newHover;
 
-        if (hoverChanged || prevHoveredAnn !== _hoveredAnnotationId) {
+        if (hoverChanged || prevHoveredAnn !== _hoveredAnnotationId || prevHoveredTable !== _hoveredTableId) {
             scheduleRender();
         } else if (state.showViewAngle && (Math.abs(mousePos.x - _lastViewAngleX) > 2 || Math.abs(mousePos.y - _lastViewAngleY) > 2)) {
             _lastViewAngleX = mousePos.x; _lastViewAngleY = mousePos.y;
@@ -1851,9 +1867,18 @@ canvas.addEventListener('mousemove', e => {
             let nx = (newCX - ox) / ppf;
 
             // Apply snap-to-grid and alignment guides (Shift held = bypass snap)
+            const prevSnapKeys = snapGuides.map(g => g.axis + g.ft).join('|');
             snapGuides = [];
             if (state.showSnap && !e.shiftKey) {
                 [nx, nd] = _applyTableSnap(nx, nd, t);
+            }
+            // Flash new snap guides briefly for visual feedback
+            const newSnapKeys = snapGuides.map(g => g.axis + g.ft).join('|');
+            if (newSnapKeys && newSnapKeys !== prevSnapKeys) {
+                const now = performance.now();
+                for (const g of snapGuides) {
+                    _snapFlashGuides.push({ axis: g.axis, ft: g.ft, isAlign: g.isAlign, startTime: now });
+                }
             }
 
             // Detect wall boundary hits (before clamping)
@@ -2061,6 +2086,26 @@ canvas.addEventListener('mouseup', (e) => {
         _annotateHoverPx = null;
     }
 
+    // Show drop distance label if a table was dragged
+    if (drag.tableId !== null && drag.tableGhost) {
+        const t = state.tables.find(tbl => tbl.id === drag.tableId);
+        if (t) {
+            const dxFt = t.x - drag.tableGhost.x;
+            const dyFt = t.dist - drag.tableGhost.dist;
+            const distFt = Math.sqrt(dxFt * dxFt + dyFt * dyFt);
+            if (distFt >= 0.1) {
+                const { ox, ry, wt, ppf } = getTopDownLayout();
+                const tcx = ox + t.x * ppf;
+                const tcy = ry + wt + t.dist * ppf + (t.length * ppf) / 2;
+                const label = state.units === 'metric'
+                    ? (distFt * 0.3048).toFixed(2) + ' m'
+                    : distFt.toFixed(1) + ' ft';
+                _dropLabel = { x: tcx, y: tcy - t.length * ppf / 2 - 14, text: label, startTime: performance.now() };
+                scheduleRender();
+            }
+        }
+    }
+
     resetDrag();
     canvas.style.cursor = state.annotateToolActive ? 'crosshair' : (drag.spaceDown ? 'grab' : 'crosshair');
     serializeToHash();
@@ -2071,6 +2116,7 @@ canvas.addEventListener('mouseleave', () => {
     canvas.style.cursor = '';
     mousePos = { x: -9999, y: -9999 };
     _hoveredAnnotationId = null;
+    _hoveredTableId = null;
     if (hoveredEquipment) { hoveredEquipment = null; scheduleRender(); }
     if (state.showViewAngle) scheduleRender();
 });

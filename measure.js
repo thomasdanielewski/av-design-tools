@@ -20,6 +20,10 @@ function toggleMeasureTool() {
     const btn = DOM['measure-btn'];
     if (btn) btn.classList.toggle('active', state.measureToolActive);
     canvas.style.cursor = state.measureToolActive ? 'crosshair' : '';
+    // Auto-expand annotations section (which contains measurement controls)
+    if (state.measureToolActive) {
+        expandSidebarSection('cg-annotations');
+    }
     scheduleRender();
 }
 

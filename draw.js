@@ -812,7 +812,7 @@ function drawContextMenuButton(drawCtx, x, y, ppf) {
  * Draw the conference table in top-down view.
  */
 function drawTable(drawCtx, ox, ry, wallThick, ppf) {
-    // Ghost outline: show original position while dragging a table
+    // Ghost: show table at original position with low opacity while dragging
     if (drag.tableId !== null && drag.tableGhost) {
         const g = drag.tableGhost;
         const tl = g.length * ppf;
@@ -825,22 +825,23 @@ function drawTable(drawCtx, ox, ry, wallThick, ppf) {
         drawCtx.save();
         drawCtx.translate(tcx, tcy);
         drawCtx.rotate(angle);
-        drawCtx.globalAlpha = 0.35;
+        drawCtx.globalAlpha = 0.15;
+        drawCtx.fillStyle = cc().surface;
         drawCtx.strokeStyle = cc().tableStroke;
         drawCtx.lineWidth = 1.5;
         drawCtx.setLineDash([5, 4]);
 
         if (g.shape === 'rectangular') {
             roundRect(drawCtx, x0, y0, tw, tl, 6);
-            drawCtx.stroke();
+            drawCtx.fill(); drawCtx.stroke();
         } else if (g.shape === 'oval') {
             drawCtx.beginPath();
             drawCtx.ellipse(0, 0, tw / 2, tl / 2, 0, 0, Math.PI * 2);
-            drawCtx.stroke();
+            drawCtx.fill(); drawCtx.stroke();
         } else if (g.shape === 'circle') {
             drawCtx.beginPath();
             drawCtx.arc(0, 0, Math.min(tw, tl) / 2, 0, Math.PI * 2);
-            drawCtx.stroke();
+            drawCtx.fill(); drawCtx.stroke();
         } else if (g.shape === 'd-shape') {
             drawCtx.beginPath();
             drawCtx.moveTo(x0, y0);
@@ -848,7 +849,7 @@ function drawTable(drawCtx, ox, ry, wallThick, ppf) {
             drawCtx.lineTo(x0 + tw, y0 + tl - tw / 2);
             drawCtx.arc(0, y0 + tl - tw / 2, tw / 2, 0, Math.PI);
             drawCtx.lineTo(x0, y0);
-            drawCtx.stroke();
+            drawCtx.fill(); drawCtx.stroke();
         }
 
         drawCtx.setLineDash([]);
@@ -953,6 +954,35 @@ function drawTable(drawCtx, ox, ry, wallThick, ppf) {
             drawCtx.fillText(`${formatFtIn(t.length)} × ${formatFtIn(t.width)}`, 0, 0);
         } else {
             drawCtx.fillText(`T${t.id}`, 0, 0);
+        }
+
+        // ── Hover highlight: dashed outline when mouse is over a draggable table ──
+        const isHovered = _hoveredTableId === t.id && drag.tableId === null;
+        if (isHovered && !isSelected && !isMultiSelected) {
+            drawCtx.save();
+            drawCtx.globalAlpha = 0.3;
+            drawCtx.strokeStyle = cc().snapGuide; // brand-like blue
+            drawCtx.lineWidth = 2;
+            drawCtx.setLineDash([6, 4]);
+            const hi = 3; // inset offset for highlight
+            if (t.shape === 'rectangular') {
+                roundRect(drawCtx, x0 - hi, y0 - hi, tw + hi * 2, tl + hi * 2, 8);
+                drawCtx.stroke();
+            } else if (t.shape === 'oval') {
+                drawCtx.beginPath();
+                drawCtx.ellipse(0, 0, tw / 2 + hi, tl / 2 + hi, 0, 0, Math.PI * 2);
+                drawCtx.stroke();
+            } else if (t.shape === 'circle') {
+                drawCtx.beginPath();
+                drawCtx.arc(0, 0, Math.min(tw, tl) / 2 + hi, 0, Math.PI * 2);
+                drawCtx.stroke();
+            } else if (t.shape === 'd-shape') {
+                drawCtx.beginPath();
+                drawCtx.ellipse(0, 0, tw / 2 + hi, tl / 2 + hi, 0, 0, Math.PI * 2);
+                drawCtx.stroke();
+            }
+            drawCtx.setLineDash([]);
+            drawCtx.restore();
         }
 
         // ── Overlap warning: dashed border + ⚠ icon (no red fill) ──────
@@ -1637,6 +1667,83 @@ function drawSnapGuides(drawCtx, guides, rx, ry, rw, rl, wt) {
     }
     drawCtx.setLineDash([]);
     drawCtx.restore();
+}
+
+/**
+ * Draw fading snap-flash guide lines after a table snaps to grid.
+ * Reads from _snapFlashGuides (populated in drag.js).
+ */
+function drawSnapFlash(drawCtx, rx, ry, rw, rl, wt) {
+    if (!_snapFlashGuides || _snapFlashGuides.length === 0) return;
+    const now = performance.now();
+    let needsRerender = false;
+    drawCtx.save();
+    drawCtx.lineWidth = 1;
+    for (let i = _snapFlashGuides.length - 1; i >= 0; i--) {
+        const g = _snapFlashGuides[i];
+        const elapsed = now - g.startTime;
+        if (elapsed > SNAP_FLASH_DURATION) {
+            _snapFlashGuides.splice(i, 1);
+            continue;
+        }
+        needsRerender = true;
+        const alpha = 0.3 * (1 - elapsed / SNAP_FLASH_DURATION);
+        drawCtx.globalAlpha = alpha;
+        drawCtx.strokeStyle = cc().snapGuide;
+        drawCtx.setLineDash([4, 3]);
+        drawCtx.beginPath();
+        if (g.axis === 'x') {
+            const px = rx + g.ft * ppf_g;
+            drawCtx.moveTo(px, ry);
+            drawCtx.lineTo(px, ry + rl);
+        } else {
+            const py = ry + wt + g.ft * ppf_g;
+            drawCtx.moveTo(rx, py);
+            drawCtx.lineTo(rx + rw, py);
+        }
+        drawCtx.stroke();
+    }
+    drawCtx.setLineDash([]);
+    drawCtx.globalAlpha = 1.0;
+    drawCtx.restore();
+    if (needsRerender) scheduleRender();
+}
+
+/**
+ * Draw a temporary distance label near a table after drag ends.
+ * Reads from _dropLabel (set in drag.js mouseup).
+ */
+function drawDropLabel(drawCtx) {
+    if (!_dropLabel) return;
+    const now = performance.now();
+    const elapsed = now - _dropLabel.startTime;
+    const duration = 1000; // 1 second
+    if (elapsed > duration) {
+        _dropLabel = null;
+        return;
+    }
+    const alpha = 1 - elapsed / duration;
+    drawCtx.save();
+    drawCtx.globalAlpha = alpha;
+    drawCtx.font = `500 ${Math.max(10, ppf_g * 0.28)}px 'JetBrains Mono', monospace`;
+    drawCtx.textAlign = 'center';
+    drawCtx.textBaseline = 'bottom';
+    // Background pill
+    const text = _dropLabel.text;
+    const tm = drawCtx.measureText(text);
+    const pw = tm.width + 10;
+    const ph = 18;
+    const px = _dropLabel.x - pw / 2;
+    const py = _dropLabel.y - ph;
+    drawCtx.fillStyle = cc().viewPill;
+    roundRect(drawCtx, px, py, pw, ph, 4);
+    drawCtx.fill();
+    // Text
+    drawCtx.fillStyle = cc().label;
+    drawCtx.fillText(text, _dropLabel.x, _dropLabel.y - 3);
+    drawCtx.globalAlpha = 1.0;
+    drawCtx.restore();
+    scheduleRender(); // keep animating until faded
 }
 
 /**
@@ -2720,6 +2827,121 @@ function _drawAnnotationHandles(drawCtx, a, ppf) {
             drawCtx.fillRect(h.x - s, h.y - s, s * 2, s * 2);
             drawCtx.strokeRect(h.x - s, h.y - s, s * 2, s * 2);
         }
+    }
+
+    drawCtx.restore();
+}
+
+// ── Getting-Started Hint Overlay ──────────────────────────────
+
+/**
+ * Tiny 4-directional move cursor icon drawn at (cx, cy) with radius r.
+ * Used by drawGettingStartedHints.
+ */
+function _drawMoveIcon(drawCtx, cx, cy, r) {
+    const arm = r * 0.65;
+    const head = r * 0.55;
+
+    // Filled arrowheads in 4 cardinal directions
+    [
+        [0, -(arm + head), 0, -1],   // north: tip above, base at -arm
+        [0,  (arm + head), 0,  1],   // south
+        [-(arm + head), 0, -1,  0],  // west
+        [ (arm + head), 0,  1,  0],  // east
+    ].forEach(([tx, ty, dx, dy]) => {
+        // perp direction for base of arrowhead
+        const px = -dy, py = dx;
+        drawCtx.beginPath();
+        drawCtx.moveTo(cx + tx, cy + ty);
+        drawCtx.lineTo(cx + tx - dx * head + px * head * 0.5, cy + ty - dy * head + py * head * 0.5);
+        drawCtx.lineTo(cx + tx - dx * head - px * head * 0.5, cy + ty - dy * head - py * head * 0.5);
+        drawCtx.closePath();
+        drawCtx.fill();
+    });
+
+    // Cross lines between arrowheads
+    drawCtx.lineWidth = 1.0;
+    drawCtx.beginPath();
+    drawCtx.moveTo(cx - arm, cy); drawCtx.lineTo(cx + arm, cy);
+    drawCtx.moveTo(cx, cy - arm); drawCtx.lineTo(cx, cy + arm);
+    drawCtx.stroke();
+}
+
+/**
+ * Draw first-time onboarding hints on the canvas.
+ * Called from renderForeground() only when state is at factory defaults
+ * and state._hasInteracted is false.
+ *
+ * @param {CanvasRenderingContext2D} drawCtx
+ * @param {number} ox   - room centre X in canvas px
+ * @param {number} ry   - room top-left Y in canvas px
+ * @param {number} wallThick - wall thickness in px
+ * @param {number} ppf  - pixels per foot
+ * @param {number} rx   - room top-left X in canvas px
+ * @param {number} rw   - room width in px
+ * @param {number} rl   - room length in px
+ */
+function drawGettingStartedHints(drawCtx, ox, ry, wallThick, ppf, rx, rw, rl) {
+    const t = state.tables[0];
+    const tl_px = t.length * ppf;
+    const tw_px = t.width * ppf;
+    const tcx = ox + t.x * ppf;
+    const tcy = ry + wallThick + t.dist * ppf + tl_px / 2;
+    const col = cc().label;
+
+    drawCtx.save();
+    drawCtx.globalAlpha = 0.40;
+    drawCtx.fillStyle = col;
+    drawCtx.strokeStyle = col;
+
+    // ── Hint 1: Dashed bounding box around table ──────────────────────────
+    const pad = Math.max(8, ppf * 0.22);
+    drawCtx.lineWidth = 1.5;
+    drawCtx.setLineDash([5, 4]);
+    roundRect(drawCtx,
+        tcx - tw_px / 2 - pad,
+        tcy - tl_px / 2 - pad,
+        tw_px + pad * 2,
+        tl_px + pad * 2,
+        8);
+    drawCtx.stroke();
+    drawCtx.setLineDash([]);
+
+    // Move icon + "Drag to move" label below the dashed box
+    const labelSize = Math.max(10, Math.min(13, ppf * 0.38));
+    const iconR = Math.max(4, Math.min(7, ppf * 0.18));
+    const groupTop = tcy + tl_px / 2 + pad + 6;
+    const iconCY = groupTop + iconR;
+
+    _drawMoveIcon(drawCtx, tcx, iconCY, iconR);
+
+    drawCtx.font = `500 ${labelSize}px 'DM Sans', sans-serif`;
+    drawCtx.textAlign = 'center';
+    drawCtx.textBaseline = 'top';
+    drawCtx.fillText('Drag to move', tcx, iconCY + iconR + 4);
+
+    // ── Hint 2: Sidebar hint — rotated label in left margin ───────────────
+    const smallSize = Math.max(9, Math.min(11, ppf * 0.28));
+    // Only draw if there is enough left-margin space (at least font-height + 4px)
+    if (rx >= smallSize + 6) {
+        const marginCX = Math.max(smallSize / 2 + 2, rx / 2);
+        const marginCY = ry + rl / 2;
+        drawCtx.save();
+        drawCtx.translate(marginCX, marginCY);
+        drawCtx.rotate(-Math.PI / 2); // CCW: text reads bottom-to-top on screen
+        drawCtx.font = `500 ${smallSize}px 'DM Sans', sans-serif`;
+        drawCtx.textAlign = 'center';
+        drawCtx.textBaseline = 'middle';
+        drawCtx.fillText('Configure in sidebar \u2192', 0, 0);
+        drawCtx.restore();
+    }
+
+    // ── Hint 3: Meeting mode hint — label in top margin ───────────────────
+    if (ry >= smallSize + 4) {
+        drawCtx.font = `500 ${smallSize}px 'DM Sans', sans-serif`;
+        drawCtx.textAlign = 'center';
+        drawCtx.textBaseline = 'bottom';
+        drawCtx.fillText('\u2191 Try Meeting Mode to analyze coverage', ox, ry - 6);
     }
 
     drawCtx.restore();

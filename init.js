@@ -794,6 +794,9 @@ if (state.viewMode === 'top') {
         overlay.style.display = 'flex';
     }
 
+    // Expose for the Tour link in the shortcuts dialog
+    window._showOnboardingTour = showOnboarding;
+
     // Show on first visit
     if (!localStorage.getItem('av-planner-visited')) {
         showOnboarding();
@@ -804,9 +807,52 @@ if (state.viewMode === 'top') {
         if (e.target === overlay) hideOnboarding();
     });
 
+    // "Show me" buttons — dismiss overlay then navigate to the relevant section
+    overlay.querySelectorAll('.onboarding-show-me').forEach(btn => {
+        btn.addEventListener('click', () => {
+            hideOnboarding();
+            const sidebar = document.querySelector('.sidebar');
+            switch (btn.dataset.step) {
+                case 'room': {
+                    const cg = document.getElementById('cg-room');
+                    if (cg && cg.getAttribute('aria-expanded') !== 'true') expandGroup(cg);
+                    if (sidebar) sidebar.scrollTop = 0;
+                    break;
+                }
+                case 'equipment': {
+                    const cgDisplay = document.getElementById('cg-display');
+                    const cgEquip = document.getElementById('cg-equipment');
+                    if (cgDisplay && cgDisplay.getAttribute('aria-expanded') !== 'true') expandGroup(cgDisplay);
+                    if (cgEquip && cgEquip.getAttribute('aria-expanded') !== 'true') expandGroup(cgEquip);
+                    if (cgDisplay) cgDisplay.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    break;
+                }
+                case 'meeting': {
+                    const meetingBtn = document.getElementById('meeting-mode-btn');
+                    if (meetingBtn) meetingBtn.click();
+                    break;
+                }
+                case 'export': {
+                    const exportBtn = document.getElementById('download-btn');
+                    if (exportBtn) exportBtn.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    break;
+                }
+            }
+        });
+    });
+
     tipsBtn.addEventListener('click', () => {
         openShortcutHelp();
     });
+
+    // Tour button inside the shortcuts dialog
+    const tourBtn = document.getElementById('shortcut-tour-btn');
+    if (tourBtn) {
+        tourBtn.addEventListener('click', () => {
+            closeShortcutHelp();
+            showOnboarding();
+        });
+    }
 })();
 
 // ── Export preview modal ──────────────────────────────────────
@@ -957,3 +1003,111 @@ document.addEventListener('keydown', e => {
             return; // Don't preventDefault for unhandled keys
     }
 });
+
+// ── Sidebar icon-strip navigation ───────────────────────────
+(function initIconStrip() {
+    const strip = document.querySelector('.sidebar-icon-strip');
+    if (!strip) return;
+    const scroll = document.querySelector('.sidebar-scroll');
+    if (!scroll) return;
+    const btns = [...strip.querySelectorAll('.icon-strip-btn[data-nav-target]')];
+
+    // Map of target id → { btn, el }
+    const navItems = [];
+    btns.forEach(btn => {
+        const id = btn.dataset.navTarget;
+        const el = document.getElementById(id);
+        if (el) navItems.push({ btn, el, id });
+        else if (id === 'meeting-mode') navItems.push({ btn, el: null, id });
+    });
+
+    // Hide POV button when pov-controls is hidden
+    function syncPovVisibility() {
+        const povBtn = btns.find(b => b.dataset.navTarget === 'pov-controls');
+        const povEl = document.getElementById('pov-controls');
+        if (povBtn && povEl) {
+            if (povEl.style.display === 'none') povBtn.setAttribute('data-nav-hidden', '');
+            else povBtn.removeAttribute('data-nav-hidden');
+        }
+    }
+    syncPovVisibility();
+    // Re-check whenever view mode changes (MutationObserver on pov-controls style)
+    const povEl = document.getElementById('pov-controls');
+    if (povEl) {
+        new MutationObserver(syncPovVisibility).observe(povEl, { attributes: true, attributeFilter: ['style'] });
+    }
+
+    // Click handler: scroll to section, expand if collapsed, flash
+    strip.addEventListener('click', e => {
+        const btn = e.target.closest('.icon-strip-btn');
+        if (!btn) return;
+        const id = btn.dataset.navTarget;
+
+        // Meeting mode is a toggle, not a scroll target
+        if (id === 'meeting-mode') {
+            const meetingBtn = document.getElementById('meeting-mode-btn');
+            if (meetingBtn) meetingBtn.click();
+            return;
+        }
+
+        const el = document.getElementById(id);
+        if (!el) return;
+
+        // Expand if collapsed
+        if (el.getAttribute('aria-expanded') === 'false') {
+            expandGroup(el);
+        }
+
+        // Scroll into view within sidebar-scroll
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+        // Flash highlight
+        el.classList.remove('nav-flash');
+        void el.offsetWidth;
+        el.classList.add('nav-flash');
+        el.addEventListener('animationend', () => el.classList.remove('nav-flash'), { once: true });
+    });
+
+    // Intersection observer: highlight active section
+    const observerOpts = {
+        root: scroll,
+        rootMargin: '0px 0px -60% 0px',
+        threshold: 0
+    };
+
+    const observer = new IntersectionObserver(entries => {
+        entries.forEach(entry => {
+            const item = navItems.find(n => n.el === entry.target);
+            if (!item) return;
+            if (entry.isIntersecting) {
+                btns.forEach(b => b.classList.remove('active'));
+                item.btn.classList.add('active');
+            }
+        });
+    }, observerOpts);
+
+    navItems.forEach(item => {
+        if (item.el) observer.observe(item.el);
+    });
+
+    // Tooltip (appended to body to escape sidebar overflow:hidden)
+    const tip = document.createElement('div');
+    tip.className = 'icon-strip-tooltip';
+    tip.style.cssText = 'position:fixed;pointer-events:none;opacity:0;transition:opacity .15s;background:var(--bg-elevated);color:var(--text-primary);font-size:11px;font-family:var(--font-body);padding:4px 8px;border-radius:4px;border:1px solid var(--border-subtle);box-shadow:0 2px 8px rgba(0,0,0,.3);z-index:9999;white-space:nowrap';
+    document.body.appendChild(tip);
+
+    strip.addEventListener('pointerenter', e => {
+        const btn = e.target.closest('.icon-strip-btn');
+        if (!btn || !btn.dataset.tip) return;
+        const r = btn.getBoundingClientRect();
+        tip.textContent = btn.dataset.tip;
+        tip.style.opacity = '1';
+        tip.style.left = (r.right + 6) + 'px';
+        tip.style.top = (r.top + r.height / 2) + 'px';
+        tip.style.transform = 'translateY(-50%)';
+    }, true);
+
+    strip.addEventListener('pointerleave', e => {
+        if (e.target.closest('.icon-strip-btn')) tip.style.opacity = '0';
+    }, true);
+})();

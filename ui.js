@@ -2,6 +2,10 @@
 
 /** Set the active brand (neat / logitech) and rebuild the video bar dropdown */
 function setBrand(brand) {
+    // Snapshot companion state before reset to detect actual changes
+    const hadCompanions = state.includeCenter || state.includeDualCenter
+        || state.includeMicPod || state.includeDualMicPod;
+
     state.brand = brand;
 
     // Apply brand theme to body
@@ -20,6 +24,14 @@ function setBrand(brand) {
             b.classList.toggle('active', isActive);
             b.setAttribute('aria-pressed', isActive);
         });
+
+    // Update brand description
+    const descEl = DOM['brand-desc'];
+    if (descEl) {
+        descEl.textContent = brand === 'logitech'
+            ? 'Rally, Rally Bar, Rally Plus, RoomMate, Sight camera, Mic pods'
+            : 'Video bars (Bar Gen 2, Bar Pro), Board 50/Pro, Center camera, Mic pods';
+    }
 
     // Rebuild video bar <select> with brand-filtered options
     const sel = DOM['video-bar'];
@@ -41,6 +53,12 @@ function setBrand(brand) {
     state.includeMicPod = false;
     state.includeDualMicPod = false;
     if (DOM['micpod-mode']) DOM['micpod-mode'].value = 'none';
+
+    // Warn user if companions were reset (skip during init / history restore)
+    if (hadCompanions && !_suppressHistory) {
+        const label = brand === 'logitech' ? 'Logitech' : 'Neat';
+        showToast(`Switched to ${label}. Companion devices have been reset.`, 'warning');
+    }
 
     // Update companion label and mic pod visibility
     DOM['center-label'].textContent =
@@ -140,6 +158,26 @@ function setMountPos(p) {
     scheduleRender();
 }
 
+/** Show a temporary mode label overlay on the canvas */
+const _MODE_LABELS = {
+    top:     { text: 'Top-Down View', icon: '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="3" x2="9" y2="21"/></svg>' },
+    pov:     { text: 'Point of View',  icon: '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>' },
+    meeting: { text: 'Meeting Mode',   icon: '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>' },
+};
+function showModeLabel(mode) {
+    const el = document.getElementById('mode-label-toast');
+    if (!el) return;
+    const cfg = _MODE_LABELS[mode];
+    if (!cfg) return;
+    // Update content
+    document.getElementById('mode-label-icon').innerHTML = cfg.icon;
+    document.getElementById('mode-label-text').textContent = cfg.text;
+    // Restart animation by removing class, flushing layout, then re-adding
+    el.classList.remove('mode-label-toast--active');
+    void el.offsetWidth;
+    el.classList.add('mode-label-toast--active');
+}
+
 /** Switch between top-down and first-person POV */
 function setViewMode(m) {
     if (isAnimating()) return;
@@ -174,12 +212,26 @@ function setViewMode(m) {
         DOM['viewer-dist'].max = povDepth;
         DOM['viewer-offset'].min = -povWidth / 2;
         DOM['viewer-offset'].max = povWidth / 2;
+
+        // Auto-expand POV settings, collapse irrelevant overlays section
+        if (changed && !_suppressHistory) {
+            expandSidebarSection('pov-controls', { collapseIds: ['cg-overlays'] });
+        }
     } else {
         DOM['pov-controls'].style.display = 'none';
         DOM['cg-overlays'].style.display = 'block';
+
+        // Collapse POV settings when leaving POV mode
+        if (changed && !_suppressHistory) {
+            const povEl = document.getElementById('pov-controls');
+            if (povEl && povEl.getAttribute('aria-expanded') === 'true') collapseGroup(povEl);
+        }
     }
 
     if (!_suppressHistory) pushHistory('switched view');
+
+    // Show mode label on user-initiated view changes
+    if (changed && !_suppressHistory) showModeLabel(m);
 
     // Animated view transition (only on user-initiated changes, not undo/redo)
     if (changed && !_suppressHistory) {
@@ -317,6 +369,25 @@ function setUnits(u) {
 
 // ── Collapsible Control Groups ───────────────────────────────
 
+/** Programmatically expand a sidebar section by its element ID, optionally collapsing others */
+function expandSidebarSection(groupId, { collapseIds = [], scrollTo = true } = {}) {
+    // Collapse specified irrelevant sections
+    for (const id of collapseIds) {
+        const el = document.getElementById(id);
+        if (el && el.getAttribute('aria-expanded') === 'true') collapseGroup(el);
+    }
+    // Expand the target section
+    const target = document.getElementById(groupId);
+    if (!target) return;
+    if (target.getAttribute('aria-expanded') !== 'true') expandGroup(target);
+    if (scrollTo) {
+        // Slight delay to let expand animation start before scrolling
+        requestAnimationFrame(() => {
+            target.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        });
+    }
+}
+
 function collapseGroup(el) {
     // Move focus out of collapsing body to prevent focus trap
     const body = el.querySelector('.control-group-body');
@@ -453,6 +524,9 @@ function toggleMeetingMode() {
 
     state.meetingMode = !state.meetingMode;
 
+    // Show mode label
+    if (state.meetingMode) showModeLabel('meeting');
+
     // Toggle button active state
     const btn = DOM['meeting-mode-btn'];
     if (btn) btn.classList.toggle('active', state.meetingMode);
@@ -516,6 +590,13 @@ function toggleMeetingMode() {
     if (state.meetingMode) {
         updateFramingModeOptions();
         invalidateMeetingCache();
+    }
+
+    // Auto-expand overlays section (has meeting-related controls), collapse POV settings
+    if (!_suppressHistory) {
+        if (state.meetingMode) {
+            expandSidebarSection('cg-overlays', { collapseIds: ['pov-controls'] });
+        }
     }
 
     if (!_suppressHistory) pushHistory(state.meetingMode ? 'enabled meeting mode' : 'disabled meeting mode');

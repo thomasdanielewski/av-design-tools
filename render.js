@@ -267,6 +267,21 @@ function renderForeground(opts = {}) {
     if (drag.tableId !== null && state.showSnap && snapGuides.length > 0) {
         drawSnapGuides(ctx, snapGuides, rx, ry, rw, rl, wallThick);
     }
+    // Snap flash: fading grid lines near table after snap
+    drawSnapFlash(ctx, rx, ry, rw, rl, wallThick);
+    // Drop distance label: fading label after drag ends
+    drawDropLabel(ctx);
+    // ── Getting-started hints (visible only on first load, factory defaults) ──
+    if (!state._hasInteracted && !state.meetingMode &&
+        state.annotations.length === 0 && state.measurements.length === 0 &&
+        state.roomLength === 20 && state.roomWidth === 15 &&
+        state.tables.length === 1) {
+        const _t0 = state.tables[0];
+        if (_t0.x === 0 && _t0.dist === 4 && _t0.rotation === 0) {
+            drawGettingStartedHints(ctx, ox, ry, wallThick, ppf, rx, rw, rl);
+        }
+    }
+
     _renderTimings.tables = performance.now() - _tTables;
 
     // ── Sub-render: annotations + measurements ──

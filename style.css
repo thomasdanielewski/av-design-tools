@@ -292,7 +292,7 @@ body {
     background: var(--bg-panel);
     border-right: 1px solid var(--border-subtle);
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
     height: 100vh;
     height: 100dvh;
     overflow: hidden;
@@ -300,6 +300,14 @@ body {
     z-index: 10;
     container-type: inline-size;
     container-name: sidebar;
+}
+
+.sidebar-main {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
 }
 
 .sidebar-header {
@@ -378,6 +386,87 @@ body {
     padding: 0;
     scrollbar-width: thin;
     scrollbar-color: var(--scrollbar-thumb) transparent;
+}
+
+/* ── Sidebar Icon Strip ── */
+.sidebar-icon-strip {
+    width: 40px;
+    min-width: 40px;
+    background: var(--bg-base);
+    border-right: 1px solid var(--border-subtle);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 12px 0;
+    gap: 4px;
+    overflow: visible;
+    flex-shrink: 0;
+    z-index: 20;
+}
+
+.icon-strip-btn {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    background: transparent;
+    color: var(--text-tertiary);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: color 0.15s var(--ease-out), background 0.15s var(--ease-out);
+    position: relative;
+    flex-shrink: 0;
+}
+
+.icon-strip-btn svg {
+    width: 18px;
+    height: 18px;
+}
+
+.icon-strip-btn:hover {
+    color: var(--text-primary);
+    background: var(--bg-hover);
+}
+
+.icon-strip-btn.active {
+    color: var(--brand);
+    background: var(--brand-dim);
+}
+
+.icon-strip-btn.active::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 6px;
+    bottom: 6px;
+    width: 2px;
+    border-radius: 1px;
+    background: var(--brand);
+}
+
+.icon-strip-btn[data-nav-hidden] {
+    display: none;
+}
+
+/* Tooltip: use JS-created element outside the sidebar to avoid overflow clipping */
+
+/* Flash animation for section highlight */
+@keyframes section-flash {
+    0%   { background-color: var(--brand-dim); }
+    100% { background-color: transparent; }
+}
+
+.control-group.nav-flash {
+    animation: section-flash 0.8s var(--ease-out);
+}
+
+/* Hide icon strip on small screens */
+@media (max-width: 767px) {
+    .sidebar-icon-strip {
+        display: none;
+    }
 }
 
 
@@ -643,6 +732,23 @@ body {
     max-height: 0;
     opacity: 0;
     pointer-events: none;
+}
+
+.group-desc {
+    color: var(--text-tertiary);
+    font-size: var(--text-xs);
+    margin-top: 0;
+    margin-bottom: 0;
+    line-height: 1.4;
+    overflow: hidden;
+    max-height: 2em;
+    opacity: 1;
+    transition: opacity 200ms var(--ease-out), max-height 200ms var(--ease-out);
+}
+
+.control-group[aria-expanded="true"] .group-desc {
+    opacity: 0;
+    max-height: 0;
 }
 
 
@@ -1079,6 +1185,14 @@ input[type="number"]::placeholder {
     border: 1px solid var(--border-subtle);
     border-radius: var(--radius-sm);
     padding: 3px;
+    margin-bottom: 0;
+}
+
+.brand-desc {
+    color: var(--text-tertiary);
+    font-size: var(--text-xs, 11px);
+    line-height: 1.4;
+    padding: 6px 8px 0;
     margin-bottom: var(--space-md);
 }
 
@@ -2203,6 +2317,61 @@ body.animating #fg-canvas {
     transition: opacity 0.35s ease, transform 0.35s ease;
 }
 
+/* ── Mode label toast (view/meeting mode indicator) ─────────── */
+.mode-label-toast {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: rgba(30, 30, 34, 0.9);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #fff;
+    font-size: var(--text-xl);
+    font-family: var(--font-display);
+    font-weight: 500;
+    letter-spacing: 0.01em;
+    padding: 14px 28px;
+    border-radius: 16px;
+    pointer-events: none;
+    opacity: 0;
+    white-space: nowrap;
+    z-index: 100;
+    backdrop-filter: blur(12px) saturate(1.2);
+    -webkit-backdrop-filter: blur(12px) saturate(1.2);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+}
+
+.mode-label-toast--active {
+    animation: modeLabelIn 0.2s ease forwards, modeLabelOut 0.5s ease 1.5s forwards;
+}
+
+@keyframes modeLabelIn {
+    from { opacity: 0; transform: translate(-50%, -50%) scale(0.92); }
+    to   { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+
+@keyframes modeLabelOut {
+    from { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+    to   { opacity: 0; transform: translate(-50%, -50%) scale(1.04); }
+}
+
+.mode-label-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    opacity: 0.85;
+}
+
+.mode-label-icon svg {
+    width: 100%;
+    height: 100%;
+}
+
 /* ── Undo / redo button click-pulse ─────────────────────────── */
 @keyframes undoBtnPulse {
     0%, 20% { background-color: var(--brand-dim); }
@@ -2898,6 +3067,36 @@ body.animating #fg-canvas {
     visibility: visible;
     opacity: 1;
     transform: translateX(-50%) translateY(0);
+}
+
+/* Toolbar variant — appears below the button, no left margin */
+.toolbar-tooltip {
+    margin-left: 0;
+}
+
+.toolbar-tooltip .tooltip-text {
+    bottom: auto;
+    top: calc(100% + 8px);
+    transform: translateX(-50%) translateY(-6px);
+    width: 220px;
+}
+
+.toolbar-tooltip:hover .tooltip-text,
+.toolbar-tooltip:focus-within .tooltip-text,
+.toolbar-tooltip:focus .tooltip-text {
+    transform: translateX(-50%) translateY(0);
+}
+
+.tooltip-text kbd {
+    display: inline-block;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-default);
+    border-radius: 4px;
+    padding: 1px 5px;
+    font-family: var(--font-mono, monospace);
+    font-size: 0.8em;
+    color: var(--text-secondary);
+    margin-left: 4px;
 }
 
 
@@ -3974,14 +4173,14 @@ select:focus-visible {
    ONBOARDING OVERLAY
    ══════════════════════════════════════════════════════════════ */
 .onboarding-overlay {
-    position: absolute;
+    position: fixed;
     inset: 0;
     display: flex;
     align-items: center;
     justify-content: center;
     backdrop-filter: var(--glass-blur);
-    z-index: 100;
-    background: rgba(0, 0, 0, 0.3);
+    z-index: 1000;
+    background: rgba(0, 0, 0, 0.45);
     animation: onboarding-fade-in 0.3s var(--ease-out);
 }
 
@@ -3995,8 +4194,8 @@ select:focus-visible {
     border: 1px solid var(--border-default);
     border-radius: var(--radius);
     padding: var(--space-lg);
-    max-width: 360px;
-    width: 90%;
+    max-width: 480px;
+    width: 92%;
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
     text-align: center;
 }
@@ -4006,42 +4205,110 @@ select:focus-visible {
     font-size: 20px;
     font-weight: 600;
     color: var(--text-primary);
+    margin: 0 0 4px 0;
+}
+
+.onboarding-subtitle {
+    font-size: var(--text-sm);
+    color: var(--text-muted);
     margin: 0 0 var(--space-md) 0;
 }
 
-.onboarding-tips {
+/* ── Step list ── */
+.onboarding-steps {
     list-style: none;
     padding: 0;
     margin: 0 0 var(--space-lg) 0;
     text-align: left;
 }
 
-.onboarding-tips li {
-    font-size: var(--text-base);
-    color: var(--text-secondary);
-    padding: 6px 0;
+.onboarding-step {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 0;
     border-bottom: 1px solid var(--border-subtle);
 }
 
-.onboarding-tips li:last-child {
+.onboarding-step:last-child {
     border-bottom: none;
 }
 
-.onboarding-tips li::before {
-    content: '·  ';
-    color: var(--accent);
+.onboarding-step-num {
+    flex-shrink: 0;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: var(--brand);
+    color: #fff;
+    font-family: var(--font-display);
+    font-size: 11px;
     font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
 }
 
-.onboarding-tips kbd {
-    display: inline-block;
-    padding: 1px 6px;
-    font-family: var(--font-mono);
-    font-size: var(--text-xs);
-    background: var(--bg-input);
-    border: 1px solid var(--border-default);
-    border-radius: var(--radius-xs);
+.onboarding-step-body {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+    min-width: 0;
+}
+
+.onboarding-step-icon {
+    flex-shrink: 0;
+    font-size: 15px;
+    color: var(--text-muted);
+    width: 18px;
+    text-align: center;
+}
+
+.onboarding-step-text {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    min-width: 0;
+}
+
+.onboarding-step-text strong {
+    font-size: var(--text-base);
+    font-weight: 600;
     color: var(--text-primary);
+    white-space: nowrap;
+}
+
+.onboarding-step-text span {
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.onboarding-show-me {
+    flex-shrink: 0;
+    background: none;
+    border: none;
+    padding: 2px 4px;
+    font-size: var(--text-xs);
+    font-family: var(--font-display);
+    color: var(--brand);
+    cursor: pointer;
+    border-radius: var(--radius-xs);
+    transition: opacity 0.15s var(--ease-out);
+    white-space: nowrap;
+}
+
+.onboarding-show-me:hover {
+    opacity: 0.75;
+    text-decoration: underline;
+}
+
+.onboarding-show-me:active {
+    opacity: 0.5;
 }
 
 .onboarding-dismiss {
@@ -4248,13 +4515,20 @@ select:focus-visible {
     flex-shrink: 0;
 }
 
-.shortcut-contact {
+.shortcut-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-md);
     margin: var(--space-lg) 0 0;
     padding-top: var(--space-md);
     border-top: 1px solid var(--border-subtle);
+}
+
+.shortcut-contact {
     font-size: var(--text-sm);
     color: var(--text-tertiary);
-    text-align: center;
+    margin: 0;
 }
 
 .shortcut-contact a {
@@ -4264,6 +4538,30 @@ select:focus-visible {
 
 .shortcut-contact a:hover {
     text-decoration: underline;
+}
+
+.shortcut-tour-btn {
+    flex-shrink: 0;
+    background: none;
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-sm);
+    padding: 4px 10px;
+    font-size: var(--text-xs);
+    font-family: var(--font-display);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.15s var(--ease-out);
+    white-space: nowrap;
+}
+
+.shortcut-tour-btn:hover {
+    border-color: var(--brand);
+    color: var(--brand);
+    background: var(--bg-hover);
+}
+
+.shortcut-tour-btn:active {
+    transform: scale(0.97);
 }
 
 

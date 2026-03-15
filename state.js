@@ -39,7 +39,9 @@ const state = {
     meetingFramingMode: 'group',   // group | individual | speaker | grid
     meetingShowBlindSpots: true,
     meetingShowSeatStatus: true,
-    meetingCameraZoneDepth: 1.0    // fraction of cameraRange for framing boundary
+    meetingCameraZoneDepth: 1.0,   // fraction of cameraRange for framing boundary
+    // Getting-started hint: set to true on first user interaction, hides onboarding hints
+    _hasInteracted: false
 };
 
 // ── Undo / Redo ──────────────────────────────────────────────
@@ -76,11 +78,15 @@ function debouncedAutoSave() {
 }
 
 function snapshotState() {
-    return typeof structuredClone === 'function' ? structuredClone(state) : JSON.parse(JSON.stringify(state));
+    const snap = typeof structuredClone === 'function' ? structuredClone(state) : JSON.parse(JSON.stringify(state));
+    delete snap._hasInteracted; // transient flag — not part of undo/autosave state
+    return snap;
 }
 
 function pushHistory(desc = '') {
     if (_suppressHistory) return;
+    // Mark first real user interaction (not the initial baseline snapshot)
+    if (history.length > 0) state._hasInteracted = true;
     // Trim any redo branch
     if (historyIndex < history.length - 1) {
         history.splice(historyIndex + 1);
@@ -118,6 +124,7 @@ function renderHistoryPanel() {
 function applyHistorySnapshot(entry) {
     _suppressHistory = true;
     Object.assign(state, entry.snap);
+    state._hasInteracted = true; // undo/redo is itself an interaction — keep hints hidden
     syncUIFromState();
     _suppressHistory = false;
     clearTimeout(_historyDebounceTimer);

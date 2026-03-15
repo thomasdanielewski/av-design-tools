@@ -115,7 +115,9 @@
       "Bash(find . -maxdepth 1 -name \"*.js\" -type f -exec wc -l {} +)",
       "Bash(grep -n \"meeting-camera-preview.*display\\\\|display.*meeting-camera\\\\|meeting.*preview.*style.display\" /c/Users/Thomas/Documents/GitHub/av-design-tools/*.js)",
       "Bash(grep -n \"const HASH_KEYS\\\\|const EQUIPMENT\" *.js)",
-      "Bash(grep -n \"^const DOM\\\\|^let DOM\" *.js)"
+      "Bash(grep -n \"^const DOM\\\\|^let DOM\" *.js)",
+      "Bash(grep -E \"^//|^/\\\\*|^function|^const.*=\" /c/Users/Thomas/Documents/GitHub/av-design-tools/render.js)",
+      "Bash(grep -E \"\\\\.js$|\\\\.json$|\\\\.html$|\\\\.css$\")"
     ]
   }
 }
